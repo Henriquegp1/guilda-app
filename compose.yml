@@ -1,0 +1,82 @@
+# Pilha completa do EBS. Sobe com:  docker compose up -d
+#
+# O Caddy resolve o HTTPS sozinho (Let's Encrypt) porque a Twitch recusa EBS em
+# HTTP — e certificado é a parte que mais atrasa esse tipo de subida.
+
+services:
+  db:
+    image: postgres:18-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?defina no .env}
+      POSTGRES_DB: twitch_guilds
+      # UTF8 explícito: no padrão do host os comentários com acento das
+      # migrações quebram com "22P05 untranslatable character".
+      POSTGRES_INITDB_ARGS: '--encoding=UTF8 --locale=C'
+    volumes:
+      - db:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres -d twitch_guilds']
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  redis:
+    image: redis:8-alpine
+    restart: unless-stopped
+    command: ['redis-server', '--save', '', '--appendonly', 'no']
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  # Roda as migrações e sai. O EBS só sobe depois que este termina bem, então
+  # nunca há servidor atendendo contra schema velho.
+  migrate:
+    build: .
+    restart: 'no'
+    command: ['node', 'src/core/migrate.js']
+    environment:
+      DATABASE_URL: postgres://postgres:${POSTGRES_PASSWORD}@db:5432/twitch_guilds
+    depends_on:
+      db:
+        condition: service_healthy
+
+  ebs:
+    build: .
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgres://postgres:${POSTGRES_PASSWORD}@db:5432/twitch_guilds
+      REDIS_URL: redis://redis:6379
+      TWITCH_EXT_SECRET: ${TWITCH_EXT_SECRET:?segredo da extensão, em base64}
+      ANNOUNCE_ENC_KEY: ${ANNOUNCE_ENC_KEY:?32 bytes em hex}
+      # Só precisa quando houver origem fora de *.ext-twitch.tv (o painel de
+      # testes local, por exemplo). Em produção fica vazio.
+      CORS_ORIGINS: ${CORS_ORIGINS:-}
+      PORT: 3000
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - '80:80'
+      - '443:443'
+    environment:
+      DOMINIO: ${DOMINIO:?domínio do EBS, ex. guilds.seucanal.com}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - ebs
+
+volumes:
+  db:
+  caddy_data:
+  caddy_config:

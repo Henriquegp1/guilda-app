@@ -1,0 +1,25 @@
+node_modules/
+
+# Segredos. `.env.example` e `.env.deploy.example` continuam versionados.
+.env
+.env.*
+!.env.example
+!.env.deploy.example
+
+# Build e artefatos
+frontend/build/
+frontend/.svelte-kit/
+frontend/extensao.zip
+
+# Capturas de crítica visual: regeradas com `npm run olhar` e `node scripts/telas.js`
+.olhar/
+.telas/
+frontend/.olhar/
+frontend/.telas/
+
+# Docker
+caddy_data/
+caddy_config/
+
+.DS_Store
+Thumbs.db

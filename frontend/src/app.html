@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="pt-BR">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<meta name="text-scale" content="scale" />
+		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+		<link
+			rel="stylesheet"
+			href="https://fonts.googleapis.com/css2?family=Grenze:wght@500;600&family=Archivo:wght@400;500;600&display=swap"
+		/>
+		<!--
+			Cria window.Twitch.ext. É o único script externo que a CSP da Twitch
+			permite além de Google Fonts e Analytics, e sem ele não há autenticação
+			nem Bits. Precisa vir antes do bundle.
+		-->
+		<script src="https://extension-files.twitch.tv/helper/v1/twitch-ext.min.js"></script>
+		%sveltekit.head%
+	</head>
+	<body data-sveltekit-preload-data="hover">
+		<div id="svelte-root" style="display: contents">%sveltekit.body%</div>
+	</body>
+</html>

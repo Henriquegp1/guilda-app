@@ -1,0 +1,20 @@
+# HTTPS automático via Let's Encrypt. A Twitch recusa EBS em HTTP, e
+# `connect-src` casa esquema: declarar https e servir http bloqueia em silêncio.
+{$DOMINIO} {
+	encode zstd gzip
+
+	# O /health não precisa passar pelo log de acesso.
+	@health path /health
+	handle @health {
+		reverse_proxy ebs:3000
+	}
+
+	handle {
+		reverse_proxy ebs:3000
+	}
+
+	log {
+		output stdout
+		format console
+	}
+}

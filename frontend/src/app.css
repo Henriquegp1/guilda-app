@@ -1,0 +1,96 @@
+/* Tokens de docs/DESIGN.md. Tinturas heráldicas, não tema escuro genérico. */
+
+:root {
+	--sable: #16121c;
+	--sable-2: #221a2b;
+	--or: #c8a02e;
+	--argent: #e6e1ee;
+	--gules: #a63232;
+	--vert: #3f7d5c;
+
+	/* Da Twitch, não nossa: só ação da plataforma (Bits, identidade). */
+	--purpure: #9146ff;
+
+	--argent-fraco: #9a93a8;
+	--borda: #322942;
+
+	--display: 'Grenze', Georgia, serif;
+	--texto:
+		'Archivo', system-ui, -apple-system, 'Segoe UI', sans-serif;
+
+	--px: 12px; /* padding lateral: acima dos 10px que a Twitch recomenda */
+	--cauda: 22px; /* profundidade da cauda de andorinha */
+}
+
+* {
+	box-sizing: border-box;
+}
+
+html,
+body {
+	margin: 0;
+	background: transparent; /* a Twitch pinta o próprio fundo atrás do iframe */
+	color: var(--argent);
+	font-family: var(--texto);
+	font-size: 13px;
+	line-height: 1.45;
+	-webkit-font-smoothing: antialiased;
+}
+
+/* Números não podem dançar: placar e posição atualizam ao vivo. */
+.num {
+	font-variant-numeric: tabular-nums;
+}
+
+h1,
+h2,
+h3 {
+	font-family: var(--display);
+	font-weight: 600;
+	margin: 0;
+	letter-spacing: 0.01em;
+}
+
+button {
+	font: inherit;
+	color: inherit;
+	cursor: pointer;
+	border: 1px solid var(--borda);
+	background: var(--sable-2);
+	border-radius: 2px;
+	padding: 9px 12px;
+	min-height: 40px;
+	transition: border-color 0.15s;
+}
+
+button:hover:not(:disabled) {
+	border-color: var(--or);
+}
+
+button:disabled {
+	opacity: 0.45;
+	cursor: default;
+}
+
+/* Foco sempre visível — piso de qualidade, não enfeite. */
+:focus-visible {
+	outline: 2px solid var(--or);
+	outline-offset: 2px;
+}
+
+/* Ação da Twitch (Bits, identidade) usa a cor da Twitch. Só ela. */
+button.twitch {
+	background: var(--purpure);
+	border-color: var(--purpure);
+	color: #fff;
+	font-weight: 600;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	*,
+	*::before,
+	*::after {
+		animation-duration: 0.01ms !important;
+		transition-duration: 0.01ms !important;
+	}
+}

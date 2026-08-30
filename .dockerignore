@@ -1,0 +1,12 @@
+node_modules
+frontend
+test
+docs
+.olhar
+.telas
+.env
+.git
+*.md
+Dockerfile
+compose.yml
+Caddyfile
