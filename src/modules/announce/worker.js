@@ -89,7 +89,8 @@ export function varsFromEvent (row) {
   const p = row.payload ?? {}
   const extra = PT[row.type]?.(p) ?? {}
   const vars = {
-    guilda: row.guild_name, tag: row.guild_tag,
+    guilda: row.guild_name ?? p.guilda ?? p.name ?? null,
+    tag: row.guild_tag ?? p.tag ?? null,
     lider: p.lider ?? p.leader_name ?? null,
     nivel: row.guild_level, prestigio: row.guild_prestige,
     membros: row.member_count, canal: row.channel_name,

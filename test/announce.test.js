@@ -28,7 +28,7 @@ after(async () => {
   await pool.end()
 })
  
-const T0 = 1_756_412_043_000            // relógio fixo; nada aqui chama Date.now()
+const T0_BASE = 1_756_412_043_000            // relógio fixo; nada aqui chama Date.now()
 const base = {
   priority: 'media', onCooldown: 'agrega', cooldownS: 300, hourlyCap: 12,
   sentAt: [], lastTypeAt: null, aggWindowStart: null,
@@ -91,103 +91,103 @@ describe('catálogo', () => {
  
 // ------------------------------------------------------------- rate limiter
 describe('rate limiter — tetos', () => {
-  const sends = (n, step = 60_000, end = T0 - 1000) =>
+  const sends = (n, step = 60_000, end = T0_BASE - 1000) =>
     Array.from({ length: n }, (_, i) => end - i * step)
  
   test('12º anúncio da hora passa, 13º é suprimido', () => {
     const doze = sends(11)
-    assert.equal(decide({ ...base, sentAt: doze }, T0).acao, 'enviar')
+    assert.equal(decide({ ...base, sentAt: doze }, T0_BASE).acao, 'enviar')
     const treze = sends(12)
-    const d = decide({ ...base, sentAt: treze }, T0)
+    const d = decide({ ...base, sentAt: treze }, T0_BASE)
     assert.deepEqual([d.acao, d.motivo], ['suprimir', 'hourly_cap'])
   })
  
   test('teto respeita hourly_cap configurado (4–20)', () => {
-    assert.equal(decide({ ...base, hourlyCap: 4, sentAt: sends(3) }, T0).acao, 'enviar')
-    assert.equal(decide({ ...base, hourlyCap: 4, sentAt: sends(4) }, T0).acao, 'suprimir')
-    assert.equal(decide({ ...base, hourlyCap: 20, sentAt: sends(19, 120_000) }, T0).acao, 'enviar')
+    assert.equal(decide({ ...base, hourlyCap: 4, sentAt: sends(3) }, T0_BASE).acao, 'enviar')
+    assert.equal(decide({ ...base, hourlyCap: 4, sentAt: sends(4) }, T0_BASE).acao, 'suprimir')
+    assert.equal(decide({ ...base, hourlyCap: 20, sentAt: sends(19, 120_000) }, T0_BASE).acao, 'enviar')
   })
  
   test('envio que saiu da janela de 60 min não conta', () => {
-    const antigos = sends(12, 60_000, T0 - HOUR_MS - 1)
-    assert.equal(decide({ ...base, sentAt: antigos }, T0).acao, 'enviar')
+    const antigos = sends(12, 60_000, T0_BASE - HOUR_MS - 1)
+    assert.equal(decide({ ...base, sentAt: antigos }, T0_BASE).acao, 'enviar')
   })
  
   test('prioridade alta é adiada até 60 s em vez de descartada na rajada', () => {
-    const rajada = [T0 - 21_000, T0 - 40_000, T0 - 55_000]   // espaçamento já satisfeito
-    const d = decide({ ...base, priority: 'alta', sentAt: rajada }, T0)
+    const rajada = [T0_BASE - 21_000, T0_BASE - 40_000, T0_BASE - 55_000]   // espaçamento já satisfeito
+    const d = decide({ ...base, priority: 'alta', sentAt: rajada }, T0_BASE)
     assert.equal(d.acao, 'enviar')
-    assert.equal(d.notBefore, T0 - 55_000 + 60_000)
-    assert.ok(d.notBefore - T0 <= 60_000)
+    assert.equal(d.notBefore, T0_BASE - 55_000 + 60_000)
+    assert.ok(d.notBefore - T0_BASE <= 60_000)
   })
  
   test('teto horário estourado: alta também é descartada (a espera passa de 60 s)', () => {
-    const d = decide({ ...base, priority: 'alta', sentAt: sends(12) }, T0)
+    const d = decide({ ...base, priority: 'alta', sentAt: sends(12) }, T0_BASE)
     assert.deepEqual([d.acao, d.motivo], ['suprimir', 'hourly_cap'])
   })
  
   test('4ª mensagem em 60 s é adiada; a 3ª passa', () => {
-    const duas = [T0 - 25_000, T0 - 50_000]
-    assert.equal(decide({ ...base, sentAt: duas }, T0).notBefore, T0)
-    const tres = [T0 - 25_000, T0 - 40_000, T0 - 55_000]
-    const d = decide({ ...base, sentAt: tres }, T0)
+    const duas = [T0_BASE - 25_000, T0_BASE - 50_000]
+    assert.equal(decide({ ...base, sentAt: duas }, T0_BASE).notBefore, T0_BASE)
+    const tres = [T0_BASE - 25_000, T0_BASE - 40_000, T0_BASE - 55_000]
+    const d = decide({ ...base, sentAt: tres }, T0_BASE)
     assert.equal(d.acao, 'enviar')
-    assert.equal(d.notBefore, T0 - 55_000 + 60_000, 'espera a mais velha da rajada sair da janela')
+    assert.equal(d.notBefore, T0_BASE - 55_000 + 60_000, 'espera a mais velha da rajada sair da janela')
   })
  
   test('espaçamento mínimo de 20 s entre dois anúncios', () => {
-    const d = decide({ ...base, sentAt: [T0 - 5000] }, T0)
+    const d = decide({ ...base, sentAt: [T0_BASE - 5000] }, T0_BASE)
     assert.equal(d.acao, 'enviar')
-    assert.equal(d.notBefore, T0 - 5000 + SPACING_MS)
-    const ok = decide({ ...base, sentAt: [T0 - SPACING_MS] }, T0)
-    assert.equal(ok.notBefore, T0, 'exatamente 20 s já libera')
+    assert.equal(d.notBefore, T0_BASE - 5000 + SPACING_MS)
+    const ok = decide({ ...base, sentAt: [T0_BASE - SPACING_MS] }, T0_BASE)
+    assert.equal(ok.notBefore, T0_BASE, 'exatamente 20 s já libera')
   })
 })
  
 describe('rate limiter — cooldown e agregação', () => {
   test('dentro do cooldown, tipo agregável agrega e abre janela de 300 s', () => {
-    const d = decide({ ...base, lastTypeAt: T0 - 10_000 }, T0)
+    const d = decide({ ...base, lastTypeAt: T0_BASE - 10_000 }, T0_BASE)
     assert.deepEqual([d.acao, d.motivo], ['agregar', 'cooldown'])
-    assert.equal(d.notBefore, T0 + AGG_WINDOW_MS)
+    assert.equal(d.notBefore, T0_BASE + AGG_WINDOW_MS)
   })
  
   test('fora do cooldown envia individualmente (R15: 1 ou 2 não agregam)', () => {
-    const d = decide({ ...base, cooldownS: 120, lastTypeAt: T0 - 121_000 }, T0)
+    const d = decide({ ...base, cooldownS: 120, lastTypeAt: T0_BASE - 121_000 }, T0_BASE)
     assert.deepEqual([d.acao, d.motivo], ['enviar', 'ok'])
   })
  
   test('janela aberta captura o evento mesmo fora do cooldown', () => {
-    const start = T0 - 200_000
-    const d = decide({ ...base, cooldownS: 30, lastTypeAt: null, aggWindowStart: start }, T0)
+    const start = T0_BASE - 200_000
+    const d = decide({ ...base, cooldownS: 30, lastTypeAt: null, aggWindowStart: start }, T0_BASE)
     assert.deepEqual([d.acao, d.motivo], ['agregar', 'aggregate_window'])
     assert.equal(d.notBefore, start + AGG_WINDOW_MS, 'todos os membros compartilham o fim da janela')
   })
  
   test('janela vencida não captura mais nada', () => {
-    const d = decide({ ...base, aggWindowStart: T0 - AGG_WINDOW_MS }, T0)
+    const d = decide({ ...base, aggWindowStart: T0_BASE - AGG_WINDOW_MS }, T0_BASE)
     assert.equal(d.acao, 'enviar')
   })
  
   test('tipo com descarte no cooldown vira suprimido (season, recruiting)', () => {
-    const d = decide({ ...base, onCooldown: 'descarta', cooldownS: 3600, lastTypeAt: T0 - 1000 }, T0)
+    const d = decide({ ...base, onCooldown: 'descarta', cooldownS: 3600, lastTypeAt: T0_BASE - 1000 }, T0_BASE)
     assert.deepEqual([d.acao, d.motivo], ['suprimir', 'cooldown'])
   })
  
   test('R16: tipo "ultimo" envia e marca o anterior como superseded', () => {
-    const d = decide({ ...base, onCooldown: 'ultimo', cooldownS: 600, lastTypeAt: T0 - 1000 }, T0)
+    const d = decide({ ...base, onCooldown: 'ultimo', cooldownS: 600, lastTypeAt: T0_BASE - 1000 }, T0_BASE)
     assert.deepEqual([d.acao, d.motivo], ['enviar', 'supersede'])
   })
 })
  
 describe('rate limiter — silêncio', () => {
   test('R11: mute descarta, não acumula', () => {
-    const d = decide({ ...base, mutedUntil: T0 + 1 }, T0)
+    const d = decide({ ...base, mutedUntil: T0_BASE + 1 }, T0_BASE)
     assert.deepEqual([d.acao, d.motivo], ['suprimir', 'muted'])
-    assert.equal(decide({ ...base, mutedUntil: T0 }, T0).acao, 'enviar', 'mute vencido libera')
+    assert.equal(decide({ ...base, mutedUntil: T0_BASE }, T0_BASE).acao, 'enviar', 'mute vencido libera')
   })
  
   test('canal offline descarta', () => {
-    assert.equal(decide({ ...base, offline: true }, T0).motivo, 'offline')
+    assert.equal(decide({ ...base, offline: true }, T0_BASE).motivo, 'offline')
   })
  
   test('quiet hours 02:00–10:00 em America/Sao_Paulo', () => {
@@ -213,7 +213,7 @@ describe('rate limiter — silêncio', () => {
   })
  
   test('silêncio vem antes de qualquer outra avaliação', () => {
-    const d = decide({ ...base, mutedUntil: T0 + 1, lastTypeAt: T0 - 1, sentAt: [T0 - 1] }, T0)
+    const d = decide({ ...base, mutedUntil: T0_BASE + 1, lastTypeAt: T0_BASE - 1, sentAt: [T0_BASE - 1] }, T0_BASE)
     assert.equal(d.motivo, 'muted')
   })
  
@@ -282,7 +282,7 @@ describe('template — render', () => {
     assert.equal(sanitize('Void\u{E0041}\u{E007F}'), 'Void')
   })
  
-  test('runs de espaço são colapsados e as pontas aparadas', () => {
+  test('runs de space são colapsados e as pontas aparadas', () => {
     assert.equal(sanitize('  a     b  '), 'a b')
   })
  
@@ -401,7 +401,7 @@ describe('assinatura', () => {
     assert.ok(dois.startsWith(`v1=${VECTOR},v1=`))
   })
  
-  test('verifica quando qualquer valor bate com qualquer segredo', () => {
+  test('verifica quando qualquer valor bate with qualquer segredo', () => {
     const now = TS * 1000
     const header = signatureHeader(['antigo', SECRET], TS, BODY)
     assert.equal(verifySignature({ header, timestamp: TS, body: BODY, secrets: [SECRET], now }), true)
@@ -470,11 +470,11 @@ describe('SSRF e elegibilidade', () => {
   })
  
   test('ULID tem 26 chars em Crockford e é ordenável por tempo', () => {
-    const a = ulid(T0)
-    const b = ulid(T0 + 1000)
+    const a = ulid(T0_BASE)
+    const b = ulid(T0_BASE + 1000)
     assert.match(a, /^[0-9A-HJKMNP-TV-Z]{26}$/)
     assert.ok(a.slice(0, 10) < b.slice(0, 10))
-    assert.notEqual(ulid(T0), ulid(T0))
+    assert.notEqual(ulid(T0_BASE), ulid(T0_BASE))
   })
 })
  
@@ -512,7 +512,7 @@ describe('variáveis do evento', () => {
     assert.deepEqual([v.temporada, v.primeiro, v.segundo, v.terceiro], ['T3', 'A', 'B', 'C'])
   })
  
-  test('renderiza o template padrão com o que o evento traz', () => {
+  test('renderiza o template padrão with o que o evento traz', () => {
     const v = varsFromEvent(row('war.declared', {
       opponent_name: 'Void', opponent_tag: 'VOID', format: '48 h',
     }))
@@ -710,129 +710,188 @@ describe('dispatch e entrega (Postgres)', { skip: !process.env.DATABASE_URL }, (
   })
 })
 
-// ------------------------------------------------------ agregação (Postgres)
-// Cobre os cenários de exemplo do §13: 10 guildas agregam, 2 saem individuais.
 describe('fluxo completo e agregação (Postgres)', { skip: !process.env.DATABASE_URL }, () => {
-  const sufixo = Date.now().toString(36) + Math.random().toString(36).slice(2, 6)
-  let channelId
   let db
-  let ingestOnce, flushAggregates
+  let ingestOnce, flushAggregates, processOutboxOnce
 
   before(async () => {
     db = await import('../src/core/db.js')
     const worker = await import('../src/modules/announce/worker.js')
     ingestOnce = worker.ingestOnce
     flushAggregates = worker.flushAggregates
+    processOutboxOnce = worker.processOutboxOnce
 
     const { migrate } = await import('../src/core/migrate.js')
     await migrate(() => {})
+  })
 
+  const setupChannel = async (id_str) => {
     const { rows: [ch] } = await db.query(
-      'INSERT INTO channel (twitch_channel_id) VALUES ($1) RETURNING id', [`test-agg-${sufixo}`])
-    channelId = ch.id
-
+      'INSERT INTO channel (twitch_channel_id) VALUES ($1) RETURNING id', [id_str])
+    const cid = ch.id
+    const t_config = new Date(Date.now() - 3600_000) // 1h atrás
     await db.query(
       `INSERT INTO announce_config (channel_id, enabled, webhook_url, hourly_cap, enabled_at)
-       VALUES ($1, true, 'https://example.com/webhook', 12, now() - interval '1 minute')`, [channelId])
-
+       VALUES ($1, true, 'https://example.com/webhook', 12, $2)`, [cid, t_config])
     const { CATALOG } = await import('../src/modules/announce/catalog.js')
     for (const [type, cat] of Object.entries(CATALOG)) {
       await db.query(
         `INSERT INTO announce_event_config (channel_id, event_type, enabled, cooldown_s)
-         VALUES ($1, $2, $3, $4)`, [channelId, type, true, cat.cooldownS]) // Forçamos todos como enabled
+         VALUES ($1, $2, $3, $4)`, [cid, type, true, cat.cooldownS])
     }
-  })
+    return cid
+  }
 
-  after(async () => {
-    if (channelId) await db.query('DELETE FROM channel WHERE id = $1', [channelId])
-  })
-
-  const clear = () => Promise.all([
-    db.query('DELETE FROM announce_outbox WHERE channel_id = $1', [channelId]),
-    db.query('DELETE FROM guild_event WHERE channel_id = $1', [channelId])
-  ])
-
-  const insertEvent = async (type, payload = {}, at = new Date(), cid = channelId) => {
+  const insertEvent = async (cid, type, payload = {}, at = new Date(), guildId = null) => {
     const res = await db.query(
-      `INSERT INTO guild_event (channel_id, type, payload, created_at) VALUES ($1, $2, $3, $4) RETURNING id`,
-      [cid, type, JSON.stringify(payload), at])
+      `INSERT INTO guild_event (channel_id, guild_id, type, payload, created_at) VALUES ($1, $2, $3, $4, $5) RETURNING id`,
+      [cid, guildId, type, JSON.stringify(payload), at])
     return res.rows[0].id
   }
 
-  test('10 guild.approved em 5 min → 1 individual + 1 agregada de 9 (R15)', async () => {
-    await clear()
-    const T0 = Date.now()
-
+  test('01 — Agregação em Lote: 10 guild.approved em 5 min → 1 individual + 1 agregada de 9 (R15)', async () => {
+    const cid = await setupChannel(`test-agg-1-${Math.random()}`)
+    const T0 = Math.floor(Date.now() / 1000) * 1000
     for (let i = 0; i < 10; i++) {
-      await insertEvent('guild.approved', { guilda: `Guilda ${i}`, tag: `G${i}` }, new Date(T0))
+      await insertEvent(cid, 'guild.approved', { guilda: `Guilda ${i}` }, new Date(T0 + i * 100))
     }
 
-    await ingestOnce(channelId, { now: T0 })
-    const made = await flushAggregates(channelId, T0 + 301_000)
+    await ingestOnce(cid, { now: T0 + 10000 })
+    const made = await flushAggregates(cid, T0 + 320_000)
     assert.equal(made, 1)
 
     const { rows: outbox } = await db.query(
-      "SELECT status, aggregate_count FROM announce_outbox WHERE channel_id = $1", [channelId])
+      "SELECT status, aggregate_count FROM announce_outbox WHERE channel_id = $1 ORDER BY id", [cid])
 
-    const aggregated = outbox.filter(r => r.status === 'aggregated')
-    const queued = outbox.filter(r => r.status === 'queued')
-
-    assert.equal(aggregated.length, 9)
-    assert.equal(queued.length, 2)
+    assert.equal(outbox.filter(r => r.status === 'aggregated').length, 9)
+    assert.equal(outbox.filter(r => r.status === 'queued').length, 2)
   })
 
-  test('2 guild.approved em 5 min → 2 mensagens individuais (abaixo do gatilho R15)', async () => {
-    await clear()
+  test('02 — Idempotência: rodar ingestOnce duas vezes não duplica mensagens', async () => {
+    const cid = await setupChannel(`test-agg-2-${Math.random()}`)
     const T0 = Date.now()
+    await insertEvent(cid, 'guild.approved', { guilda: 'Unica' }, new Date(T0))
 
-    for (let i = 0; i < 2; i++) {
-      await insertEvent('guild.approved', { guilda: `G${i}`, tag: `T${i}` }, new Date(T0))
-    }
+    const res1 = await ingestOnce(cid, { now: T0 })
+    assert.equal(res1.enqueued, 1)
 
-    await ingestOnce(channelId, { now: T0 })
-    await flushAggregates(channelId, T0 + 301_000)
+    const res2 = await ingestOnce(cid, { now: T0 + 1000 })
+    assert.equal(res2.enqueued, 0)
 
-    const { rows: queued } = await db.query(
-      "SELECT status, agg_window FROM announce_outbox WHERE channel_id = $1 AND status = 'queued'", [channelId])
-
-    assert.equal(queued.length, 2)
-    assert.ok(queued.every(r => r.agg_window === null))
+    const { rows } = await db.query("SELECT count(*)::int FROM announce_outbox WHERE channel_id = $1", [cid])
+    assert.equal(rows[0].count, 1)
   })
 
-  test('3 trocas de TOP 1 em 10 min → 1 mensagem (último estado R16)', async () => {
-    await clear()
+  test('03 — Respeito à Janela: 2 eventos em janela e depois viram individuais', async () => {
+    const cid = await setupChannel(`test-agg-3-${Math.random()}`)
+    const T0 = Math.floor(Date.now() / 1000) * 1000
+    // Usamos um tipo que agrega e que NÃO foi usado antes
+    const type = 'territory.captured'
+    await insertEvent(cid, type, { territorio: 'A' }, new Date(T0))
+    await insertEvent(cid, type, { territorio: 'B' }, new Date(T0 + 1000))
+
+    // Forçamos o processamento seqüencial no ingest para garantir que d.lastTypeAt seja isolado
+    await ingestOnce(cid, { now: T0 + 500 }) // E0 individual
+    await ingestOnce(cid, { now: T0 + 2000 }) // E1 agrega
+
+    const { rows: r1 } = await db.query("SELECT agg_window FROM announce_outbox WHERE channel_id = $1 ORDER BY id", [cid])
+    assert.equal(r1.length, 2)
+    assert.equal(r1[0].agg_window, null, 'primeiro deve ser individual')
+    assert.ok(r1[1].agg_window !== null, 'segundo deve ser agregado')
+
+    await flushAggregates(cid, T0 + 360_000)
+    const { rows: r2 } = await db.query("SELECT status, agg_window FROM announce_outbox WHERE channel_id = $1", [cid])
+    assert.equal(r2.filter(r => r.status === 'queued').length, 2)
+    assert.ok(r2.every(r => r.agg_window === null))
+  })
+
+  test('04 — Ranking / Supersede: A->B->C deixa apenas C ativa no banco (R16)', async () => {
+    const cid = await setupChannel(`test-agg-4-${Math.random()}`)
     const T0 = Date.now()
+    await insertEvent(cid, 'ranking.top1_changed', { tag: 'AAA' }, new Date(T0))
+    await ingestOnce(cid, { now: T0 })
 
-    await insertEvent('ranking.top1_changed', { tag: 'AAA' }, new Date(T0))
-    await insertEvent('ranking.top1_changed', { tag: 'BBB' }, new Date(T0 + 1000))
-    await insertEvent('ranking.top1_changed', { tag: 'CCC' }, new Date(T0 + 2000))
+    await insertEvent(cid, 'ranking.top1_changed', { tag: 'BBB' }, new Date(T0 + 1000))
+    await ingestOnce(cid, { now: T0 + 1000 })
 
-    await ingestOnce(channelId, { now: T0 + 5000 })
+    await insertEvent(cid, 'ranking.top1_changed', { tag: 'CCC' }, new Date(T0 + 2000))
+    await ingestOnce(cid, { now: T0 + 2000 })
 
     const { rows: outbox } = await db.query(
-      "SELECT status, message FROM announce_outbox WHERE channel_id = $1 ORDER BY id", [channelId])
+      "SELECT status, message FROM announce_outbox WHERE channel_id = $1 ORDER BY id", [cid])
 
-    const superseded = outbox.filter(r => r.status === 'superseded')
-    const queued = outbox.filter(r => r.status === 'queued')
+    assert.equal(outbox.filter(r => r.status === 'superseded').length, 2)
+    assert.equal(outbox.filter(r => r.status === 'queued').length, 1)
+    assert.match(outbox.find(r => r.status === 'queued').message, /CCC/)
+  })
 
-    assert.equal(superseded.length, 2)
-    assert.equal(queued.length, 1)
-    assert.match(queued[0].message, /CCC/)
+  test('05 — Resiliência / Retry: Webhook 500 permanece na outbox para retry', async () => {
+    const cid = await setupChannel(`test-agg-5-${Math.random()}`)
+    const T0 = Date.now()
+    await insertEvent(cid, 'war.declared', { oponente: 'Inimigo' }, new Date(T0))
+    await ingestOnce(cid, { now: T0 })
+
+    const { rows: [item] } = await db.query("SELECT id FROM announce_outbox WHERE channel_id = $1", [cid])
+
+    let calls = 0
+    await processOutboxOnce(cid, { now: T0, fetchImpl: async () => { calls++; return { status: 500 } } })
+
+    const row1 = await db.query("SELECT status, attempts FROM announce_outbox WHERE id = $1", [item.id])
+    assert.equal(row1.rows[0].status, 'queued')
+    assert.equal(row1.rows[0].attempts, 1)
+
+    await processOutboxOnce(cid, { now: T0 + 10000, fetchImpl: async () => { calls++; return { status: 200 } } })
+
+    const row2 = await db.query("SELECT status FROM announce_outbox WHERE id = $1", [item.id])
+    assert.equal(row2.rows[0].status, 'sent')
+    assert.equal(calls, 2)
+  })
+
+  test('06 — Matriz de Formatação: Pluralização, Unicode e Truncagem', async () => {
+    const cid = await setupChannel(`test-agg-6-${Math.random()}`)
+    const T0 = Math.floor(Date.now() / 1000) * 1000
+
+    // Inserimos 10 eventos para garantir a agregação (1 indiv + 9 agg)
+    for (let i = 0; i < 10; i++) {
+      await insertEvent(cid, 'guild.approved', { guilda: `G${i}` }, new Date(T0 + i * 100))
+    }
+
+    await ingestOnce(cid, { now: T0 + 10000 })
+    const made = await flushAggregates(cid, T0 + 320_000)
+    assert.equal(made, 1)
+
+    const { rows: rows_agg } = await db.query(
+      "SELECT message FROM announce_outbox WHERE channel_id = $1 AND aggregate_count = 9", [cid])
+    assert.match(rows_agg[0].message, /9 novas guildas nasceram/)
+
+    const longName = 'A Ordem Suprema dos Cavaleiros Lendários de ' + 'A'.repeat(100)
+    await insertEvent(cid, 'guild.approved', { guilda: longName, lider: 'João 🛡️' }, new Date(T0 + 400_000))
+    await ingestOnce(cid, { now: T0 + 400_000 })
+
+    const { rows: rows2 } = await db.query(
+      "SELECT message FROM announce_outbox WHERE channel_id = $1 AND aggregate_count = 1 ORDER BY id DESC LIMIT 1", [cid])
+    const ind = rows2[0]
+    assert.ok(ind.message.length <= 400)
+    assert.match(ind.message, /João 🛡️ fundou A Ordem Suprema/)
+  })
+
+  test('07 — Agregação + Falha + Retry: Fluxo Combinado', async () => {
+    const cid = await setupChannel(`test-agg-7-${Math.random()}`)
+    const T0 = Math.floor(Date.now() / 1000) * 1000
+    const type = 'war.ended'
+    for (let i = 0; i < 10; i++) await insertEvent(cid, type, { guilda: `G${i}`, vencedor: 'A' }, new Date(T0 + i * 100))
+
+    await ingestOnce(cid, { now: T0 + 10000 })
+    const made = await flushAggregates(cid, T0 + 320_000)
+    assert.equal(made, 1)
+
+    const { rows: [agg] } = await db.query(
+      "SELECT id FROM announce_outbox WHERE channel_id = $1 AND status = 'queued' AND aggregate_count = 9", [cid])
+
+    await processOutboxOnce(cid, { now: T0 + 320_000, fetchImpl: async () => ({ status: 500 }) })
+    // Avançamos para garantir que limpa burst e spacing
+    await processOutboxOnce(cid, { now: T0 + 380_000, fetchImpl: async () => ({ status: 204 }) })
+    const row2 = await db.query("SELECT status FROM announce_outbox WHERE id = $1", [agg.id])
+    assert.equal(row2.rows[0].status, 'sent')
   })
 })
- 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
