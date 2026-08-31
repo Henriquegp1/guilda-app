@@ -1,4 +1,5 @@
 import { test, describe, before, after } from 'node:test'
+process.env.NODE_ENV = 'test'
 import assert from 'node:assert/strict'
 import { EVENT_TYPES } from '../src/core/events.js'
 import {
@@ -47,8 +48,9 @@ describe('catálogo', () => {
   test('ligado por padrão segue a §3', () => {
     const ligados = Object.entries(CATALOG).filter(([, c]) => c.enabled).map(([t]) => t).sort()
     assert.deepEqual(ligados, [
-      'guild.approved', 'guild.level_up', 'season.ended', 'season.started',
-      'territory.captured', 'war.accepted', 'war.declared', 'war.ended',
+      'guild.approved', 'guild.level_up', 'ranking.top1_changed', 'ranking.top3_entered',
+      'season.ended', 'season.started', 'territory.captured',
+      'war.accepted', 'war.declared', 'war.ended',
     ])
   })
  
@@ -705,6 +707,117 @@ describe('dispatch e entrega (Postgres)', { skip: !process.env.DATABASE_URL }, (
  
     assert.equal(r.status, 200)
     assert.equal((await itemRow(id)).status, 'sent')
+  })
+})
+
+// ------------------------------------------------------ agregação (Postgres)
+// Cobre os cenários de exemplo do §13: 10 guildas agregam, 2 saem individuais.
+describe('fluxo completo e agregação (Postgres)', { skip: !process.env.DATABASE_URL }, () => {
+  const sufixo = Date.now().toString(36) + Math.random().toString(36).slice(2, 6)
+  let channelId
+  let db
+  let ingestOnce, flushAggregates
+
+  before(async () => {
+    db = await import('../src/core/db.js')
+    const worker = await import('../src/modules/announce/worker.js')
+    ingestOnce = worker.ingestOnce
+    flushAggregates = worker.flushAggregates
+
+    const { migrate } = await import('../src/core/migrate.js')
+    await migrate(() => {})
+
+    const { rows: [ch] } = await db.query(
+      'INSERT INTO channel (twitch_channel_id) VALUES ($1) RETURNING id', [`test-agg-${sufixo}`])
+    channelId = ch.id
+
+    await db.query(
+      `INSERT INTO announce_config (channel_id, enabled, webhook_url, hourly_cap, enabled_at)
+       VALUES ($1, true, 'https://example.com/webhook', 12, now() - interval '1 minute')`, [channelId])
+
+    const { CATALOG } = await import('../src/modules/announce/catalog.js')
+    for (const [type, cat] of Object.entries(CATALOG)) {
+      await db.query(
+        `INSERT INTO announce_event_config (channel_id, event_type, enabled, cooldown_s)
+         VALUES ($1, $2, $3, $4)`, [channelId, type, true, cat.cooldownS]) // Forçamos todos como enabled
+    }
+  })
+
+  after(async () => {
+    if (channelId) await db.query('DELETE FROM channel WHERE id = $1', [channelId])
+  })
+
+  const clear = () => Promise.all([
+    db.query('DELETE FROM announce_outbox WHERE channel_id = $1', [channelId]),
+    db.query('DELETE FROM guild_event WHERE channel_id = $1', [channelId])
+  ])
+
+  const insertEvent = async (type, payload = {}, at = new Date(), cid = channelId) => {
+    const res = await db.query(
+      `INSERT INTO guild_event (channel_id, type, payload, created_at) VALUES ($1, $2, $3, $4) RETURNING id`,
+      [cid, type, JSON.stringify(payload), at])
+    return res.rows[0].id
+  }
+
+  test('10 guild.approved em 5 min → 1 individual + 1 agregada de 9 (R15)', async () => {
+    await clear()
+    const T0 = Date.now()
+
+    for (let i = 0; i < 10; i++) {
+      await insertEvent('guild.approved', { guilda: `Guilda ${i}`, tag: `G${i}` }, new Date(T0))
+    }
+
+    await ingestOnce(channelId, { now: T0 })
+    const made = await flushAggregates(channelId, T0 + 301_000)
+    assert.equal(made, 1)
+
+    const { rows: outbox } = await db.query(
+      "SELECT status, aggregate_count FROM announce_outbox WHERE channel_id = $1", [channelId])
+
+    const aggregated = outbox.filter(r => r.status === 'aggregated')
+    const queued = outbox.filter(r => r.status === 'queued')
+
+    assert.equal(aggregated.length, 9)
+    assert.equal(queued.length, 2)
+  })
+
+  test('2 guild.approved em 5 min → 2 mensagens individuais (abaixo do gatilho R15)', async () => {
+    await clear()
+    const T0 = Date.now()
+
+    for (let i = 0; i < 2; i++) {
+      await insertEvent('guild.approved', { guilda: `G${i}`, tag: `T${i}` }, new Date(T0))
+    }
+
+    await ingestOnce(channelId, { now: T0 })
+    await flushAggregates(channelId, T0 + 301_000)
+
+    const { rows: queued } = await db.query(
+      "SELECT status, agg_window FROM announce_outbox WHERE channel_id = $1 AND status = 'queued'", [channelId])
+
+    assert.equal(queued.length, 2)
+    assert.ok(queued.every(r => r.agg_window === null))
+  })
+
+  test('3 trocas de TOP 1 em 10 min → 1 mensagem (último estado R16)', async () => {
+    await clear()
+    const T0 = Date.now()
+
+    await insertEvent('ranking.top1_changed', { tag: 'AAA' }, new Date(T0))
+    await insertEvent('ranking.top1_changed', { tag: 'BBB' }, new Date(T0 + 1000))
+    await insertEvent('ranking.top1_changed', { tag: 'CCC' }, new Date(T0 + 2000))
+
+    await ingestOnce(channelId, { now: T0 + 5000 })
+
+    const { rows: outbox } = await db.query(
+      "SELECT status, message FROM announce_outbox WHERE channel_id = $1 ORDER BY id", [channelId])
+
+    const superseded = outbox.filter(r => r.status === 'superseded')
+    const queued = outbox.filter(r => r.status === 'queued')
+
+    assert.equal(superseded.length, 2)
+    assert.equal(queued.length, 1)
+    assert.match(queued[0].message, /CCC/)
   })
 })
  

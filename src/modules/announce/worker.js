@@ -215,11 +215,11 @@ async function insertOutbox ({ ev, cfg, cat, status, reason = null, message = nu
   const { rows } = await query(
     `INSERT INTO announce_outbox
        (id, channel_id, guild_event_id, guild_id, event_type, priority, dedup_key,
-        status, suppress_reason, message, payload, not_before, expires_at, agg_window)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
+        status, suppress_reason, message, payload, not_before, expires_at, agg_window, created_at)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
      ON CONFLICT (channel_id, dedup_key) DO NOTHING RETURNING id`,
     [id, cfg.channel_id, ev.id, ev.guild_id, ev.type, cat.priority, String(ev.id),
-      status, reason, message, payload, nb, new Date(+nb + TTL_MS), aggWindow && new Date(aggWindow)])
+      status, reason, message, payload, nb, new Date(+nb + TTL_MS), aggWindow && new Date(aggWindow), new Date(now)])
   return rows[0]?.id ?? null
 }
 

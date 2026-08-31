@@ -23,6 +23,8 @@ export const EVENT_TYPES = new Set([
   'war.declared', 'war.accepted', 'war.declined',
   'war.started', 'war.ended', 'war.settled', 'war.prestige_awarded', 'territory.yield',
   'territory.captured', 'territory.lost', 'dispute.opened', 'dispute.closed',
+  // 07
+  'ranking.top1_changed', 'ranking.top3_entered',
   // 06
   'identity.changed', 'emblem.changed',
   // Twitch EventSub, gravados com o type original (docs/EVENTOS.md)

@@ -24,6 +24,8 @@ export const CATALOG = {
   'season.started':       { priority: 'alta',  cooldownS: 3600, onCooldown: 'descarta', enabled: true,  vars: ['temporada', 'termina_em'] },
   'season.ended':         { priority: 'alta',  cooldownS: 3600, onCooldown: 'descarta', enabled: true,  vars: ['temporada', 'primeiro', 'segundo', 'terceiro'] },
   'guild.recruiting':     { priority: 'baixa', cooldownS: 1800, onCooldown: 'descarta', enabled: false, vars: ['vagas', 'modo'] },
+  'ranking.top1_changed': { priority: 'alta',  cooldownS: 600,  onCooldown: 'ultimo',   enabled: true,  vars: ['tag', 'tag_anterior'] },
+  'ranking.top3_entered': { priority: 'media', cooldownS: 600,  onCooldown: 'ultimo',   enabled: true,  vars: ['tag'] },
 }
 
 // Erro de programação, não de runtime: falha no import se alguém acrescentar um
@@ -59,6 +61,8 @@ export const DEFAULT_TEMPLATES = {
   'season.started':       '🚩 Temporada {temporada} começou! Termina em {termina_em}. Boa sorte, guildas!',
   'season.ended':         '🏁 Temporada {temporada} encerrada! 🥇 {primeiro} 🥈 {segundo} 🥉 {terceiro}',
   'guild.recruiting':     '📣 {guilda} [{tag}] está recrutando! {vagas} vagas, entrada {modo}.',
+  'ranking.top1_changed': '👑 {tag} assumiu o TOP 1 do ranking, ultrapassando {tag_anterior}!',
+  'ranking.top3_entered': '🏆 {tag} entrou para o TOP 3 do ranking! A disputa está acirrada.',
 }
 
 export const DEFAULT_TEMPLATES_AGG = {
