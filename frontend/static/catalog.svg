@@ -1,0 +1,59 @@
+<svg xmlns="http://www.w3.org/2000/svg">
+  <!-- Símbolos -->
+  <symbol id="symbol--sword" viewBox="0 0 48 48">
+    <path d="M34 10 L10 34 L14 38 L38 14 Z M32 8 L40 16 L42 14 L34 6 Z" fill="currentColor"/>
+    <rect x="8" y="32" width="12" height="4" transform="rotate(-45 14 34)" fill="currentColor"/>
+  </symbol>
+
+  <symbol id="symbol--shield" viewBox="0 0 48 48">
+    <path d="M24 4 L8 12 V24 C8 34 16 42 24 44 C32 42 40 34 40 24 V12 L24 4 Z" fill="currentColor"/>
+  </symbol>
+
+  <symbol id="symbol--axe" viewBox="0 0 48 48">
+    <path d="M10 10 L20 10 V40 H10 Z M20 15 C30 15 38 20 38 25 C38 30 30 35 20 35 Z" fill="currentColor"/>
+  </symbol>
+
+  <symbol id="symbol--dragon" viewBox="0 0 48 48">
+    <path d="M40 10 Q30 5 20 15 T10 40 L15 40 Q20 30 30 25 T40 10" fill="currentColor"/>
+    <circle cx="32" cy="15" r="2" fill="white"/>
+  </symbol>
+
+  <symbol id="symbol--lion" viewBox="0 0 48 48">
+    <circle cx="24" cy="24" r="15" fill="currentColor" opacity="0.8"/>
+    <path d="M24 12 L28 20 L24 28 L20 20 Z" fill="white"/>
+  </symbol>
+
+  <symbol id="symbol--blank" viewBox="0 0 48 48"></symbol>
+
+  <!-- Background Patterns -->
+  <symbol id="bg--split--pattern" viewBox="0 0 96 104">
+    <rect width="48" height="104" fill="currentColor"/>
+  </symbol>
+
+  <symbol id="bg--checker--pattern" viewBox="0 0 96 104">
+    <rect width="48" height="52" fill="currentColor"/>
+    <rect x="48" y="52" width="48" height="52" fill="currentColor"/>
+  </symbol>
+
+  <!-- Bordas -->
+  <symbol id="border--plain" viewBox="0 0 96 104">
+    <path d="M4 4 H92 V44 C92 74 72 90 48 100 C24 90 4 74 4 44 Z" fill="none" stroke="currentColor" stroke-width="6"/>
+  </symbol>
+
+  <symbol id="border--rope" viewBox="0 0 96 104">
+    <path d="M4 4 H92 V44 C92 74 72 90 48 100 C24 90 4 74 4 44 Z" fill="none" stroke="currentColor" stroke-width="4" stroke-dasharray="4 2"/>
+  </symbol>
+
+  <symbol id="border--none" viewBox="0 0 96 104"></symbol>
+
+  <!-- Efeitos -->
+  <symbol id="effect--glow" viewBox="0 0 96 104">
+    <path d="M4 4 H92 V44 C92 74 72 90 48 100 C24 90 4 74 4 44 Z" fill="white" opacity="0.3"/>
+  </symbol>
+
+  <symbol id="effect--flames" viewBox="0 0 96 104">
+    <path d="M10 80 Q25 60 40 80 T70 80" fill="none" stroke="orange" stroke-width="4" opacity="0.6"/>
+  </symbol>
+
+  <symbol id="effect--none" viewBox="0 0 96 104"></symbol>
+</svg>

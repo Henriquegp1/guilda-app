@@ -10,12 +10,17 @@ node_modules/
 frontend/build/
 frontend/.svelte-kit/
 frontend/extensao.zip
+.artifacts/
 
 # Capturas de crítica visual: regeradas com `npm run olhar` e `node scripts/telas.js`
 .olhar/
 .telas/
 frontend/.olhar/
 frontend/.telas/
+
+# IDE / editor
+.idea/
+.vscode/
 
 # Docker
 caddy_data/
