@@ -275,13 +275,15 @@ export default async function members (app) {
     if (!req.auth.userId) return null
 
     const { rows } = await c.query(
-      `SELECT g.*, m.role, m.joined_at
+      `SELECT g.*, m.role, m.joined_at, e.custom_local_path
          FROM guild_member m JOIN guild g ON g.id = m.guild_id
+         LEFT JOIN guild_emblem e ON e.guild_id = g.id AND e.is_active = true
         WHERE m.channel_id = $1 AND m.user_id = $2`, [cid, req.auth.userId])
     if (!rows[0]) return null
 
-    const { role, joined_at: joinedAt, ...g } = rows[0]
-    return { ...g, my_role: role, joined_at: joinedAt }
+    const { role, joined_at: joinedAt, custom_local_path: customLocal, ...g } = rows[0]
+    const customUrl = customLocal ? `${process.env.BASE_URL ?? 'http://localhost:3000'}/public/custom-assets/${customLocal}` : null
+    return { ...g, my_role: role, joined_at: joinedAt, custom_emblem_url: customUrl }
   }))
 
   app.get('/me/invites', async (req) => tx(async (c) => {

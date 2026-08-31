@@ -8,7 +8,10 @@
 	import Guildas from '$lib/telas/Guildas.svelte';
 	import Ranking from '$lib/telas/Ranking.svelte';
 	import Criar from '$lib/telas/Criar.svelte';
+	import PainelGuerra from '$lib/telas/PainelGuerra.svelte';
+	import MapaMundi from '$lib/telas/MapaMundi.svelte';
 	import { iniciar, onAuth } from '$lib/twitch';
+	import { entrarBloco } from '$lib/motion';
 	import { minhaGuilda, ErroApi, type Guilda, type Cargo } from '$lib/api';
 
 	let estado = $state<'carregando' | 'pronto' | 'erro'>('carregando');
@@ -38,10 +41,13 @@
 		guilda
 			? [
 					{ id: 'minha', rotulo: 'Minha' },
+					{ id: 'mapa', rotulo: 'Mapa' },
+					{ id: 'guerra', rotulo: 'Guerra' },
 					{ id: 'ranking', rotulo: 'Ranking' }
 				]
 			: [
 					{ id: 'guildas', rotulo: 'Guildas' },
+					{ id: 'mapa', rotulo: 'Mapa' },
 					{ id: 'ranking', rotulo: 'Ranking' },
 					{ id: 'criar', rotulo: 'Criar' }
 				]
@@ -59,15 +65,23 @@
 	{:else}
 		<Aba {abas} bind:atual={aba} />
 
-		{#if aba === 'minha' && guilda}
-			<MinhaGuilda {guilda} cargo={guilda.my_role} aoSair={carregar} />
-		{:else if aba === 'guildas'}
-			<Guildas aoEntrar={carregar} />
-		{:else if aba === 'ranking'}
-			<Ranking minhaGuildaId={guilda?.id ?? null} />
-		{:else if aba === 'criar'}
-			<Criar aoCriar={carregar} />
-		{/if}
+		{#key aba}
+			<div class="aba-conteudo" in:entrarBloco>
+				{#if aba === 'minha' && guilda}
+					<MinhaGuilda {guilda} cargo={guilda.my_role} aoSair={carregar} aoAtualizar={carregar} />
+				{:else if aba === 'mapa'}
+					<MapaMundi />
+				{:else if aba === 'guerra' && guilda}
+					<PainelGuerra {guilda} cargo={guilda.my_role} />
+				{:else if aba === 'guildas'}
+					<Guildas aoEntrar={carregar} />
+				{:else if aba === 'ranking'}
+					<Ranking minhaGuildaId={guilda?.id ?? null} />
+				{:else if aba === 'criar'}
+					<Criar aoCriar={carregar} />
+				{/if}
+			</div>
+		{/key}
 	{/if}
 </Estandarte>
 
@@ -84,5 +98,12 @@
 	.centro p {
 		margin: 0;
 		color: var(--argent-fraco);
+	}
+
+	.aba-conteudo {
+		flex: 1;
+		display: flex;
+		flex-direction: column;
+		min-height: 0;
 	}
 </style>

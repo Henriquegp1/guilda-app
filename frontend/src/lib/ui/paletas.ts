@@ -12,6 +12,11 @@ export const PALETAS: Record<string, { primária: string; secundária: string; d
 	'palette.crimson_black': { primária: '#600', secundária: '#000', detalhe: '#f00' },
 	'palette.gold_navy': { primária: '#001f3f', secundária: '#000a1a', detalhe: '#ffca28' },
 	'palette.emerald_ivory': { primária: '#004d40', secundária: '#f5f5f0', detalhe: '#00c853' },
+	'palette.violet_ash': { primária: '#332740', secundária: '#1c1522', detalhe: '#b9a8cc' },
+	'palette.copper_teal': { primária: '#0f3d3e', secundária: '#081f20', detalhe: '#c97a3d' },
+	'palette.frost_steel': { primária: '#25333d', secundária: '#131b21', detalhe: '#bcd8e8' },
+	'palette.toxic_lime': { primária: '#26330e', secundária: '#141b08', detalhe: '#c6ff33' },
+	'palette.blood_bone': { primária: '#3a0a0a', secundária: '#1a0404', detalhe: '#e8dcc8' },
 	'palette.royal_gold': { primária: '#3d2b1f', secundária: '#1a110a', detalhe: '#ffd700' },
 	'palette.void_neon': { primária: '#0a0a0a', secundária: '#000', detalhe: '#00f2ff' }
 };

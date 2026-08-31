@@ -1,4 +1,6 @@
 import { createHash } from 'node:crypto'
+import { writeFile, mkdir } from 'node:fs/promises'
+import { join } from 'node:path'
 import { query, tx } from '../../core/db.js'
 import { emit, audit } from '../../core/events.js'
 import { badRequest, conflict, forbidden, notFound, onUnique } from '../../core/errors.js'
@@ -16,6 +18,7 @@ import {
 const DB = { query: (text, params) => query(text, params) }
 const norm = (v) => String(v ?? '').trim().toLowerCase()
 const days = (n) => `${n} days`
+const slotsOwned = (ents) => ents.slots.size + 1
 
 // ---------------------------------------------------------------- contexto
 
@@ -60,7 +63,39 @@ async function entitlements (c, guildId) {
   }
 }
 
-const slotsOwned = (ents) => 1 + ents.slots.size   // R4: slot 1 é grátis e sempre existe
+const CUSTOM_STORAGE = join(process.cwd(), 'public', 'custom-assets')
+const MAX_IMAGE_SIZE = 1 * 1024 * 1024 // 1MB
+
+async function ingestCustomImage (sourceUrl) {
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), 5000)
+
+  try {
+    const res = await fetch(sourceUrl, { signal: controller.signal })
+    if (!res.ok) throw badRequest('IMAGE_DOWNLOAD_FAILED', `status ${res.status}`)
+
+    const size = Number(res.headers.get('content-length'))
+    if (size > MAX_IMAGE_SIZE) throw badRequest('IMAGE_TOO_LARGE', 'máximo 1MB')
+
+    const type = res.headers.get('content-type')
+    if (!type?.startsWith('image/')) throw badRequest('INVALID_IMAGE_TYPE', 'deve ser PNG ou JPG')
+
+    const buffer = Buffer.from(await res.arrayBuffer())
+    if (buffer.length > MAX_IMAGE_SIZE) throw badRequest('IMAGE_TOO_LARGE', 'máximo 1MB')
+
+    const hash = createHash('sha256').update(buffer).digest('hex')
+    const ext = type === 'image/png' ? 'png' : 'jpg'
+    const filename = `${hash}.${ext}`
+    const path = join(CUSTOM_STORAGE, filename)
+
+    await mkdir(CUSTOM_STORAGE, { recursive: true })
+    await writeFile(path, buffer)
+
+    return { hash, filename, type }
+  } finally {
+    clearTimeout(timeout)
+  }
+}
 
 // ---------------------------------------------------------------- dinheiro
 
@@ -153,9 +188,28 @@ async function deniedCombo (c, ids) {
  * a versão anterior vira 'reverted' e continua no histórico. `render_url` é
  * determinístico pelo hash — o job assíncrono só materializa os bytes (§4).
  */
+async function publishCustomEmblem (c, { channelId, guild, slot, sourceUrl, asset, userId }) {
+  // Brasões customizados SEMPRE entram em revisão (Segurança)
+  const { rows } = await c.query(
+    `INSERT INTO guild_emblem (channel_id, guild_id, slot_index, layers, catalog_version,
+                               status, is_active, created_by,
+                               custom_source_url, custom_asset_hash, custom_local_path)
+     VALUES ($1, $2, $3, '{}', $4, 'pending_review', false, $5, $6, $7, $8)
+     RETURNING id, status`,
+    [channelId, guild.id, slot, CATALOG_VERSION, userId, sourceUrl, asset.hash, asset.filename])
+
+  const emblem = rows[0]
+
+  await c.query(
+    `INSERT INTO guild_identity_history (channel_id, guild_id, field, old_value, new_value, requested_by, state)
+     VALUES ($1, $2, 'emblem_custom', $3, $4, $5, 'pending_review')`,
+    [channelId, guild.id, 'layered', sourceUrl, userId])
+
+  return emblem
+}
+
 async function publishEmblem (c, { channelId, guild, slot, layers, userId, status = 'published' }) {
-  const stored = normalizeLayers(layers)
-  const hash = emblemHash(stored)
+  const hash = emblemHash(layers)
 
   // R8: publicação em análise não desbanca a anterior — o público continua
   // vendo o brasão antigo, que nem sai de 'published'.
@@ -176,7 +230,7 @@ async function publishEmblem (c, { channelId, guild, slot, layers, userId, statu
                                status, render_url, is_active, created_by)
      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
      RETURNING id, slot_index, status, render_url, is_active, layers, created_at`,
-    [channelId, guild.id, slot, stored, CATALOG_VERSION, status, renderUrl(hash), active, userId])
+    [channelId, guild.id, slot, layers, CATALOG_VERSION, status, renderUrl(hash), active, userId])
 
   const emblem = rows[0]
   await emit(c, {
@@ -330,16 +384,25 @@ async function applyIdentity (c, { channelId, guild, field, next, actorUserId, a
 
 export default async function identity (app) {
   // -------------------------------------------------- catálogo
-  app.get('/emblem/catalog', async (req) => {
-    const { rows } = await query('SELECT asset_ids, action FROM emblem_denied_combo ORDER BY id')
+  app.get('/emblem/catalog', { config: { public: true } }, async (req) => {
+    let rows = []
+    try {
+      const res = await query('SELECT asset_ids, action FROM emblem_denied_combo ORDER BY id')
+      rows = res.rows
+    } catch (e) {
+      // Silencioso: se o banco estiver fora, o catálogo continua funcionando (R0)
+      console.warn('EBS: banco fora, servindo catálogo em modo de compatibilidade')
+    }
     return {
       version: CATALOG_VERSION,
       assets: ASSETS.map(a => ({
         id: a.id, layer: a.layer, tier: a.tier, status: a.status,
+        render_type: a.render_type,
         price_bits: a.price, unlock_level: a.unlockLevel,
         svg_symbol_id: a.svgSymbolId, is_layer_fallback: a.isFallback,
+        author: a.author
       })),
-      sprite_url: `${process.env.EMBLEM_CDN ?? 'https://cdn.example/emblem'}/catalog/v${CATALOG_VERSION}.svg`,
+      sprite_url: 'http://localhost:5173/catalog.svg',
       denied_combos_hash: createHash('sha256').update(JSON.stringify(rows)).digest('hex'),
       bundle: { sku: 'effect.bundle', price_bits: SKU_BITS['effect.bundle'], pick: 3, from: PAID_EFFECTS },
       prices: SKU_BITS,
@@ -420,6 +483,26 @@ export default async function identity (app) {
         emblem_id: emblem.id, status: emblem.status, render_url: emblem.render_url,
         layers_hash: emblem.layers_hash,
       }
+    })
+  })
+
+  app.post('/guilds/:id/identity/custom-image', async (req) => {
+    const { source_url, slot = 1 } = req.body ?? {}
+    if (!source_url) throw badRequest('VALIDATION_ERROR', 'source_url obrigatória')
+    const s = Number(slot)
+    if (!Number.isInteger(s) || s < 1 || s > MAX_SLOTS) throw badRequest('SLOT_NOT_OWNED', 'slot inexistente')
+
+    const asset = await ingestCustomImage(source_url)
+
+    return tx(async (c) => {
+      const { channelId, guild, userId } = await scope(c, req, { roles: ['leader', 'officer'], eligible: true })
+      const ents = await entitlements(c, guild.id)
+      if (s > 1 && !ents.slots.has(`slot:${s}`)) throw forbidden('SLOT_NOT_OWNED', `slot ${s} não comprado`)
+
+      const emblem = await publishCustomEmblem(c, {
+        channelId, guild, slot: s, sourceUrl: source_url, asset, userId,
+      })
+      return { emblem_id: emblem.id, status: emblem.status }
     })
   })
 
@@ -589,16 +672,32 @@ export default async function identity (app) {
            FROM guild_identity_history h JOIN guild g ON g.id = h.guild_id
           WHERE h.channel_id = $1 AND h.state = 'pending_review'
           ORDER BY h.created_at LIMIT $2`, [channelId, limit])
-      items.push(...rows.map(r => ({ request_id: `identity-${r.id}`, type: r.field, ...r })))
+      items.push(...rows.map(r => ({
+        request_id: `identity-${r.id}`,
+        type: r.field,
+        guild_name: r.guild_name,
+        requested_by: r.requested_by,
+        old_value: r.old_value,
+        new_value: r.new_value,
+        created_at: r.created_at
+      })))
     }
     if (type !== 'name' && type !== 'tag') {
-      // painel de moderação recebe PNG + a lista de ids lado a lado (§4).
       const { rows } = await query(
-        `SELECT e.id, e.guild_id, e.slot_index, e.layers, e.render_url, e.created_by, e.created_at, g.name AS guild_name
+        `SELECT e.id, e.guild_id, e.slot_index, e.layers, e.render_url, e.created_by, e.created_at,
+                e.custom_local_path, g.name AS guild_name
            FROM guild_emblem e JOIN guild g ON g.id = e.guild_id
           WHERE e.channel_id = $1 AND e.status = 'pending_review'
           ORDER BY e.created_at LIMIT $2`, [channelId, limit])
-      items.push(...rows.map(r => ({ request_id: `emblem-${r.id}`, type: 'emblem', png_url: r.render_url, ...r })))
+      items.push(...rows.map(r => ({
+        request_id: `emblem-${r.id}`,
+        type: 'emblem',
+        guild_name: r.guild_name,
+        requested_by: r.created_by,
+        layers: r.layers,
+        png_url: r.custom_local_path ? `/custom-assets/${r.custom_local_path}` : r.render_url,
+        created_at: r.created_at
+      })))
     }
     return { items }
   })
@@ -613,8 +712,7 @@ export default async function identity (app) {
       const { rows } = await c.query(
         `UPDATE guild_emblem SET status = 'published' WHERE id = $1 AND channel_id = $2 AND status = 'pending_review'
          RETURNING id, guild_id, slot_index`, [id, channelId])
-        .catch(onUnique('guild_emblem_slot_uq', 'NOT_PENDING', 'o slot já tem outro brasão publicado'))
-      if (!rows[0]) throw conflict('NOT_PENDING', 'nada pendente com esse id')
+      if (!rows[0]) throw conflict('REQUEST_ALREADY_RESOLVED', 'Este brasão já foi processado ou não está pendente')
 
       await c.query(
         `UPDATE guild_emblem SET is_active = false WHERE guild_id = $1 AND is_active AND id <> $2`,
@@ -651,6 +749,17 @@ export default async function identity (app) {
     await c.query(
       `UPDATE guild_identity_history SET state = 'approved', reviewed_by = $2, reviewed_at = now() WHERE id = $1`,
       [id, req.auth.userId])
+
+    if (r.field === 'emblem_custom') {
+      const { rows: [emblem] } = await c.query(
+        "SELECT id FROM guild_emblem WHERE guild_id = $1 AND custom_source_url = $2 AND status = 'pending_review'",
+        [r.guild_id, r.new_value])
+      if (emblem) {
+        await c.query("UPDATE guild_emblem SET is_active = false WHERE guild_id = $1 AND is_active = true", [r.guild_id])
+        await c.query("UPDATE guild_emblem SET status = 'published', is_active = true WHERE id = $1", [emblem.id])
+      }
+    }
+
     return { state: 'approved' }
   }))
 
@@ -664,7 +773,7 @@ export default async function identity (app) {
       const { rows } = await c.query(
         `UPDATE guild_emblem SET status = 'reverted' WHERE id = $1 AND channel_id = $2 AND status = 'pending_review'
          RETURNING id, guild_id`, [id, channelId])
-      if (!rows[0]) throw conflict('NOT_PENDING', 'nada pendente com esse id')
+      if (!rows[0]) throw conflict('REQUEST_ALREADY_RESOLVED', 'Este brasão já foi processado ou não está pendente')
       await audit(c, {
         channelId, actorUserId: req.auth.userId, action: 'emblem.rejected', target: `emblem:${rows[0].id}`,
         after: { reason: req.body?.reason ?? null },
@@ -691,6 +800,12 @@ export default async function identity (app) {
       `UPDATE guild_identity_history
           SET state = 'rejected', reviewed_by = $2, reviewed_at = now(), reject_reason = $3 WHERE id = $1`,
       [id, req.auth.userId, String(req.body?.reason ?? 'sem motivo')])
+
+    if (r.field === 'emblem_custom') {
+      await c.query(
+        "UPDATE guild_emblem SET status = 'reverted' WHERE guild_id = $1 AND custom_source_url = $2 AND status = 'pending_review'",
+        [r.guild_id, r.new_value])
+    }
 
     // R14/§8: crédito de 100% do que foi pago (Bits + crédito já consumido).
     const credited = await issueCredit(c, {

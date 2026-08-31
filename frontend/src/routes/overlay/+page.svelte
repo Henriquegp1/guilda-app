@@ -1,18 +1,13 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { iniciar, onAuth, ouvirBroadcast } from '$lib/twitch';
-	import { guerrasAtivas, type Guerra } from '$lib/api';
-	import { animarNumero, gsap, dur } from '$lib/motion';
+	import { wars } from '$lib/stores/warStore';
+	import { animarNumero, gsap, dur, impacto } from '$lib/motion';
 
-	let guerras = $state<Guerra[]>([]);
-	let raiz: HTMLDivElement;
+	let guerras = wars;
+	let raiz = $state<HTMLDivElement>();
 
 	// Guarda o valor exibido para interpolar do anterior, não do zero.
 	const exibido = new Map<string, number>();
-
-	function aplicar(novas: Guerra[]) {
-		guerras = novas;
-	}
 
 	/** Ação Svelte: `update` é o que faz o número interpolar a cada mensagem. */
 	function placar(el: HTMLElement, valor: number) {
@@ -20,62 +15,43 @@
 		const aplicar = (v: number) => {
 			const de = exibido.get(chave);
 			exibido.set(chave, v);
-			if (de !== undefined && de !== v) animarNumero(el, de, v);
-			else el.textContent = v.toLocaleString('pt-BR');
+			if (de !== undefined && de !== v) {
+				animarNumero(el, de, v);
+				// Animação de impacto no container do lado que pontuou
+				impacto(el.parentElement!);
+			} else {
+				el.textContent = v.toLocaleString('pt-BR');
+			}
 		};
 		aplicar(valor);
 		return { update: aplicar };
 	}
 
 	onMount(() => {
-		iniciar();
-		const paraAuth = onAuth(() => {
-			// PubSub é a fonte viva; o GET é o que segura enquanto ela silencia.
-			guerrasAtivas()
-				.then((r) => aplicar(r.items))
-				.catch(() => {});
-		});
-		const paraPubSub = ouvirBroadcast<{ type?: string; wars?: Guerra[] }>((m) => {
-			if (m?.type === 'war.board' && Array.isArray(m.wars)) aplicar(m.wars);
-		});
-		return () => {
-			paraAuth();
-			paraPubSub();
-		};
+		const parar = wars.iniciar();
+		return parar;
 	});
 
 	$effect(() => {
-		if (!raiz || !guerras.length) return;
+		if (!raiz || !$guerras.length) return;
 		const ctx = gsap.context(() => {
-			gsap.fromTo(
-				raiz,
-				{ opacity: 0, y: -8 },
-				{ opacity: 1, y: 0, duration: dur(0.35) }
-			);
+			gsap.fromTo(raiz!, { opacity: 0, y: -8 }, { opacity: 1, y: 0, duration: dur(0.35) });
 		}, raiz);
 		return () => ctx.revert();
 	});
 </script>
 
-{#if guerras.length}
+{#if $guerras.length}
 	<div class="tabuleiro" bind:this={raiz}>
-		{#each guerras as g (g.id)}
+		{#each $guerras as g (g.id)}
 			<div class="guerra">
 				<div class="lado">
 					<b>{g.challenger.tag}</b>
-					<span
-						class="num"
-						data-chave={`${g.id}-a`}
-						use:placar={g.challenger.score}
-					></span>
+					<span class="num" data-chave={`${g.id}-a`} use:placar={g.challenger.score}></span>
 				</div>
 				<span class="cruz" aria-label="contra">⚔</span>
 				<div class="lado dir">
-					<span
-						class="num"
-						data-chave={`${g.id}-b`}
-						use:placar={g.defender.score}
-					></span>
+					<span class="num" data-chave={`${g.id}-b`} use:placar={g.defender.score}></span>
 					<b>{g.defender.tag}</b>
 				</div>
 			</div>

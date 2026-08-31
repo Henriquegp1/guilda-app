@@ -31,8 +31,7 @@ export function iniciar() {
 
 	const definir = (role: any, token: string) => {
 		_token = token;
-		const roleValida = role === 'broadcaster' || role === 'moderator' || role === 'viewer' ? role : 'broadcaster';
-		viewerStore.set({ role: roleValida, isLoaded: true, token });
+		viewerStore.set({ role, isLoaded: true, token });
 	};
 
 	if (!t) {
@@ -40,26 +39,47 @@ export function iniciar() {
 		return;
 	}
 
-	const roleInicial = t.viewer?.role && ['broadcaster', 'moderator', 'viewer'].includes(t.viewer.role)
-		? t.viewer.role
-		: 'broadcaster';
-	definir(roleInicial, 'dev-token');
-
 	t.onAuthorized((auth: any) => {
-		const role = auth?.role ?? t.viewer?.role ?? 'viewer';
-		const token = auth?.token ?? 'dev-token';
-		definir(role, token);
+		const role = t.viewer?.role ?? 'viewer';
+		definir(role, auth.token);
 	});
 }
 
 /**
  * Atalho para reagir à autorização da Twitch.
- * Retorna a função de cancelamento da inscrição na store.
  */
 export function onAuth(fn: (auth: any) => void) {
 	return viewerStore.subscribe(($v) => {
 		if ($v.isLoaded) fn($v);
 	});
+}
+
+/**
+ * Atalho para a lista de produtos (Fase 01).
+ */
+export function produtosBits(): Promise<any[]> {
+	return new Promise((resolve) => {
+		const t = (window as any).Twitch?.ext;
+		if (!t) {
+			resolve([{ sku: 'guild_creation', cost: { amount: 500, type: 'bits' } }]);
+			return;
+		}
+		t.bits.getProducts().then(resolve);
+	});
+}
+
+export function bitsHabilitado(): boolean {
+	const t = (window as any).Twitch?.ext;
+	return !t || t.features.isBitsEnabled;
+}
+
+export function aoMudarRecursos(fn: () => void): () => void {
+	const t = (window as any).Twitch?.ext;
+	if (!t) return () => {};
+	t.onContext((_ctx: any, mudou: string[]) => {
+		if (mudou.includes('isBitsEnabled')) fn();
+	});
+	return () => {};
 }
 
 /**
@@ -75,7 +95,7 @@ export function gastarBits(sku: string): Promise<string> {
 		}
 		t.bits.useBits(sku);
 		t.bits.onTransactionComplete((res: any) => resolve(res.transactionReceipt));
-		t.bits.onTransactionCancelled(() => reject(new Error('Cancelado')));
+		t.bits.onTransactionCancelled(() => reject(new Error('BITS_CANCELADO')));
 	});
 }
 

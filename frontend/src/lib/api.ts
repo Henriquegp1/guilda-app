@@ -37,18 +37,10 @@ const MENSAGENS: Record<string, string> = {
 export const mensagemDe = (code: string, cru?: string) =>
 	MENSAGENS[code] ?? cru ?? 'Algo deu errado. Tente de novo.';
 
-type Opcoes = {
-	metodo?: string;
-	corpo?: unknown;
-	sinal?: AbortSignal;
-	requerAuth?: boolean;
-};
+type Opcoes = { metodo?: string; corpo?: unknown; sinal?: AbortSignal };
 
-export async function chamar<T>(rota: string, { metodo = 'GET', corpo, sinal, requerAuth = true }: Opcoes = {}) {
+export async function chamar<T>(rota: string, { metodo = 'GET', corpo, sinal }: Opcoes = {}) {
 	const token = tokenAtual();
-	if (requerAuth && !token) {
-		throw new ErroApi('UNAUTHORIZED', 401, mensagemDe('UNAUTHORIZED'));
-	}
 
 	let res: Response;
 	try {
@@ -80,12 +72,10 @@ export async function chamar<T>(rota: string, { metodo = 'GET', corpo, sinal, re
 	return json as T;
 }
 
-export const get = <T>(rota: string, sinal?: AbortSignal, opcoes: Pick<Opcoes, 'requerAuth'> = {}) =>
-	chamar<T>(rota, { sinal, ...opcoes });
-export const post = <T>(rota: string, corpo?: unknown, opcoes: Pick<Opcoes, 'requerAuth'> = {}) =>
-	chamar<T>(rota, { metodo: 'POST', corpo, ...opcoes });
-export const patch = <T>(rota: string, corpo?: unknown, opcoes: Pick<Opcoes, 'requerAuth'> = {}) =>
-	chamar<T>(rota, { metodo: 'PATCH', corpo, ...opcoes });
+export const get = <T>(rota: string, sinal?: AbortSignal) => chamar<T>(rota, { sinal });
+export const post = <T>(rota: string, corpo?: unknown) => chamar<T>(rota, { metodo: 'POST', corpo });
+export const patch = <T>(rota: string, corpo?: unknown) =>
+	chamar<T>(rota, { metodo: 'PATCH', corpo });
 
 // ------------------------------------------------------------------- domínio
 
@@ -310,7 +300,7 @@ export const meusConvites = () => get<{ invites: Convite[] }>('/me/invites');
 export const aceitarConvite = (code: string) => post<unknown>(`/invites/${code}/accept`);
 
 // ---- identidade e brasão
-export const fetchCatalog = () => get<Catalog>('/emblem/catalog', undefined, { requerAuth: false });
+export const fetchCatalog = () => get<Catalog>('/emblem/catalog');
 export const carregarEmblema = (gid: number) =>
 	get<{ active: Emblem | null; slots: Emblem[] }>(`/guilds/${gid}/emblem`);
 export const carregarPosses = (gid: number) =>

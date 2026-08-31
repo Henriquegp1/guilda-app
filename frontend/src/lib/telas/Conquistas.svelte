@@ -83,7 +83,10 @@
 					{#each progresso as p}
 						<div class="item-progresso">
 							<div class="topo-prog">
-								<span>{p.code}</span>
+								<div class="meta-prog">
+									<b>{p.name}</b>
+									<small>{p.description}</small>
+								</div>
 								<span class="num">{p.current} / {p.target}</span>
 							</div>
 							<div class="barra-trilho">
@@ -211,9 +214,25 @@
 	.topo-prog {
 		display: flex;
 		justify-content: space-between;
+		align-items: flex-start;
 		font-size: 11px;
-		margin-bottom: 6px;
+		margin-bottom: 8px;
+	}
+
+	.meta-prog {
+		display: flex;
+		flex-direction: column;
+		gap: 2px;
+	}
+
+	.meta-prog b {
+		color: var(--argent);
 		text-transform: uppercase;
+	}
+
+	.meta-prog small {
+		color: var(--argent-fraco);
+		font-size: 10px;
 	}
 
 	.barra-trilho {

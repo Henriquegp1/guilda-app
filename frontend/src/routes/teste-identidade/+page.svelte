@@ -15,7 +15,7 @@
 			background: 'bg.solid',
 			palette: 'palette.slate',
 			border: 'border.none',
-			symbol: 'symbol.sword',
+			symbol: 'symbol.sword-hilt',
 			effect: 'effect.none'
 		})
 	};

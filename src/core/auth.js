@@ -82,6 +82,7 @@ export const newChannelToken = () => 'ctk_' + randomBytes(24).toString('base64ur
  * — um deles casava com o canal errado quando o chamador era o bot.
  */
 export async function authenticate (req) {
+  if (req.routeOptions.config?.public) return
   const raw = req.headers.authorization
   if (!raw?.startsWith('Bearer ')) throw unauthorized('missing bearer token')
   const token = raw.slice(7)

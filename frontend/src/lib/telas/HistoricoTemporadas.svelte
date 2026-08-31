@@ -7,7 +7,7 @@
 
 	let temporadas = $state<Temporada[]>([]);
 	let selecionada = $state<number | null>(null);
-	let podio = $state<{ position: number; tag: string; prestige_final: number }[]>([]);
+	let podio = $state<{ position: number; tag: string; name: string; prestige_final: number }[]>([]);
 	let loading = $state(true);
 
 	async function carregar() {
@@ -60,8 +60,11 @@
 					{#each podio as a}
 						<div class="linha-vencedor pos-{a.position}">
 							<span class="coroa">{a.position === 1 ? '👑' : a.position === 2 ? '🥈' : '🥉'}</span>
-							<b class="tag">[{a.tag}]</b>
-							<span class="pontos num">{a.prestige_final.toLocaleString('pt-BR')} Poder</span>
+							<div class="identidade-vencedor">
+								<b class="tag">[{a.tag}]</b>
+								<span class="nome-v">{a.name}</span>
+							</div>
+							<span class="pontos num">{a.prestige_final.toLocaleString('pt-BR')} <small>Poder</small></span>
 						</div>
 					{/each}
 				</div>
@@ -141,8 +144,11 @@
 	.pos-3 { border-color: #cd7f32; }
 
 	.coroa { font-size: 24px; }
-	.tag { font-family: var(--display); font-size: 18px; color: var(--or); }
-	.pontos { margin-left: auto; color: var(--argent-fraco); }
+	.identidade-vencedor { display: flex; flex-direction: column; }
+	.tag { font-family: var(--display); font-size: 16px; color: var(--or); line-height: 1; }
+	.nome-v { font-size: 11px; color: var(--argent-fraco); text-transform: uppercase; letter-spacing: 0.05em; }
+	.pontos { margin-left: auto; color: var(--argent); font-size: 14px; text-align: right; }
+	.pontos small { display: block; font-size: 9px; text-transform: uppercase; color: var(--argent-fraco); }
 
 	.centro { padding: 40px; text-align: center; color: var(--argent-fraco); font-size: 12px; }
 </style>

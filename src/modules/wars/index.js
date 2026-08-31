@@ -739,10 +739,12 @@ export default async function wars (app) {
   app.get('/territories', async (req) => {
     const { rows } = await query(
       `SELECT t.*, h.guild_id AS owner_guild_id, h.acquired_at, h.protected_until,
-              g.name AS owner_name, g.tag AS owner_tag
+              g.name AS owner_name, g.tag AS owner_tag,
+              d.id AS active_dispute_id, d.closes_at AS dispute_closes_at
          FROM territory t
          LEFT JOIN territory_holding h ON h.territory_id = t.id AND h.released_at IS NULL
          LEFT JOIN guild g ON g.id = h.guild_id
+         LEFT JOIN territory_dispute d ON d.territory_id = t.id AND d.status = 'open'
         WHERE t.channel_id = $1 ORDER BY t.map_y, t.map_x, t.id`, [req.auth.channelId])
     return { items: rows }
   })
@@ -894,6 +896,20 @@ export default async function wars (app) {
          JOIN guild g ON g.id = e.guild_id
         WHERE e.dispute_id = $1 ORDER BY e.points DESC, e.joined_at`, [d.id])
     return { dispute: d, entries }
+  })
+
+  app.get('/guilds/:id/members/eligibility', async (req) => {
+    const gid = num(req.params.id)
+    const { rows, active } = await membersByActivity({ query }, req.auth.channelId, gid)
+    return {
+      items: rows.map(r => ({
+        user_id: r.user_id,
+        role: r.role,
+        events: r.events,
+        is_eligible: r.events > 0,
+      })),
+      active_count: active,
+    }
   })
 }
 

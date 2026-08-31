@@ -1,19 +1,33 @@
 <script lang="ts">
 	import Brasao from '$lib/ui/Brasao.svelte';
-	import { progressao, posicaoDa, sair, ErroApi } from '$lib/api';
-	import type { Guilda, Cargo, Progressao } from '$lib/api';
-	import { gsap, dur } from '$lib/motion';
+	import EditorBrasao from './EditorBrasao.svelte';
+	import Conquistas from './Conquistas.svelte';
+	import {
+		progressao,
+		posicaoDa,
+		sair,
+		listarTerritorios,
+		carregarConquistas,
+		ErroApi
+	} from '$lib/api';
+	import type { Guilda, Cargo, Progressao, Territory, Achievement } from '$lib/api';
+	import { gsap, dur, entrarBloco } from '$lib/motion';
 
 	let {
 		guilda,
 		cargo,
-		aoSair
-	}: { guilda: Guilda; cargo: Cargo; aoSair: () => void } = $props();
+		aoSair,
+		aoAtualizar
+	}: { guilda: Guilda; cargo: Cargo; aoSair: () => void; aoAtualizar: () => void } = $props();
 
 	let prog = $state<Progressao | null>(null);
 	let posicao = $state<number | null>(null);
+	let terrs = $state<Territory[]>([]);
+	let medalhas = $state<Achievement[]>([]);
 	let aviso = $state('');
-	let barra: HTMLDivElement;
+	let barra = $state<HTMLDivElement>();
+	let editando = $state(false);
+	let vendoConquistas = $state(false);
 
 	$effect(() => {
 		// Falha aqui não derruba a tela: o essencial já está na prop `guilda`.
@@ -23,7 +37,15 @@
 		posicaoDa(guilda.id)
 			.then((r) => (posicao = r.position))
 			.catch(() => {});
+		listarTerritorios()
+			.then((res) => (terrs = res.items.filter((t) => t.owner_guild_id === guilda.id)))
+			.catch(() => {});
+		carregarConquistas(guilda.id)
+			.then((res) => (medalhas = res.unlocked.slice(0, 4)))
+			.catch(() => {});
 	});
+
+	const rendimentoTotal = $derived(terrs.reduce((sum, t) => sum + t.prestige_per_day, 0));
 
 	// A barra cresce a partir de zero uma vez, quando o dado chega. Nada anima na
 	// primeira pintura do painel (docs/MOVIMENTO.md) — isto acontece depois.
@@ -56,10 +78,26 @@
 	}
 </script>
 
-<div class="conteudo">
-	<header>
-		<Brasao tag={guilda.tag} tamanho={78} />
-		<h1>{guilda.name}</h1>
+{#if editando}
+	<div class="editor-overlay" in:entrarBloco>
+		<header class="editor-header">
+			<button class="voltar" onclick={() => (editando = false)}>← Voltar</button>
+			<h2>Identidade</h2>
+		</header>
+		<EditorBrasao {guilda} aoSalvar={() => { editando = false; aoAtualizar(); }} />
+	</div>
+{:else if vendoConquistas}
+	<Conquistas guildaId={guilda.id} aoVoltar={() => (vendoConquistas = false)} />
+{:else}
+	<div class="conteudo" in:entrarBloco>
+		<header>
+			<Brasao
+				tag={guilda.tag}
+				tamanho={78}
+				layers={guilda.emblem_preset ? JSON.parse(guilda.emblem_preset) : undefined}
+				customUrl={guilda.custom_emblem_url}
+			/>
+			<h1>{guilda.name}</h1>
 		<p class="linhagem">
 			<span class="num">Nível {guilda.level}</span>
 			{#if posicao}
@@ -71,6 +109,15 @@
 
 	{#if guilda.motto}
 		<p class="lema">“{guilda.motto}”</p>
+	{/if}
+
+	{#if medalhas.length > 0}
+		<button class="conquistas-resumo" onclick={() => (vendoConquistas = true)}>
+			{#each medalhas as m}
+				<span class="medalha-mini" title={m.name}>🏅</span>
+			{/each}
+			{#if medalhas.length >= 4}<span>+</span>{/if}
+		</button>
 	{/if}
 
 	{#if prog}
@@ -98,6 +145,13 @@
 			<dt>Membros</dt>
 			<dd class="num" class:aviso={lotada}>{guilda.member_count}/{guilda.member_limit}</dd>
 		</div>
+		{#if terrs.length > 0}
+			<div class="rendimento">
+				<dt>Rendimento Territorial</dt>
+				<dd class="num verde">+{rendimentoTotal} Prestígio / dia</dd>
+				<small>{terrs.length} territórios sob domínio</small>
+			</div>
+		{/if}
 	</dl>
 
 	{#if guilda.status === 'pending'}
@@ -117,6 +171,10 @@
 {/if}
 
 <div class="acoes">
+	{#if cargo === 'leader' || cargo === 'officer'}
+		<button class="secundario" onclick={() => (editando = true)}>Editar Identidade</button>
+	{/if}
+
 	{#if cargo === 'leader'}
 		<!-- Líder não sai sem transferir (fase 02, R17): o servidor recusa, e a
 		     interface não oferece a ação para não prometer o que não entrega. -->
@@ -125,6 +183,7 @@
 		<button onclick={deixar}>Sair da guilda</button>
 	{/if}
 </div>
+{/if}
 
 <style>
 	.conteudo {
@@ -166,6 +225,22 @@
 		font-family: var(--display);
 		font-size: 14px;
 		text-wrap: balance;
+	}
+
+	.conquistas-resumo {
+		display: flex;
+		justify-content: center;
+		gap: 6px;
+		margin-top: 10px;
+		background: none;
+		border: none;
+		cursor: pointer;
+		padding: 4px;
+	}
+
+	.medalha-mini {
+		font-size: 16px;
+		filter: drop-shadow(0 2px 4px rgba(0,0,0,0.5));
 	}
 
 	.xp {
@@ -221,6 +296,22 @@
 		color: var(--gules);
 	}
 
+	.verde {
+		color: var(--vert);
+	}
+
+	.rendimento {
+		grid-column: 1 / -1;
+		margin-top: 10px;
+		padding-top: 10px;
+		border-top: 1px solid var(--borda);
+	}
+
+	.rendimento small {
+		font-size: 10px;
+		color: var(--argent-fraco);
+	}
+
 	.nota {
 		margin: 12px 0 0;
 		padding-left: 10px;
@@ -241,7 +332,45 @@
 		display: grid;
 	}
 
-	.acoes .nota {
+	.acoes button.secundario {
+		background: none;
+		border: 1px solid var(--borda);
+		color: var(--argent);
+		margin-bottom: 8px;
+	}
+
+	.editor-overlay {
+		position: absolute;
+		inset: 0;
+		z-index: 10;
+		background: var(--sable);
+		display: flex;
+		flex-direction: column;
+	}
+
+	.editor-header {
+		display: flex;
+		align-items: center;
+		padding: 10px;
+		border-bottom: 1px solid var(--borda);
+		background: var(--sable-2);
+	}
+
+	.editor-header h2 {
 		margin: 0;
+		font-size: 14px;
+		text-transform: uppercase;
+		letter-spacing: 0.1em;
+		flex: 1;
+		text-align: center;
+		padding-right: 40px; /* compensa o botão voltar */
+	}
+
+	.voltar {
+		background: none;
+		border: none;
+		color: var(--or);
+		font-size: 12px;
+		cursor: pointer;
 	}
 </style>

@@ -9,11 +9,28 @@ function createWarStore() {
 	const load = async () => {
 		try {
 			const res = await guerrasAtivas();
-			set(res.items);
+			set(res.items.map(normalizarGuerra));
 		} catch (e) {
 			console.error('Falha ao carregar guerras:', e);
 		}
 	};
+
+	function normalizarGuerra(w: any): Guerra {
+		return {
+			...w,
+			id: w.id ?? w.war_id,
+			score_challenger: w.score_challenger ?? w.challenger?.score ?? 0,
+			score_defender: w.score_defender ?? w.defender?.score ?? 0,
+			challenger: w.challenger ?? {
+				guild_id: w.challenger_guild_id,
+				tag: w.challenger_tag ?? '???'
+			},
+			defender: w.defender ?? {
+				guild_id: w.defender_guild_id,
+				tag: w.defender_tag ?? '???'
+			}
+		};
+	}
 
 	return {
 		subscribe,
@@ -25,7 +42,7 @@ function createWarStore() {
 			// Integração PubSub (se houver broadcast de atualização)
 			const unsubscribePubSub = ouvirBroadcast<{ type: string; wars?: Guerra[] }>((m) => {
 				if (m.type === 'war.board' && Array.isArray(m.wars)) {
-					set(m.wars);
+					set(m.wars.map(normalizarGuerra));
 				}
 			});
 

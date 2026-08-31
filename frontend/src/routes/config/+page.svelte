@@ -5,30 +5,27 @@
 	import {
 		configAnuncio,
 		salvarConfigAnuncio,
-		territorios,
 		temporadaAtual,
 		ErroApi,
 		type Temporada
 	} from '$lib/api';
+	import GerenciarTerritorios from '$lib/telas/GerenciarTerritorios.svelte';
 
 	let estado = $state<'carregando' | 'pronto' | 'erro'>('carregando');
 	let erro = $state('');
 	let salvo = $state('');
 
 	let anuncio = $state<{ webhook_url?: string; enabled?: boolean; max_per_hour?: number }>({});
-	let terrs = $state<{ id: number; name: string; guild_tag?: string }[]>([]);
 	let temporada = $state<Temporada | null>(null);
 
 	async function carregar() {
 		try {
-			const [a, t, s] = await Promise.all([
+			const [a, t] = await Promise.all([
 				configAnuncio().catch(() => ({})),
-				territorios().catch(() => ({ items: [] })),
 				temporadaAtual().catch(() => null)
 			]);
 			anuncio = a as typeof anuncio;
-			terrs = t.items;
-			temporada = s;
+			temporada = t;
 			estado = 'pronto';
 		} catch (e) {
 			erro = e instanceof ErroApi ? e.message : 'Não foi possível carregar a configuração.';
@@ -114,22 +111,12 @@
 		</section>
 
 		<section>
-			<h2>Territórios <span class="conta num">{terrs.length}</span></h2>
-			{#if terrs.length}
-				<ul class="terrs">
-					{#each terrs as t (t.id)}
-						<li>
-							<span>{t.name}</span>
-							<span class="dono">{t.guild_tag ? `[${t.guild_tag}]` : 'neutro'}</span>
-						</li>
-					{/each}
-				</ul>
-			{:else}
-				<p class="ajuda">
-					Nenhum território criado. Guildas disputam esses locais durante eventos, e cada um
-					rende Prestígio por dia para quem o detém.
-				</p>
-			{/if}
+			<h2>Territórios</h2>
+			<p class="ajuda">
+				Crie os locais que as guildas disputarão. Cada território rende Prestígio por dia para a
+				guilda que o dominar.
+			</p>
+			<GerenciarTerritorios />
 		</section>
 	{/if}
 </main>

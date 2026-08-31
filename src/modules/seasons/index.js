@@ -12,7 +12,7 @@ import {
 } from './ranking.js'
 import { ACHIEVEMENTS, TRIGGER_TYPES, evaluateAll } from './achievements.js'
 import { SEASON_DAYS, dueStatus, earlyEnd, nextWindow } from './lifecycle.js'
-import { cached } from '../../core/redis.js'
+import { cached, redis } from '../../core/redis.js'
 
 /**
  * Fase 04 — Competição. Como a fase 03, este módulo é sobretudo CONSUMIDOR de
@@ -92,18 +92,38 @@ async function post (client, { channelId, guildId, seasonId, eventId, source, po
 
   // R16 — o piso é 0 (clamp, não erro). O ledger guarda o -5000 inteiro; o
   // agregado nunca fica negativo, e o recompute usa o mesmo greatest(0, ...).
-  await client.query(
+  const { rows: [p] } = await client.query(
     `INSERT INTO guild_season_prestige (season_id, guild_id, channel_id, prestige, last_gain_at)
      VALUES ($1, $2, $3, greatest(0, $4::int), CASE WHEN $4::int > 0 THEN $5::timestamptz END)
      ON CONFLICT (season_id, guild_id) DO UPDATE
         SET prestige = greatest(0, guild_season_prestige.prestige + $4::int),
             last_gain_at = CASE WHEN $4::int > 0 THEN $5::timestamptz
                                 ELSE guild_season_prestige.last_gain_at END,
-            updated_at = now()`,
+            updated_at = now()
+     RETURNING prestige, last_gain_at`,
     [seasonId, guildId, channelId, points, at ?? new Date()])
 
   await syncGuildPrestige(client, seasonId, guildId)
+  updateLiveRank(seasonId, guildId, p.prestige, p.last_gain_at).catch(() => {})
   return entry
+}
+
+/**
+ * Para o card "Sua Guilda" ser instantâneo, mantemos um ZSET no Redis com o
+ * Prestígio de todas as guildas da temporada ativa.
+ */
+async function updateLiveRank (seasonId, guildId, prestige, lastGainAt) {
+  const r = await redis()
+  if (!r) return
+
+  // Score do ZSET = prestige + (1 - (timestamp / 2^48)) para desempate ASC do tempo.
+  // Como ZREVRANK quer score maior, (max - timestamp) funciona.
+  const timestamp = lastGainAt ? +new Date(lastGainAt) : 0
+  const score = Number(prestige) + (1 - (timestamp / 1_000_000_000_000_000))
+
+  try {
+    await r.zAdd(`rank:zset:${seasonId}`, { score, value: String(guildId) })
+  } catch { /* silencioso */ }
 }
 
 /** `guild.prestige` (core) é espelho de leitura da temporada ativa — a fase 07 lê ele. */
@@ -222,6 +242,21 @@ export async function takeSnapshot (client, seasonId, isFinal = false) {
 
 /** Posição ao vivo (§5.1). ponytail: janela sobre a temporada inteira — D7 troca por ZSET. */
 async function livePosition (client, seasonId, guildId) {
+  const r = await redis()
+  if (r) {
+    try {
+      const rank = await r.zRevRank(`rank:zset:${seasonId}`, String(guildId))
+      if (rank !== null) {
+        const prestigeScore = await r.zScore(`rank:zset:${seasonId}`, String(guildId))
+        return {
+          guild_id: guildId,
+          prestige: Math.floor(prestigeScore),
+          position: rank + 1,
+        }
+      }
+    } catch { /* fallback */ }
+  }
+
   const { rows } = await client.query(
     `WITH ranked AS (
        SELECT p.guild_id, p.prestige,
@@ -379,10 +414,28 @@ export default async function seasons (app) {
     // só existe para limitar memória. Sem Redis, cai direto no Postgres.
     const rows = await cached(`rank:${snapshot.id}:${after}:${limit}`, 300, async () => {
       const { rows } = await query(
-        `SELECT r.position, r.guild_id, r.prestige, g.name, g.tag, g.level, g.emblem_preset
-           FROM ranking_snapshot_row r JOIN guild g ON g.id = r.guild_id
-          WHERE r.snapshot_id = $1 AND r.position > $2
-          ORDER BY r.position LIMIT $3`, [snapshot.id, after, limit])
+        `WITH current_snap AS (
+           SELECT position, guild_id, prestige
+             FROM ranking_snapshot_row
+            WHERE snapshot_id = $1
+         ),
+         prev_snap_id AS (
+           SELECT id FROM ranking_snapshot
+            WHERE season_id = $4 AND id < $1
+            ORDER BY taken_at DESC LIMIT 1
+         ),
+         prev_snap AS (
+           SELECT position, guild_id
+             FROM ranking_snapshot_row
+            WHERE snapshot_id = (SELECT id FROM prev_snap_id)
+         )
+         SELECT r.position, r.guild_id, r.prestige, g.name, g.tag, g.level, g.emblem_preset,
+                (p.position - r.position) AS delta_position
+           FROM current_snap r
+           JOIN guild g ON g.id = r.guild_id
+           LEFT JOIN prev_snap p ON p.guild_id = r.guild_id
+          WHERE r.position > $2
+          ORDER BY r.position LIMIT $3`, [snapshot.id, after, limit, snapshot.season_id])
       return rows
     })
 
@@ -477,8 +530,14 @@ export default async function seasons (app) {
     return {
       unlocked,
       progress: progress
-        .filter(p => !has.has(p.code))
-        .map(p => ({ ...p, target: ACHIEVEMENTS[p.code]?.target ?? null })),
+        .filter(p => !has.has(p.code) && ACHIEVEMENTS[p.code])
+        .map(p => ({
+          code: p.code,
+          name: ACHIEVEMENTS[p.code].name,
+          description: ACHIEVEMENTS[p.code].description,
+          current: p.current,
+          target: ACHIEVEMENTS[p.code].target
+        })),
     }
   })
 

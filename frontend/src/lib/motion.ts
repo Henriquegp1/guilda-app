@@ -53,3 +53,32 @@ export function reordenar(itens: Element[], mutar: () => void) {
 		onLeave: (els) => gsap.to(els, { opacity: 0, duration: dur(0.2) })
 	});
 }
+
+/**
+ * Transição de entrada para blocos de conteúdo (abas, cards).
+ * RPG feel: fade in + subida leve.
+ */
+export function entrarBloco(node: HTMLElement, { delay = 0, d = 0.4 } = {}) {
+	gsap.fromTo(
+		node,
+		{ opacity: 0, y: 10 },
+		{ opacity: 1, y: 0, duration: dur(d), delay, ease: 'power2.out' }
+	);
+	return {
+		duration: dur(d + delay) * 1000
+	};
+}
+
+/**
+ * Transição de saída para blocos de conteúdo.
+ */
+export function sairBloco(node: HTMLElement, { d = 0.25 } = {}) {
+	gsap.to(node, { opacity: 0, y: -10, duration: dur(d), ease: 'power2.in' });
+}
+
+/**
+ * Animação de impacto para mudanças de score ou conquistas.
+ */
+export function impacto(node: HTMLElement) {
+	gsap.fromTo(node, { scale: 1.2 }, { scale: 1, duration: dur(0.4), ease: 'back.out(2)' });
+}

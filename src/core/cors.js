@@ -7,6 +7,7 @@
  * `Authorization` em jogo, `*` seria abrir o EBS para qualquer página.
  */
 const TWITCH = /^https:\/\/[a-z0-9]+\.ext-twitch\.tv$/
+const LOCAL = /^http:\/\/localhost(:\d+)?$/
 
 const extras = () =>
   (process.env.CORS_ORIGINS ?? '')
@@ -15,7 +16,7 @@ const extras = () =>
     .filter(Boolean)
 
 export const origemPermitida = (origem) =>
-  !!origem && (TWITCH.test(origem) || extras().includes(origem))
+  !!origem && (TWITCH.test(origem) || LOCAL.test(origem) || extras().includes(origem))
 
 export function cors (app) {
   app.addHook('onRequest', async (req, reply) => {

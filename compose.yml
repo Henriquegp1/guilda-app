@@ -7,6 +7,8 @@ services:
   db:
     image: postgres:18-alpine
     restart: unless-stopped
+    ports:
+      - '5432:5432'
     environment:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?defina no .env}
       POSTGRES_DB: twitch_guilds
@@ -14,7 +16,7 @@ services:
       # migrações quebram com "22P05 untranslatable character".
       POSTGRES_INITDB_ARGS: '--encoding=UTF8 --locale=C'
     volumes:
-      - db:/var/lib/postgresql/data
+      - db:/var/lib/postgresql
     healthcheck:
       test: ['CMD-SHELL', 'pg_isready -U postgres -d twitch_guilds']
       interval: 5s
@@ -24,6 +26,8 @@ services:
   redis:
     image: redis:8-alpine
     restart: unless-stopped
+    ports:
+      - '6379:6379'
     command: ['redis-server', '--save', '', '--appendonly', 'no']
     healthcheck:
       test: ['CMD', 'redis-cli', 'ping']

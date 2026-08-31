@@ -1,4 +1,4 @@
-import { test, describe, after } from 'node:test'
+import { test, describe, before, after } from 'node:test'
 import assert from 'node:assert/strict'
 import { EVENT_TYPES } from '../src/core/events.js'
 import {
@@ -15,7 +15,9 @@ import {
 import {
   sign, signatureHeader, verifySignature, newSecret, SIGNATURE_SKEW_S,
 } from '../src/modules/announce/sign.js'
-import { isPrivateAddress, ulid, varsFromEvent, guildEligible } from '../src/modules/announce/worker.js'
+import {
+  isPrivateAddress, ulid, varsFromEvent, guildEligible, processOutboxOnce, deliverNow,
+} from '../src/modules/announce/worker.js'
  
 // Este arquivo é o único da suíte que fala com o Postgres (seção "outbox" no
 // fim) sem nunca fechar o pool depois — sem isto o processo deste arquivo de
@@ -539,3 +541,185 @@ describe('outbox (precisa de Postgres)', { skip: !process.env.DATABASE_URL }, ()
     assert.match(rows[0].indexdef, /UNIQUE.*channel_id, dedup_key/)
   })
 })
+ 
+// ------------------------------------------------------- dispatch (Postgres)
+// Exercita processOutboxOnce/deliverNow de ponta a ponta: webhook fake via
+// fetchImpl (nunca sai da máquina), mas leitura/escrita reais no Postgres —
+// é onde vivem R8, R9, R12 e R19, que não dá pra validar só com funções puras.
+// assertPublicUrl faz um DNS lookup de verdade (não é injetável), então o
+// canal aqui usa um webhook_url público de verdade (example.com) — os testes
+// desta suíte precisam de acesso à internet além do Postgres.
+describe('dispatch e entrega (Postgres)', { skip: !process.env.DATABASE_URL }, () => {
+  const sufixo = Date.now().toString(36) + Math.random().toString(36).slice(2, 6)
+  let channelId
+  let db
+ 
+  before(async () => {
+    db = await import('../src/core/db.js')
+    const { migrate } = await import('../src/core/migrate.js')
+    await migrate(() => {})
+ 
+    const { rows: [ch] } = await db.query(
+      'INSERT INTO channel (twitch_channel_id) VALUES ($1) RETURNING id', [`test-dispatch-${sufixo}`])
+    channelId = ch.id
+ 
+    await db.query(
+      `INSERT INTO announce_config (channel_id, enabled, webhook_url, hourly_cap, enabled_at)
+       VALUES ($1, true, 'https://example.com/webhook', 12, now())`, [channelId])
+ 
+    const { encryptSecret, newSecret } = await import('../src/modules/announce/sign.js')
+    await db.query(
+      `INSERT INTO announce_secret (channel_id, secret_enc, status) VALUES ($1, $2, 'active')`,
+      [channelId, encryptSecret(newSecret())])
+  })
+ 
+  after(async () => {
+    if (channelId) await db.query('DELETE FROM channel WHERE id = $1', [channelId])
+  })
+ 
+  const insertItem = async (over = {}) => {
+    const id = ulid()
+    await db.query(
+      `INSERT INTO announce_outbox
+         (id, channel_id, event_type, priority, dedup_key, status, message, payload,
+          attempts, not_before, expires_at)
+       VALUES ($1, $2, $3, $4, $1, $5, 'oi', '{}'::jsonb, $6, $7, $8)`,
+      [id, channelId, over.eventType ?? 'ranking.top1_changed', over.priority ?? 'alta',
+        over.status ?? 'queued', over.attempts ?? 0,
+        over.notBefore ?? new Date(0), over.expiresAt ?? new Date(Date.now() + 600_000)])
+    return id
+  }
+ 
+  const itemRow = async (id) =>
+    (await db.query('SELECT * FROM announce_outbox WHERE id = $1', [id])).rows[0]
+ 
+  const configRow = async () =>
+    (await db.query('SELECT * FROM announce_config WHERE channel_id = $1', [channelId])).rows[0]
+ 
+  const resetChannel = () => Promise.all([
+    db.query(
+      `UPDATE announce_config SET enabled = true, fail_streak = 0,
+              webhook_url = 'https://example.com/webhook' WHERE channel_id = $1`, [channelId]),
+    db.query('DELETE FROM announce_outbox WHERE channel_id = $1', [channelId]),
+  ])
+ 
+  test('bot devolvendo 500: fica queued, agenda retry com backoff de ~2s (±20%)', async () => {
+    await resetChannel()
+    const T0 = Date.now()
+    const id = await insertItem({ attempts: 0 })
+    const fetchImpl = async () => ({ status: 500 })
+ 
+    await processOutboxOnce(channelId, { now: T0, fetchImpl })
+ 
+    const item = await itemRow(id)
+    assert.equal(item.status, 'queued')
+    assert.equal(item.attempts, 1)
+    const waited = +new Date(item.not_before) - T0
+    assert.ok(waited >= 1600 && waited <= 2400, `backoff fora da janela: ${waited}ms`)
+ 
+    const { rows: log } = await db.query(
+      'SELECT * FROM announce_delivery_log WHERE outbox_id = $1', [id])
+    assert.equal(log.length, 1)
+    assert.equal(log[0].attempt, 1)
+    assert.equal(log[0].http_status, 500)
+  })
+ 
+  test('R19: 3ª tentativa falha vira failed e soma no fail_streak do canal', async () => {
+    await resetChannel()
+    const T0 = Date.now()
+    const id = await insertItem({ attempts: 2 })   // próxima tentativa é a 3ª
+    const fetchImpl = async () => ({ status: 500 })
+ 
+    await processOutboxOnce(channelId, { now: T0, fetchImpl })
+ 
+    const item = await itemRow(id)
+    assert.equal(item.status, 'failed')
+    assert.equal(item.attempts, 3)
+    assert.match(item.suppress_reason, /http 500/)
+    assert.equal((await configRow()).fail_streak, 1)
+  })
+ 
+  test('R19: 10 falhas terminais seguidas desligam announce_config.enabled', async () => {
+    await resetChannel()
+    const T0 = Date.now()
+    const ids = await Promise.all(Array.from({ length: 10 }, () => insertItem({ attempts: 2 })))
+    const fetchImpl = async () => ({ status: 500 })
+ 
+    await processOutboxOnce(channelId, { now: T0, fetchImpl, max: 25 })
+ 
+    for (const id of ids) assert.equal((await itemRow(id)).status, 'failed')
+    const cfg = await configRow()
+    assert.equal(cfg.fail_streak, 10)
+    assert.equal(cfg.enabled, false)
+  })
+ 
+  test('R12: item vencido nunca é tentado — vira expired sem chamar o webhook', async () => {
+    await resetChannel()
+    const T0 = Date.now()
+    const id = await insertItem({ expiresAt: new Date(T0 - 1000) })
+    const fetchImpl = async () => { throw new Error('não deveria ter sido chamado') }
+ 
+    await processOutboxOnce(channelId, { now: T0, fetchImpl })
+ 
+    assert.equal((await itemRow(id)).status, 'expired')
+  })
+ 
+  test('sucesso (2xx): marca sent, grava sent_at e zera o fail_streak', async () => {
+    await resetChannel()
+    await db.query('UPDATE announce_config SET fail_streak = 5 WHERE channel_id = $1', [channelId])
+    const T0 = Date.now()
+    const id = await insertItem({ attempts: 0 })
+    const fetchImpl = async () => ({ status: 200 })
+ 
+    await processOutboxOnce(channelId, { now: T0, fetchImpl })
+ 
+    const item = await itemRow(id)
+    assert.equal(item.status, 'sent')
+    assert.ok(item.sent_at)
+    assert.equal((await configRow()).fail_streak, 0)
+  })
+ 
+  test('SSRF revalidada no dispatch: webhook apontando pra IP privado nunca chama fetchImpl e conta como falha', async () => {
+    await resetChannel()
+    await db.query(
+      `UPDATE announce_config SET webhook_url = 'https://localhost/webhook' WHERE channel_id = $1`, [channelId])
+    const T0 = Date.now()
+    const id = await insertItem({ attempts: 0 })
+    const fetchImpl = async () => { throw new Error('não deveria ter sido chamado') }
+ 
+    await processOutboxOnce(channelId, { now: T0, fetchImpl })
+ 
+    const item = await itemRow(id)
+    assert.equal(item.status, 'failed')
+    assert.match(item.suppress_reason, /webhook_blocked/)
+    assert.equal((await configRow()).fail_streak, 1)
+  })
+ 
+  test('R21: deliverNow (POST /announce/test) entrega direto, fora do teto horário', async () => {
+    await resetChannel()
+    const T0 = Date.now()
+    const id = await insertItem({ attempts: 0 })
+    const fetchImpl = async () => ({ status: 200 })
+ 
+    const r = await deliverNow(channelId, id, { now: T0, fetchImpl })
+ 
+    assert.equal(r.status, 200)
+    assert.equal((await itemRow(id)).status, 'sent')
+  })
+})
+ 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

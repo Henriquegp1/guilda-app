@@ -4,16 +4,22 @@
 
 	let { guilda, tipo, aoSucesso }: { guilda: Guilda; tipo: 'name' | 'tag'; aoSucesso: () => void } = $props();
 
-	let valor = $state(tipo === 'name' ? guilda.name : guilda.tag);
+	// Svelte 5: Inicializamos com o valor atual, mas usamos $derived para os rótulos
+	let valor = $state('');
 	let ocupado = $state(false);
 	let erro = $state('');
 
-	const regex = tipo === 'name'
-		? /^[A-Za-z0-9][A-Za-z0-9 ]{1,22}[A-Za-z0-9]$/
-		: /^[A-Z0-9]{2,5}$/;
+	// Sincroniza valor inicial
+	$effect(() => {
+		valor = tipo === 'name' ? guilda.name : guilda.tag;
+	});
 
-	const rotulo = tipo === 'name' ? 'Nome da Guilda' : 'TAG';
-	const preco = tipo === 'name' ? 500 : 300;
+	const regex = $derived(tipo === 'name'
+		? /^[A-Za-z0-9][A-Za-z0-9 ]{1,22}[A-Za-z0-9]$/
+		: /^[A-Z0-9]{2,5}$/);
+
+	const rotulo = $derived(tipo === 'name' ? 'Nome da Guilda' : 'TAG');
+	const preco = $derived(tipo === 'name' ? 500 : 300);
 
 	async function solicitar() {
 		if (!regex.test(valor)) {
@@ -28,9 +34,7 @@
 		ocupado = true;
 		erro = '';
 		try {
-			// 1. Paga (sempre custa Bits para rename)
 			const receipt = await gastarBits(`guild.${tipo === 'name' ? 'rename' : 'tag'}`);
-			// 2. Envia para o EBS (entra na fila de moderação)
 			await post(`/guilds/${guilda.id}/identity/${tipo}`, {
 				value: valor,
 				transaction_receipt: receipt

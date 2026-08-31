@@ -1,8 +1,9 @@
 <script lang="ts">
-	import { catalog, assetsByLayer } from '$lib/catalog';
+	import { catalog, assetsByLayer, assetsById } from '$lib/catalog';
 	import Brasao from '$lib/ui/Brasao.svelte';
 	import { type EmblemLayers, type Asset } from '$lib/api';
 	import { onMount } from 'svelte';
+	import { get } from 'svelte/store';
 
 	let modo = $state<'designer' | 'simulacao'>('designer');
 	let nivelSimulado = $state(1);
@@ -10,10 +11,30 @@
 	let favoritos = $state<Partial<EmblemLayers>[]>([]);
 	let inspecionando = $state<Partial<EmblemLayers> | null>(null);
 
+	// Filtros manuais para testar camadas específicas
+	let filtros = $state<Record<string, string>>({
+		shape: '',
+		background: '',
+		palette: '',
+		border: '',
+		symbol: '',
+		effect: ''
+	});
+
 	onMount(() => {
 		const salvos = localStorage.getItem('guilda_lab_favoritos');
 		if (salvos) favoritos = JSON.parse(salvos);
 		gerarAleatorios(20);
+	});
+
+	$effect(() => {
+		// Re-gerar quando mudar o modo ou nível na simulação
+		if (modo === 'simulacao' || Object.values(filtros).some(v => v !== '')) {
+			// apenas se a grade já tiver algo
+			if (grade.length > 0 && !Object.values(filtros).some(v => v !== '')) {
+				gerarAleatorios(grade.length);
+			}
+		}
 	});
 
 	function salvarFavoritos() {
@@ -28,23 +49,26 @@
 		if (modo === 'designer') return true;
 		if (a.tier === 'free') return true;
 		if (a.tier === 'level') return nivelSimulado >= (a.unlock_level || 0);
-		return false; // paid assets como "indisponíveis" na simulação base
+		return false;
 	}
 
 	function gerarBrasao(curado = false): Partial<EmblemLayers> {
 		const camadas: Partial<EmblemLayers> = {};
-		const layers: (keyof typeof $assetsByLayer)[] = ['shape', 'background', 'palette', 'border', 'symbol', 'effect'];
+		const layers: (keyof EmblemLayers)[] = ['shape', 'background', 'palette', 'border', 'symbol', 'effect'];
 
 		for (const l of layers) {
-			const opcoes = $assetsByLayer[l].filter(itemDisponivel);
+			// Se houver um filtro manual fixo, usa ele
+			if (filtros[l]) {
+				camadas[l] = filtros[l] as any;
+				continue;
+			}
+
+			const opcoes = get(assetsByLayer)[l].filter(itemDisponivel);
 			if (opcoes.length === 0) continue;
 
 			if (curado) {
-				// Lógica simples de curadoria:
-				// - 30% de chance de border.none ou effect.none
 				if ((l === 'border' || l === 'effect') && Math.random() < 0.3) {
-					camadas[l] = `effect.none` as any; // simplificação
-					if (l === 'border') camadas[l] = 'border.none' as any;
+					camadas[l] = (l === 'border' ? 'border.none' : 'effect.none') as any;
 					continue;
 				}
 			}
@@ -100,10 +124,27 @@
 	</header>
 
 	<main class="viewport">
+		<aside class="controles-manuais">
+			<h2>Mixer Manual</h2>
+			{#each Object.keys(filtros) as layer}
+				<div class="grupo-filtro">
+					<label>{layer}</label>
+					<select bind:value={filtros[layer]} onchange={() => gerarAleatorios(grade.length)}>
+						<option value="">🎲 Aleatório</option>
+						{#each get(assetsByLayer)[layer].filter(itemDisponivel) as a}
+							<option value={a.id}>{a.id.split('.')[1]}</option>
+						{/each}
+					</select>
+				</div>
+			{/each}
+			<button class="reset" onclick={() => { filtros = { shape: '', background: '', palette: '', border: '', symbol: '', effect: '' }; gerarAleatorios(20); }}>Limpar Mixer</button>
+		</aside>
+
 		<section class="secao-grade">
 			<div class="grade">
 				{#each grade as b}
-					<div
+					<button
+						type="button"
 						class="item-brasao"
 						onmouseenter={() => (inspecionando = b)}
 						onclick={() => toggleFavorito(b)}
@@ -112,7 +153,7 @@
 						{#if favoritos.some((f) => JSON.stringify(f) === JSON.stringify(b))}
 							<span class="fav-badge">⭐</span>
 						{/if}
-					</div>
+					</button>
 				{/each}
 			</div>
 		</section>
@@ -128,7 +169,10 @@
 						{#each Object.entries(inspecionando) as [camada, id]}
 							<div class="linha-detalhe">
 								<span class="label">{camada}:</span>
-								<span class="valor">{id}</span>
+																	{id}
+									{#if get(assetsById).get(id as string)?.author}
+										<small class="autor-ins">({get(assetsById).get(id as string)?.author})</small>
+									{/if}
 							</div>
 						{/each}
 					</div>
@@ -202,6 +246,43 @@
 		flex: 1;
 		display: flex;
 		overflow: hidden;
+	}
+
+	.controles-manuais {
+		width: 220px;
+		background: #1a1d2e;
+		border-right: 1px solid #2d324d;
+		padding: 1.5rem;
+		overflow-y: auto;
+		display: flex;
+		flex-direction: column;
+		gap: 1rem;
+	}
+
+	.grupo-filtro {
+		display: flex;
+		flex-direction: column;
+		gap: 0.3rem;
+	}
+
+	.grupo-filtro label {
+		font-size: 0.75rem;
+		text-transform: uppercase;
+		color: #888;
+		letter-spacing: 0.05em;
+	}
+
+	.controles-manuais select {
+		width: 100%;
+		font-size: 0.85rem;
+	}
+
+	.reset {
+		margin-top: 1rem;
+		background: none;
+		border: 1px solid #e74c3c;
+		color: #e74c3c;
+		font-size: 0.75rem;
 	}
 
 	.secao-grade {
@@ -278,6 +359,7 @@
 
 	.label { color: #888; }
 	.valor { color: #d4af37; font-weight: bold; }
+	.autor-ins { font-size: 9px; font-weight: normal; color: #666; margin-left: 4px; }
 
 	.acoes-inspecao {
 		display: flex;

@@ -4,12 +4,33 @@
 	import { aceitarGuerra, recusarGuerra, type Guilda, type Cargo, type Guerra } from '$lib/api';
 	import Brasao from '$lib/ui/Brasao.svelte';
 	import DeclararGuerra from './DeclararGuerra.svelte';
+	import EscalacaoGuerra from './EscalacaoGuerra.svelte';
+	import { warDetails, type WarRosterItem } from '$lib/api';
 
 	let { guilda, cargo }: { guilda: Guilda; cargo: Cargo } = $props();
 
 	let guerra = minhaGuerra(guilda.id);
 	let declarando = $state(false);
+	let editandoRoster = $state(false);
 	let ocupado = $state(false);
+	let rosterAtual = $state<WarRosterItem[]>([]);
+
+	async function carregarRoster() {
+		if ($guerra) {
+			try {
+				const res = await warDetails($guerra.id);
+				rosterAtual = res.roster.filter((r) => r.guild_id === guilda.id);
+			} catch (e) {
+				console.error(e);
+			}
+		}
+	}
+
+	$effect(() => {
+		if ($guerra && (cargo === 'leader' || cargo === 'officer')) {
+			carregarRoster();
+		}
+	});
 
 	onMount(() => {
 		const parar = wars.iniciar();
@@ -49,9 +70,11 @@
 
 <div class="painel-guerra">
 	{#if $guerra}
+		{@const total = $guerra.score_challenger + $guerra.score_defender}
+		{@const pctChallenger = total > 0 ? ($guerra.score_challenger / total) * 100 : 50}
 		<div class="guerra-ativa">
 			<header class="status-header">
-				<span class="badge { $guerra.status }">{$guerra.status.toUpperCase()}</span>
+				<span class="badge {$guerra.status}">{$guerra.status.toUpperCase()}</span>
 				<span class="formato">{$guerra.format.toUpperCase()}</span>
 			</header>
 
@@ -59,34 +82,93 @@
 				<div class="lado">
 					<Brasao tag={guilda.tag} tamanho={64} />
 					<span class="score num">
-						{ $guerra.challenger_guild_id === guilda.id ? $guerra.score_challenger : $guerra.score_defender }
+						{$guerra.challenger_guild_id === guilda.id
+							? $guerra.score_challenger
+							: $guerra.score_defender}
 					</span>
 				</div>
 				<div class="vs">⚔</div>
 				<div class="lado">
-					<Brasao tag="???" tamanho={64} /> <!-- Precisamos carregar a tag do inimigo -->
+					<Brasao
+						tag={$guerra.challenger_guild_id === guilda.id ? $guerra.defender.tag : $guerra.challenger.tag}
+						tamanho={64}
+					/>
 					<span class="score num">
-						{ $guerra.challenger_guild_id === guilda.id ? $guerra.score_defender : $guerra.score_challenger }
+						{$guerra.challenger_guild_id === guilda.id
+							? $guerra.score_defender
+							: $guerra.score_challenger}
 					</span>
 				</div>
 			</div>
 
+			<div class="progresso-conflito">
+				<div class="barra-total">
+					<div
+						class="preenche challenger"
+						style:width="{pctChallenger}%"
+						style:background-color={$guerra.challenger_guild_id === guilda.id
+							? 'var(--vert)'
+							: 'var(--gules)'}
+					></div>
+					<div
+						class="preenche defender"
+						style:width="{100 - pctChallenger}%"
+						style:background-color={$guerra.defender_guild_id === guilda.id
+							? 'var(--vert)'
+							: 'var(--gules)'}
+					></div>
+				</div>
+				<div class="labels-barra">
+					<span>{Math.round(pctChallenger)}%</span>
+					<span>{Math.round(100 - pctChallenger)}%</span>
+				</div>
+			</div>
+
 			<div class="timer-box">
-				{#if $guerra.status === 'pending'}
-					<p>Desafio expira em: <span class="num">{formatarTempo($guerra.challenge_expires_at)}</span></p>
-					{#if $guerra.defender_guild_id === guilda.id && (cargo === 'leader' || cargo === 'officer')}
-						<div class="botoes-pendente">
-							<button class="aceitar" disabled={ocupado} onclick={() => responder($guerra!.id, 'aceitar')}>Aceitar</button>
-							<button class="recusar" disabled={ocupado} onclick={() => responder($guerra!.id, 'recusar')}>Recusar</button>
-						</div>
+				{#if $guerra.status === 'pending' || $guerra.status === 'accepted'}
+					{#if $guerra.status === 'pending'}
+						<p>
+							Desafio expira em: <span class="num">{formatarTempo($guerra.challenge_expires_at)}</span>
+						</p>
+					{:else}
+						<p>Começa em: <span class="num">{formatarTempo($guerra.starts_at)}</span></p>
+					{/if}
+
+					{#if cargo === 'leader' || cargo === 'officer'}
+						<button class="ajuste-roster" onclick={() => (editandoRoster = true)}>
+							Escalar Time ({rosterAtual.length}/{$guerra.roster_size})
+						</button>
+						{#if $guerra.status === 'pending' && $guerra.defender_guild_id === guilda.id}
+							<div class="botoes-pendente">
+								<button
+									class="aceitar"
+									disabled={ocupado}
+									onclick={() => responder($guerra!.id, 'aceitar')}>Aceitar</button
+								>
+								<button
+									class="recusar"
+									disabled={ocupado}
+									onclick={() => responder($guerra!.id, 'recusar')}>Recusar</button
+								>
+							</div>
+						{/if}
 					{/if}
 				{:else if $guerra.status === 'active'}
 					<p>Termina em: <span class="num">{formatarTempo($guerra.ends_at)}</span></p>
-				{:else if $guerra.status === 'accepted'}
-					<p>Começa em: <span class="num">{formatarTempo($guerra.starts_at)}</span></p>
 				{/if}
 			</div>
 		</div>
+	{:else if editandoRoster && $guerra}
+		<EscalacaoGuerra
+			war={$guerra}
+			guildaId={guilda.id}
+			currentRoster={rosterAtual}
+			aoSucesso={() => {
+				editandoRoster = false;
+				carregarRoster();
+			}}
+			aoCancelar={() => (editandoRoster = false)}
+		/>
 	{:else if declarando}
 		<DeclararGuerra {guilda} aoCancelar={() => (declarando = false)} />
 	{:else}
@@ -153,6 +235,33 @@
 		font-family: var(--display);
 	}
 
+	.progresso-conflito {
+		margin-bottom: 24px;
+	}
+
+	.barra-total {
+		height: 8px;
+		background: var(--sable-2);
+		border: 1px solid var(--borda);
+		border-radius: 4px;
+		display: flex;
+		overflow: hidden;
+	}
+
+	.preenche {
+		height: 100%;
+		transition: width 0.6s cubic-bezier(0.2, 1, 0.3, 1);
+	}
+
+	.labels-barra {
+		display: flex;
+		justify-content: space-between;
+		margin-top: 4px;
+		font-size: 10px;
+		color: var(--argent-fraco);
+		font-family: var(--texto);
+	}
+
 	.timer-box {
 		text-align: center;
 		background: var(--sable-2);
@@ -197,6 +306,17 @@
 		font-weight: bold;
 		border: none;
 		border-radius: 2px;
+		cursor: pointer;
+	}
+	.ajuste-roster {
+		margin-top: 10px;
+		width: 100%;
+		background: none;
+		border: 1px solid var(--or);
+		color: var(--or);
+		padding: 6px;
+		font-size: 11px;
+		text-transform: uppercase;
 		cursor: pointer;
 	}
 </style>

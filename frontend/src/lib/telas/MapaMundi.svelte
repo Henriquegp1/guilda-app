@@ -1,11 +1,14 @@
 <script lang="ts">
-	import { listarTerritorios, type Territory } from '$lib/api';
+	import { listarTerritorios, entrarDisputa, type Territory } from '$lib/api';
 	import { onMount } from 'svelte';
 	import Brasao from '$lib/ui/Brasao.svelte';
+	import { entrarBloco } from '$lib/motion';
 
 	let territories = $state<Territory[]>([]);
 	let loading = $state(true);
 	let selectedId = $state<number | null>(null);
+	let ocupado = $state(false);
+	let mensagem = $state('');
 
 	async function load() {
 		try {
@@ -21,6 +24,20 @@
 	onMount(load);
 
 	const selected = $derived(territories.find((t) => t.id === selectedId) || null);
+
+	async function participarDisputa(id: number) {
+		ocupado = true;
+		mensagem = '';
+		try {
+			await entrarDisputa(id);
+			mensagem = 'Inscrito na disputa com sucesso!';
+			await load();
+		} catch (e: any) {
+			mensagem = e.message || 'Falha ao entrar na disputa.';
+		} finally {
+			ocupado = false;
+		}
+	}
 
 	function formatarProtecao(iso: string | null) {
 		if (!iso) return null;
@@ -38,18 +55,27 @@
 	{:else}
 		<div class="viewport">
 			<svg viewBox="0 0 1000 1000" class="mapa-svg">
-				<!-- Fundo do Mapa (pode ser uma imagem ou padrão) -->
-				<rect width="1000" height="1000" fill="var(--sable-2)" />
+				<defs>
+					<radialGradient id="grad-mapa" cx="50%" cy="50%" r="50%">
+						<stop offset="0%" stop-color="#1a1422" />
+						<stop offset="100%" stop-color="#0e0b13" />
+					</radialGradient>
+				</defs>
+				<!-- Fundo do Mapa com gradiente radial -->
+				<rect width="1000" height="1000" fill="url(#grad-mapa)" />
+
 				<pattern id="grid" width="100" height="100" patternUnits="userSpaceOnUse">
-					<path d="M 100 0 L 0 0 0 100" fill="none" stroke="rgba(255,255,255,0.03)" stroke-width="1" />
+					<path d="M 100 0 L 0 0 0 100" fill="none" stroke="var(--or)" stroke-width="0.5" opacity="0.1" />
 				</pattern>
 				<rect width="1000" height="1000" fill="url(#grid)" />
 
 				{#each territories as t (t.id)}
 					{@const protegido = !!formatarProtecao(t.protected_until)}
+					{@const emDisputa = !!t.active_dispute_id}
 					<g
 						class="ponto"
 						class:selecionado={selectedId === t.id}
+						class:disputa={emDisputa}
 						onclick={() => (selectedId = t.id)}
 						transform="translate({t.map_x}, {t.map_y})"
 					>
@@ -58,6 +84,11 @@
 							<circle r="40" fill="none" stroke="var(--vert)" stroke-width="2" stroke-dasharray="4 4" opacity="0.6">
 								<animateTransform attributeName="transform" type="rotate" from="0" to="360" dur="10s" repeatCount="indefinite" />
 							</circle>
+						{/if}
+
+						<!-- Ícone de Disputa (Espadas) -->
+						{#if emDisputa}
+							<text y="-25" text-anchor="middle" font-size="20">⚔️</text>
 						{/if}
 
 						<!-- Base do ponto -->
@@ -75,7 +106,7 @@
 		</div>
 
 		{#if selected}
-			<div class="detalhes">
+			<div class="detalhes" in:entrarBloco>
 				<header>
 					<div class="brasao-mini">
 						<Brasao tag={selected.owner_tag || ''} tamanho={48} />
@@ -102,12 +133,25 @@
 							<span>Proteção</span>
 							<b class="verde">{formatarProtecao(selected.protected_until)}</b>
 						</div>
+					{:else if selected.active_dispute_id}
+						<div class="stat">
+							<span>Disputa Aberta</span>
+							<b class="ouro">Fecha em {formatarProtecao(selected.dispute_closes_at)}</b>
+						</div>
 					{/if}
 				</div>
 
-				{#if !selected.owner_guild_id}
-					<button class="disputar">Entrar na Disputa</button>
+				{#if selected.active_dispute_id}
+					<button
+						class="disputar"
+						disabled={ocupado}
+						onclick={() => participarDisputa(selected.active_dispute_id!)}
+					>
+						{ocupado ? 'Processando...' : 'Entrar na Disputa'}
+					</button>
 				{/if}
+
+				{#if mensagem}<p class="aviso-mapa" class:sucesso={mensagem.includes('sucesso')}>{mensagem}</p>{/if}
 			</div>
 		{:else}
 			<div class="ajuda-mapa">
@@ -167,6 +211,11 @@
 		stroke-width: 4px;
 	}
 
+	.ponto.disputa circle {
+		stroke: var(--gules);
+		stroke-width: 2px;
+	}
+
 	.detalhes {
 		padding: 16px;
 		background: var(--sable-2);
@@ -195,6 +244,17 @@
 
 	.ouro { color: var(--or); }
 	.verde { color: var(--vert); }
+
+	.aviso-mapa {
+		margin-top: 10px;
+		font-size: 11px;
+		text-align: center;
+		color: var(--gules);
+	}
+
+	.aviso-mapa.sucesso {
+		color: var(--vert);
+	}
 
 	.disputar {
 		width: 100%;
