@@ -40,6 +40,7 @@ const mk = (layer, tier, slug, extra) => ({
   status: 'active',
   price: tier === 'paid' ? PAID_PRICE[layer] : null,
   unlockLevel: null,
+  author: 'Game-icons.net', // Default para a v1
   ...extra,
 })
 const free = (layer, slugs) => slugs.map(s => mk(layer, 'free', s))
@@ -65,12 +66,20 @@ export const ASSETS = [
   ...level('border', [['laurel', 6], ['chain', 10]]),
   ...paid('border', ['runic']),
 
-  ...free('symbol', ['blank', 'sword', 'shield', 'axe', 'hammer', 'bow', 'star', 'crown', 'anchor',
-    'leaf', 'flame', 'skull', 'wolf', 'bear', 'fox', 'raven', 'fish', 'gear']),
-  ...level('symbol', [['lion', 3], ['tiger', 4], ['eagle', 5], ['serpent', 6], ['scorpion', 7], ['spider', 8],
-    ['owl', 9], ['stag', 10], ['boar', 11], ['whale', 12], ['kraken', 13], ['griffin', 14],
-    ['unicorn', 15], ['basilisk', 16], ['sphinx', 17], ['chimera', 18], ['hydra', 19], ['cerberus', 20]]),
-  ...paid('symbol', ['dragon', 'phoenix', 'leviathan', 'behemoth']),
+  // 18 grátis (§3) — inclui o fallback obrigatório 'blank'
+  ...free('symbol', [
+    'blank', 'sword', 'shield', 'axe', 'bow', 'dagger', 'hammer', 'spear',
+    'mace', 'staff', 'wand', 'torch', 'lantern', 'scroll', 'potion', 'gem', 'key', 'flag',
+  ]),
+  // 18 desbloqueáveis por nível (§3) — nenhum slug repete o das camadas grátis/pagas
+  ...level('symbol', [
+    ['eagle', 5], ['wolf', 8], ['bear', 10], ['boar', 12], ['falcon', 15],
+    ['cerberus', 20], ['griffin', 22], ['unicorn', 25], ['chimera', 28], ['hydra', 30],
+    ['kraken', 32], ['basilisk', 35], ['wyrm', 38], ['colossus', 40], ['titan', 42],
+    ['seraph', 45], ['minotaur', 48], ['reaper', 50],
+  ]),
+  // 4 pagos (§3) — ids próprios, sem colidir com os desbloqueáveis por nível
+  ...paid('symbol', ['dragon', 'leviathan', 'behemoth', 'phoenix']),
 
   ...free('effect', ['none']),
   ...level('effect', [['glow', 4], ['smoke', 9]]),
