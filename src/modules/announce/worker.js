@@ -1,6 +1,6 @@
 import { randomBytes } from 'node:crypto'
 import { lookup } from 'node:dns/promises'
-import { query, tx } from '../../core/db.js'
+import { query as dbQuery, tx } from '../../core/db.js'
 import { CATALOG, DEFAULT_TEMPLATES_AGG, passesCatalogFilter } from './catalog.js'
 import { decide, inQuietHours, AGG_WINDOW_MS, AGG_TRIGGER, AGG_MAX, TTL_MS } from './ratelimit.js'
 import { listOf, renderMessage } from './template.js'
@@ -49,14 +49,14 @@ export async function assertPublicUrl (raw) {
 }
 
 // --- estado do canal ------------------------------------------------------
-export const getConfig = async (channelId) =>
-  (await query('SELECT * FROM announce_config WHERE channel_id = $1', [channelId])).rows[0] ?? null
+export const getConfig = async (c, channelId) =>
+  (await c.query('SELECT * FROM announce_config WHERE channel_id = $1', [channelId])).rows[0] ?? null
 
 const quietOf = (cfg) => cfg.quiet_from ? { from: cfg.quiet_from, to: cfg.quiet_to, timezone: cfg.timezone } : null
 
 /** Segredos vivos: o `active` e, durante a rotação, o `retiring` não vencido. */
-export async function liveSecrets (channelId, now = Date.now()) {
-  const { rows } = await query(
+export async function liveSecrets (c, channelId, now = Date.now()) {
+  const { rows } = await c.query(
     `SELECT secret_enc, status, retires_at FROM announce_secret
       WHERE channel_id = $1 AND status <> 'revoked' ORDER BY created_at DESC`, [channelId])
   return rows
@@ -78,6 +78,8 @@ const PT = {
   'season.started': (p) => ({ temporada: p.name ?? p.season_id, termina_em: p.ends_at }),
   'season.ended': (p) => ({ temporada: p.name ?? p.season_id, primeiro: p.podium?.[0], segundo: p.podium?.[1], terceiro: p.podium?.[2] }),
   'guild.recruiting': (p) => ({ vagas: p.vagas, modo: p.modo }),
+  'dispute.opened': (p) => ({ territorio: p.territory_name ?? p.territory_id }),
+  'dispute.closed': (p) => ({ territorio: p.territory_name ?? p.territory_id, vencedor: p.winner_name }),
 }
 
 /**
@@ -114,12 +116,12 @@ const EVENT_SELECT = `
  * Só as regras que dependem do estado de entrada (R2/R3/R10/R11 + cooldown +
  * agregação); teto, rajada e espaçamento ficam para o dispatch (R8/R9).
  */
-export async function ingestOnce (channelId, { now = Date.now(), limit = 200 } = {}) {
-  const cfg = await getConfig(channelId)
+export async function ingestOnce (c, { channelId, now = Date.now(), limit = 200 } = {}) {
+  const cfg = await getConfig(c, channelId)
   if (!cfg?.enabled || !cfg.webhook_url) return { enqueued: 0, suppressed: 0 }   // R1
 
   const types = Object.keys(CATALOG)
-  const { rows: evCfg } = await query(
+  const { rows: evCfg } = await c.query(
     'SELECT event_type, enabled, template, template_agg, cooldown_s FROM announce_event_config WHERE channel_id = $1',
     [channelId])
   const byType = new Map(evCfg.map(r => [r.event_type, r]))
@@ -127,7 +129,7 @@ export async function ingestOnce (channelId, { now = Date.now(), limit = 200 } =
   const active = types.filter(t => byType.get(t)?.enabled)
   if (!active.length) return { enqueued: 0, suppressed: 0 }
 
-  const { rows: events } = await query(`${EVENT_SELECT}
+  const { rows: events } = await c.query(`${EVENT_SELECT}
     FROM guild_event ge
     LEFT JOIN guild g ON g.id = ge.guild_id
     JOIN channel c ON c.id = ge.channel_id
@@ -142,7 +144,7 @@ export async function ingestOnce (channelId, { now = Date.now(), limit = 200 } =
   const lastType = new Map()
   const aggWindow = new Map()
   for (const t of active) {
-    const { rows } = await query(
+    const { rows } = await c.query(
       `SELECT max(coalesce(sent_at, created_at)) AS last,
               max(agg_window) FILTER (WHERE status = 'queued' AND agg_window IS NOT NULL) AS win
          FROM announce_outbox
@@ -160,7 +162,7 @@ export async function ingestOnce (channelId, { now = Date.now(), limit = 200 } =
     if (!passesCatalogFilter(ev.type, ev.payload)) continue          // §3: conquista comum é ruído
     // R3/R4: pending, rejeitada, suspended ou banned nunca anuncia.
     if (!guildEligible(ev.guild_status)) {
-      await insertOutbox({ ev, cfg, cat, status: 'suppressed', reason: 'guild_ineligible', now })
+      await insertOutbox(c, { ev, cfg, cat, status: 'suppressed', reason: 'guild_ineligible', now })
       suppressed++
       continue
     }
@@ -173,14 +175,14 @@ export async function ingestOnce (channelId, { now = Date.now(), limit = 200 } =
     }, now)
 
     if (d.acao === 'suprimir') {
-      await insertOutbox({ ev, cfg, cat, status: 'suppressed', reason: d.motivo, now })
+      await insertOutbox(c, { ev, cfg, cat, status: 'suppressed', reason: d.motivo, now })
       suppressed++
       continue
     }
 
     const aggStart = d.acao === 'agregar' ? d.notBefore - AGG_WINDOW_MS : null
     const { message } = renderMessage({ eventType: ev.type, template: ec.template, vars: varsFromEvent(ev) })
-    const ok = await insertOutbox({
+    const ok = await insertOutbox(c, {
       ev, cfg, cat, status: 'queued', now,
       message: d.acao === 'agregar' ? null : message,
       notBefore: d.notBefore, aggWindow: aggStart,
@@ -191,7 +193,7 @@ export async function ingestOnce (channelId, { now = Date.now(), limit = 200 } =
     if (d.acao === 'agregar') aggWindow.set(ev.type, aggStart)
     else lastType.set(ev.type, now)
     if (d.motivo === 'supersede') {                                   // R16
-      await query(
+      await c.query(
         `UPDATE announce_outbox SET status = 'superseded'
           WHERE channel_id = $1 AND event_type = $2 AND status = 'queued' AND id <> $3`,
         [channelId, ev.type, ok])
@@ -200,7 +202,7 @@ export async function ingestOnce (channelId, { now = Date.now(), limit = 200 } =
   return { enqueued, suppressed }
 }
 
-async function insertOutbox ({ ev, cfg, cat, status, reason = null, message = null, notBefore, aggWindow = null, now }) {
+async function insertOutbox (c, { ev, cfg, cat, status, reason = null, message = null, notBefore, aggWindow = null, now }) {
   const id = ulid(now)
   const nb = new Date(notBefore ?? now)
   const payload = {
@@ -213,7 +215,7 @@ async function insertOutbox ({ ev, cfg, cat, status, reason = null, message = nu
     aggregate: { count: 1, window_s: 0 },
     vars: varsFromEvent(ev),
   }
-  const { rows } = await query(
+  const { rows } = await c.query(
     `INSERT INTO announce_outbox
        (id, channel_id, guild_event_id, guild_id, event_type, priority, dedup_key,
         status, suppress_reason, message, payload, not_before, expires_at, agg_window, created_at)
@@ -226,8 +228,9 @@ async function insertOutbox ({ ev, cfg, cat, status, reason = null, message = nu
 
 // --- agregação ------------------------------------------------------------
 /** Fecha janelas vencidas ou cheias. ≥3 vira um agregado; 1 ou 2 saem sozinhos (R15). */
-export async function flushAggregates (channelId, now = Date.now()) {
-  const { rows: groups } = await query(
+export async function flushAggregates (c, { channelId, now = Date.now() } = {}) {
+  let made = 0
+  const { rows: groups } = await c.query(
     `SELECT event_type, agg_window, count(*)::int AS n
        FROM announce_outbox
       WHERE channel_id = $1 AND status = 'queued' AND agg_window IS NOT NULL
@@ -235,57 +238,54 @@ export async function flushAggregates (channelId, now = Date.now()) {
      HAVING count(*) >= $2 OR agg_window <= $3`,
     [channelId, AGG_MAX, new Date(now - AGG_WINDOW_MS)])
 
-  let made = 0
   for (const g of groups) {
-    await tx(async (c) => {
-      const { rows: members } = await c.query(
-        `SELECT id, payload, guild_id FROM announce_outbox
-          WHERE channel_id = $1 AND event_type = $2 AND agg_window = $3 AND status = 'queued'
-          ORDER BY created_at FOR UPDATE`,
-        [channelId, g.event_type, g.agg_window])
-      if (!members.length) return
+    const { rows: members } = await c.query(
+      `SELECT id, payload, guild_id FROM announce_outbox
+        WHERE channel_id = $1 AND event_type = $2 AND agg_window = $3 AND status = 'queued'
+        ORDER BY id FOR UPDATE`,
+      [channelId, g.event_type, g.agg_window])
+    if (!members.length) continue
 
-      if (members.length < AGG_TRIGGER) {
-        await c.query(
-          `UPDATE announce_outbox SET agg_window = NULL, not_before = $2 WHERE id = ANY($1)`,
-          [members.map(m => m.id), new Date(now)])
-        return
-      }
-
-      const { rows: [ec] } = await c.query(
-        'SELECT template_agg FROM announce_event_config WHERE channel_id = $1 AND event_type = $2',
-        [channelId, g.event_type])
-      const nomes = members.map(m => m.payload.vars?.guilda).filter(Boolean)
-      const vars = { ...members[members.length - 1].payload.vars, quantidade: members.length, lista: listOf(nomes) }
-      const template = ec?.template_agg ?? DEFAULT_TEMPLATES_AGG[g.event_type]
-      const { message } = renderMessage({ eventType: g.event_type, template, vars, agg: true })
-
-      const id = ulid(now)
-      const payload = {
-        id,
-        channel_id: members[0].payload.channel_id,
-        event: g.event_type,
-        priority: CATALOG[g.event_type].priority,
-        occurred_at: new Date(now).toISOString(),
-        message,
-        aggregate: { count: members.length, window_s: AGG_WINDOW_MS / 1000 },
-        vars,
-      }
+    if (members.length < AGG_TRIGGER) {
       await c.query(
-        `INSERT INTO announce_outbox
-           (id, channel_id, event_type, priority, dedup_key, status, aggregate_count,
-            message, payload, not_before, expires_at)
-         VALUES ($1,$2,$3,$4,$5,'queued',$6,$7,$8,$9,$10)
-         ON CONFLICT (channel_id, dedup_key) DO NOTHING`,
-        [id, channelId, g.event_type, CATALOG[g.event_type].priority,
-          `agg:${g.event_type}:${Math.floor(+new Date(g.agg_window) / 1000)}`,
-          members.length, message, payload, new Date(now), new Date(now + TTL_MS)])
-      // R14: os membros viram parte do agregado e nunca saem sozinhos.
-      await c.query(
-        `UPDATE announce_outbox SET status = 'aggregated', agg_window = NULL WHERE id = ANY($1)`,
-        [members.map(m => m.id)])
-      made++
-    })
+        `UPDATE announce_outbox SET agg_window = NULL, not_before = $2 WHERE id = ANY($1)`,
+        [members.map(m => m.id), new Date(now)])
+      continue
+    }
+
+    const { rows: [ec] } = await c.query(
+      'SELECT template_agg FROM announce_event_config WHERE channel_id = $1 AND event_type = $2',
+      [channelId, g.event_type])
+    const nomes = members.map(m => m.payload.vars?.guilda).filter(Boolean)
+    const vars = { ...members[members.length - 1].payload.vars, quantidade: members.length, lista: listOf(nomes) }
+    const template = ec?.template_agg ?? DEFAULT_TEMPLATES_AGG[g.event_type]
+    const { message } = renderMessage({ eventType: g.event_type, template, vars, agg: true })
+
+    const id = ulid(now)
+    const payload = {
+      id,
+      channel_id: members[0].payload.channel_id,
+      event: g.event_type,
+      priority: CATALOG[g.event_type].priority,
+      occurred_at: new Date(now).toISOString(),
+      message,
+      aggregate: { count: members.length, window_s: AGG_WINDOW_MS / 1000 },
+      vars,
+    }
+    await c.query(
+      `INSERT INTO announce_outbox
+         (id, channel_id, event_type, priority, dedup_key, status, aggregate_count,
+          message, payload, not_before, expires_at)
+       VALUES ($1,$2,$3,$4,$5,'queued',$6,$7,$8,$9,$10)
+       ON CONFLICT (channel_id, dedup_key) DO NOTHING`,
+      [id, channelId, g.event_type, CATALOG[g.event_type].priority,
+        `agg:${g.event_type}:${Math.floor(+new Date(g.agg_window) / 1000)}`,
+        members.length, message, payload, new Date(now), new Date(now + TTL_MS)])
+    // R14: os membros viram parte do agregado e nunca saem sozinhos.
+    await c.query(
+      `UPDATE announce_outbox SET status = 'aggregated', agg_window = NULL WHERE id = ANY($1)`,
+      [members.map(m => m.id)])
+    made++
   }
   return made
 }
@@ -320,7 +320,7 @@ async function sendOnce (item, cfg, secrets, attempt, fetchImpl, now) {
   }
 }
 
-const terminal = (id, status, reason = null) => query(
+const terminal = (c, id, status, reason = null) => c.query(
   `UPDATE announce_outbox SET status = $2, suppress_reason = $3 WHERE id = $1`, [id, status, reason])
 
 /**
@@ -329,22 +329,22 @@ const terminal = (id, status, reason = null) => query(
  * (2 s, depois 10 s). Três tentativas acontecem em três passadas — é o que
  * mantém a função rápida e sem timer em background.
  */
-export async function processOutboxOnce (channelId, { now = Date.now(), fetchImpl = fetch, max = 25 } = {}) {
+export async function processOutboxOnce (c, { channelId, now = Date.now(), fetchImpl = fetch, max = 25 } = {}) {
   const out = { sent: 0, failed: 0, expired: 0, suppressed: 0, retried: 0, aggregated: 0 }
 
   // R12: vencido nunca é tentado.
-  const exp = await query(
+  const exp = await c.query(
     `UPDATE announce_outbox SET status = 'expired'
       WHERE channel_id = $1 AND status IN ('queued','sending') AND expires_at <= $2 RETURNING id`,
     [channelId, new Date(now)])
   out.expired = exp.rowCount
 
-  const cfg = await getConfig(channelId)
+  const cfg = await getConfig(c, channelId)
   if (!cfg?.enabled || !cfg.webhook_url) return out                  // R1
 
-  out.aggregated = await flushAggregates(channelId, now)
+  out.aggregated = await flushAggregates(c, { channelId, now })
 
-  const { rows: due } = await query(
+  const { rows: due } = await c.query(
     `SELECT o.*, g.status AS guild_status FROM announce_outbox o
        LEFT JOIN guild g ON g.id = o.guild_id
       WHERE o.channel_id = $1 AND o.status = 'queued' AND o.agg_window IS NULL
@@ -353,26 +353,26 @@ export async function processOutboxOnce (channelId, { now = Date.now(), fetchImp
     [channelId, new Date(now), max])
   if (!due.length) return out
 
-  const { rows: sentRows } = await query(
+  const { rows: sentRows } = await c.query(
     `SELECT sent_at FROM announce_outbox
       WHERE channel_id = $1 AND status = 'sent' AND sent_at > $2`,
     [channelId, new Date(now - 3_600_000)])
   const sentAt = sentRows.map(r => +new Date(r.sent_at))
 
-  const secrets = await liveSecrets(channelId, now)
+  const secrets = await liveSecrets(c, channelId, now)
   let urlOk = null
 
   for (const item of due) {
     // R4: status da guilda reavaliado agora, não só na entrada.
     if (!guildEligible(item.guild_status)) {
-      await terminal(item.id, 'suppressed', 'guild_ineligible')
+      await terminal(c, item.id, 'suppressed', 'guild_ineligible')
       out.suppressed++
       continue
     }
     // R11: mute/quiet/offline valem também no dispatch.
     if (cfg.offline || (cfg.muted_until && +new Date(cfg.muted_until) > now) ||
         (cfg.quiet_from && inQuietHours(now, quietOf(cfg)))) {
-      await terminal(item.id, 'suppressed',
+      await terminal(c, item.id, 'suppressed',
         cfg.offline ? 'offline' : (cfg.muted_until && +new Date(cfg.muted_until) > now ? 'muted' : 'quiet_hours'))
       out.suppressed++
       continue
@@ -384,12 +384,12 @@ export async function processOutboxOnce (channelId, { now = Date.now(), fetchImp
       hourlyCap: cfg.hourly_cap, sentAt,
     }, now)
     if (d.acao === 'suprimir') {
-      await terminal(item.id, 'suppressed', d.motivo)
+      await terminal(c, item.id, 'suppressed', d.motivo)
       out.suppressed++
       continue
     }
     if (d.notBefore > now) {
-      await query('UPDATE announce_outbox SET not_before = $2 WHERE id = $1', [item.id, new Date(d.notBefore)])
+      await c.query('UPDATE announce_outbox SET not_before = $2 WHERE id = $1', [item.id, new Date(d.notBefore)])
       continue
     }
 
@@ -397,24 +397,24 @@ export async function processOutboxOnce (channelId, { now = Date.now(), fetchImp
       urlOk = await assertPublicUrl(cfg.webhook_url).then(() => true, (e) => e.message)
     }
     if (urlOk !== true) {
-      await terminal(item.id, 'failed', `webhook_blocked: ${urlOk}`)
+      await terminal(c, item.id, 'failed', `webhook_blocked: ${urlOk}`)
       out.failed++
-      await bumpFailure(channelId, cfg)
+      await bumpFailure(c, channelId, cfg)
       continue
     }
 
     const attempt = item.attempts + 1
     const r = await sendOnce(item, cfg, secrets, attempt, fetchImpl, now)
-    await query(
+    await c.query(
       `INSERT INTO announce_delivery_log (outbox_id, attempt, http_status, latency_ms, error)
        VALUES ($1,$2,$3,$4,$5) ON CONFLICT DO NOTHING`,
       [item.id, attempt, r.status, r.latency, r.error ?? null])
 
     if (r.status && r.status >= 200 && r.status < 300) {
-      await query(
+      await c.query(
         `UPDATE announce_outbox SET status = 'sent', sent_at = $2, attempts = $3 WHERE id = $1`,
         [item.id, new Date(now), attempt])
-      await query('UPDATE announce_config SET fail_streak = 0 WHERE channel_id = $1', [channelId])
+      await c.query('UPDATE announce_config SET fail_streak = 0 WHERE channel_id = $1', [channelId])
       cfg.fail_streak = 0
       sentAt.push(now)
       out.sent++
@@ -423,46 +423,47 @@ export async function processOutboxOnce (channelId, { now = Date.now(), fetchImp
 
     const retriable = r.status === null || RETRIABLE(r.status)
     if (retriable && attempt < 3) {
-      await query(
+      await c.query(
         `UPDATE announce_outbox SET attempts = $2, not_before = $3 WHERE id = $1`,
         [item.id, attempt, new Date(now + jitter(BACKOFF_MS[attempt - 1]))])
       out.retried++
       continue
     }
-    await query(
+    await c.query(
       `UPDATE announce_outbox SET status = 'failed', attempts = $2, suppress_reason = $3 WHERE id = $1`,
       [item.id, attempt, r.error ?? `http ${r.status}`])
     out.failed++
-    await bumpFailure(channelId, cfg)
+    await bumpFailure(c, channelId, cfg)
   }
   return out
 }
 
 /** R19: 10 falhas consecutivas desligam o canal. Religar é manual. */
-async function bumpFailure (channelId, cfg) {
-  const { rows: [row] } = await query(
+async function bumpFailure (c, channelId, cfg) {
+  const { rows: [row] } = await c.query(
     `UPDATE announce_config SET fail_streak = fail_streak + 1, updated_at = now()
       WHERE channel_id = $1 RETURNING fail_streak`, [channelId])
   cfg.fail_streak = row.fail_streak
   if (row.fail_streak >= 10) {
-    await query('UPDATE announce_config SET enabled = false WHERE channel_id = $1', [channelId])
+    await c.query('UPDATE announce_config SET enabled = false WHERE channel_id = $1', [channelId])
     cfg.enabled = false
   }
 }
 
 /** POST /announce/test: entrega direta, fora do teto horário (R21). */
 export async function deliverNow (channelId, itemId, { now = Date.now(), fetchImpl = fetch } = {}) {
-  const cfg = await getConfig(channelId)
-  const { rows: [item] } = await query('SELECT * FROM announce_outbox WHERE id = $1', [itemId])
+  const c = { query: dbQuery }
+  const cfg = await getConfig(c, channelId)
+  const { rows: [item] } = await c.query('SELECT * FROM announce_outbox WHERE id = $1', [itemId])
   if (!cfg?.webhook_url || !item) return null
   await assertPublicUrl(cfg.webhook_url)
-  const secrets = await liveSecrets(channelId, now)
+  const secrets = await liveSecrets(c, channelId, now)
   const r = await sendOnce(item, cfg, secrets, 1, fetchImpl, now)
-  await query(
+  await c.query(
     `INSERT INTO announce_delivery_log (outbox_id, attempt, http_status, latency_ms, error)
      VALUES ($1,1,$2,$3,$4) ON CONFLICT DO NOTHING`, [itemId, r.status, r.latency, r.error ?? null])
   const ok = r.status >= 200 && r.status < 300
-  await query(
+  await c.query(
     ok
       ? `UPDATE announce_outbox SET status = 'sent', sent_at = $2, attempts = 1 WHERE id = $1`
       : `UPDATE announce_outbox SET status = 'failed', attempts = 1, suppress_reason = $2 WHERE id = $1`,

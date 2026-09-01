@@ -29,6 +29,8 @@ uma fase é uma integração quebrada esperando acontecer.
 | `guild.emptied` / `guild.disbanded` | 02 | 04, 06 | — | `{ actor_user_id?, member_count_at_exit }` |
 | `guild.recruiting` | 02 | 07 | — | `{ vagas, modo }` |
 | `guild.level_up` | 03 | 04 (Lendários), 07 | — | `{ from, to, unlocks[] }` |
+| `ranking.top1_changed` | 04 | 07 | — | `{ tag, tag_anterior }` |
+| `ranking.top3_entered` | 04 | 07 | — | `{ tag }` |
 | `watch.tick` | 03 | — | — | `{ user_id }` |
 | `event.win` | 04/05 | 03, 04 (Primeiro Sangue, Dominadores) | id do evento | `{ event_id }` |
 | `event.placement` | 04/05 | 03, 04 | id do evento | `{ event_id, rank }` |

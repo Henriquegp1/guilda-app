@@ -26,6 +26,8 @@ export const CATALOG = {
   'guild.recruiting':     { priority: 'baixa', cooldownS: 1800, onCooldown: 'descarta', enabled: false, vars: ['vagas', 'modo'] },
   'ranking.top1_changed': { priority: 'alta',  cooldownS: 600,  onCooldown: 'ultimo',   enabled: true,  vars: ['tag', 'tag_anterior'] },
   'ranking.top3_entered': { priority: 'media', cooldownS: 600,  onCooldown: 'ultimo',   enabled: true,  vars: ['tag'] },
+  'dispute.opened':       { priority: 'alta',  cooldownS: 120,  onCooldown: 'agrega',   enabled: true,  vars: ['territorio'] },
+  'dispute.closed':       { priority: 'alta',  cooldownS: 120,  onCooldown: 'agrega',   enabled: true,  vars: ['territorio', 'vencedor'] },
 }
 
 // Erro de programação, não de runtime: falha no import se alguém acrescentar um
@@ -63,6 +65,8 @@ export const DEFAULT_TEMPLATES = {
   'guild.recruiting':     '📣 {guilda} [{tag}] está recrutando! {vagas} vagas, entrada {modo}.',
   'ranking.top1_changed': '👑 {tag} assumiu o TOP 1 do ranking, ultrapassando {tag_anterior}!',
   'ranking.top3_entered': '🏆 {tag} entrou para o TOP 3 do ranking! A disputa está acirrada.',
+  'dispute.opened':       '⚔️ A disputa pelo território {territorio} começou! Quem levará a melhor?',
+  'dispute.closed':       '🏁 A disputa por {territorio} terminou! {vencedor} é o novo mestre da região.',
 }
 
 export const DEFAULT_TEMPLATES_AGG = {
@@ -73,4 +77,6 @@ export const DEFAULT_TEMPLATES_AGG = {
   'war.ended':            '🏁 {quantidade} guerras encerradas: {lista}.',
   'territory.captured':   '🗺️ {quantidade} territórios mudaram de dono: {lista}.',
   'achievement.unlocked': '🏅 {quantidade} conquistas desbloqueadas: {lista}.',
+  'dispute.opened':       '⚔️ {quantidade} novas disputas de território começaram: {lista}.',
+  'dispute.closed':       '🏁 {quantidade} disputas de território foram decididas: {lista}.',
 }

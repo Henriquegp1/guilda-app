@@ -76,7 +76,7 @@ export default async function announce (app) {
     const raw = await readRaw(req)
     // Header do bot não cria canal: id inventado é 404, não linha nova.
     const channelId = await channelPkByTwitchId(req.headers['x-guilds-channel-id'] ?? '')
-    const secrets = await liveSecrets(channelId)
+    const secrets = await liveSecrets({ query }, channelId)
     const ok = verifySignature({
       header: req.headers['x-guilds-signature'],
       timestamp: req.headers['x-guilds-timestamp'],

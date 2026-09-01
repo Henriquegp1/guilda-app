@@ -48,7 +48,8 @@ describe('catálogo', () => {
   test('ligado por padrão segue a §3', () => {
     const ligados = Object.entries(CATALOG).filter(([, c]) => c.enabled).map(([t]) => t).sort()
     assert.deepEqual(ligados, [
-      'guild.approved', 'guild.level_up', 'ranking.top1_changed', 'ranking.top3_entered',
+      'dispute.closed', 'dispute.opened', 'guild.approved', 'guild.level_up',
+      'ranking.top1_changed', 'ranking.top3_entered',
       'season.ended', 'season.started', 'territory.captured',
       'war.accepted', 'war.declared', 'war.ended',
     ])
@@ -611,7 +612,7 @@ describe('dispatch e entrega (Postgres)', { skip: !process.env.DATABASE_URL }, (
     const id = await insertItem({ attempts: 0 })
     const fetchImpl = async () => ({ status: 500 })
  
-    await processOutboxOnce(channelId, { now: T0, fetchImpl })
+    await processOutboxOnce(db, { channelId, now: T0, fetchImpl })
  
     const item = await itemRow(id)
     assert.equal(item.status, 'queued')
@@ -632,7 +633,7 @@ describe('dispatch e entrega (Postgres)', { skip: !process.env.DATABASE_URL }, (
     const id = await insertItem({ attempts: 2 })   // próxima tentativa é a 3ª
     const fetchImpl = async () => ({ status: 500 })
  
-    await processOutboxOnce(channelId, { now: T0, fetchImpl })
+    await processOutboxOnce(db, { channelId, now: T0, fetchImpl })
  
     const item = await itemRow(id)
     assert.equal(item.status, 'failed')
@@ -647,7 +648,7 @@ describe('dispatch e entrega (Postgres)', { skip: !process.env.DATABASE_URL }, (
     const ids = await Promise.all(Array.from({ length: 10 }, () => insertItem({ attempts: 2 })))
     const fetchImpl = async () => ({ status: 500 })
  
-    await processOutboxOnce(channelId, { now: T0, fetchImpl, max: 25 })
+    await processOutboxOnce(db, { channelId, now: T0, fetchImpl, max: 25 })
  
     for (const id of ids) assert.equal((await itemRow(id)).status, 'failed')
     const cfg = await configRow()
@@ -661,7 +662,7 @@ describe('dispatch e entrega (Postgres)', { skip: !process.env.DATABASE_URL }, (
     const id = await insertItem({ expiresAt: new Date(T0 - 1000) })
     const fetchImpl = async () => { throw new Error('não deveria ter sido chamado') }
  
-    await processOutboxOnce(channelId, { now: T0, fetchImpl })
+    await processOutboxOnce(db, { channelId, now: T0, fetchImpl })
  
     assert.equal((await itemRow(id)).status, 'expired')
   })
@@ -673,7 +674,7 @@ describe('dispatch e entrega (Postgres)', { skip: !process.env.DATABASE_URL }, (
     const id = await insertItem({ attempts: 0 })
     const fetchImpl = async () => ({ status: 200 })
  
-    await processOutboxOnce(channelId, { now: T0, fetchImpl })
+    await processOutboxOnce(db, { channelId, now: T0, fetchImpl })
  
     const item = await itemRow(id)
     assert.equal(item.status, 'sent')
@@ -689,7 +690,7 @@ describe('dispatch e entrega (Postgres)', { skip: !process.env.DATABASE_URL }, (
     const id = await insertItem({ attempts: 0 })
     const fetchImpl = async () => { throw new Error('não deveria ter sido chamado') }
  
-    await processOutboxOnce(channelId, { now: T0, fetchImpl })
+    await processOutboxOnce(db, { channelId, now: T0, fetchImpl })
  
     const item = await itemRow(id)
     assert.equal(item.status, 'failed')
@@ -756,8 +757,8 @@ describe('fluxo completo e agregação (Postgres)', { skip: !process.env.DATABAS
       await insertEvent(cid, 'guild.approved', { guilda: `Guilda ${i}` }, new Date(T0 + i * 100))
     }
 
-    await ingestOnce(cid, { now: T0 + 10000 })
-    const made = await flushAggregates(cid, T0 + 320_000)
+    await ingestOnce(db, { channelId: cid, now: T0 + 10000 })
+    const made = await flushAggregates(db, { channelId: cid, now: T0 + 320_000 })
     assert.equal(made, 1)
 
     const { rows: outbox } = await db.query(
@@ -772,10 +773,10 @@ describe('fluxo completo e agregação (Postgres)', { skip: !process.env.DATABAS
     const T0 = Date.now()
     await insertEvent(cid, 'guild.approved', { guilda: 'Unica' }, new Date(T0))
 
-    const res1 = await ingestOnce(cid, { now: T0 })
+    const res1 = await ingestOnce(db, { channelId: cid, now: T0 })
     assert.equal(res1.enqueued, 1)
 
-    const res2 = await ingestOnce(cid, { now: T0 + 1000 })
+    const res2 = await ingestOnce(db, { channelId: cid, now: T0 + 1000 })
     assert.equal(res2.enqueued, 0)
 
     const { rows } = await db.query("SELECT count(*)::int FROM announce_outbox WHERE channel_id = $1", [cid])
@@ -791,15 +792,15 @@ describe('fluxo completo e agregação (Postgres)', { skip: !process.env.DATABAS
     await insertEvent(cid, type, { territorio: 'B' }, new Date(T0 + 1000))
 
     // Forçamos o processamento seqüencial no ingest para garantir que d.lastTypeAt seja isolado
-    await ingestOnce(cid, { now: T0 + 500 }) // E0 individual
-    await ingestOnce(cid, { now: T0 + 2000 }) // E1 agrega
+    await ingestOnce(db, { channelId: cid, now: T0 + 500 }) // E0 individual
+    await ingestOnce(db, { channelId: cid, now: T0 + 2000 }) // E1 agrega
 
     const { rows: r1 } = await db.query("SELECT agg_window FROM announce_outbox WHERE channel_id = $1 ORDER BY id", [cid])
     assert.equal(r1.length, 2)
     assert.equal(r1[0].agg_window, null, 'primeiro deve ser individual')
     assert.ok(r1[1].agg_window !== null, 'segundo deve ser agregado')
 
-    await flushAggregates(cid, T0 + 360_000)
+    await flushAggregates(db, { channelId: cid, now: T0 + 360_000 })
     const { rows: r2 } = await db.query("SELECT status, agg_window FROM announce_outbox WHERE channel_id = $1", [cid])
     assert.equal(r2.filter(r => r.status === 'queued').length, 2)
     assert.ok(r2.every(r => r.agg_window === null))
@@ -809,13 +810,13 @@ describe('fluxo completo e agregação (Postgres)', { skip: !process.env.DATABAS
     const cid = await setupChannel(`test-agg-4-${Math.random()}`)
     const T0 = Date.now()
     await insertEvent(cid, 'ranking.top1_changed', { tag: 'AAA' }, new Date(T0))
-    await ingestOnce(cid, { now: T0 })
+    await ingestOnce(db, { channelId: cid, now: T0 })
 
     await insertEvent(cid, 'ranking.top1_changed', { tag: 'BBB' }, new Date(T0 + 1000))
-    await ingestOnce(cid, { now: T0 + 1000 })
+    await ingestOnce(db, { channelId: cid, now: T0 + 1000 })
 
     await insertEvent(cid, 'ranking.top1_changed', { tag: 'CCC' }, new Date(T0 + 2000))
-    await ingestOnce(cid, { now: T0 + 2000 })
+    await ingestOnce(db, { channelId: cid, now: T0 + 2000 })
 
     const { rows: outbox } = await db.query(
       "SELECT status, message FROM announce_outbox WHERE channel_id = $1 ORDER BY id", [cid])
@@ -829,18 +830,18 @@ describe('fluxo completo e agregação (Postgres)', { skip: !process.env.DATABAS
     const cid = await setupChannel(`test-agg-5-${Math.random()}`)
     const T0 = Date.now()
     await insertEvent(cid, 'war.declared', { oponente: 'Inimigo' }, new Date(T0))
-    await ingestOnce(cid, { now: T0 })
+    await ingestOnce(db, { channelId: cid, now: T0 })
 
     const { rows: [item] } = await db.query("SELECT id FROM announce_outbox WHERE channel_id = $1", [cid])
 
     let calls = 0
-    await processOutboxOnce(cid, { now: T0, fetchImpl: async () => { calls++; return { status: 500 } } })
+    await processOutboxOnce(db, { channelId: cid, now: T0, fetchImpl: async () => { calls++; return { status: 500 } } })
 
     const row1 = await db.query("SELECT status, attempts FROM announce_outbox WHERE id = $1", [item.id])
     assert.equal(row1.rows[0].status, 'queued')
     assert.equal(row1.rows[0].attempts, 1)
 
-    await processOutboxOnce(cid, { now: T0 + 10000, fetchImpl: async () => { calls++; return { status: 200 } } })
+    await processOutboxOnce(db, { channelId: cid, now: T0 + 10000, fetchImpl: async () => { calls++; return { status: 200 } } })
 
     const row2 = await db.query("SELECT status FROM announce_outbox WHERE id = $1", [item.id])
     assert.equal(row2.rows[0].status, 'sent')
@@ -856,8 +857,8 @@ describe('fluxo completo e agregação (Postgres)', { skip: !process.env.DATABAS
       await insertEvent(cid, 'guild.approved', { guilda: `G${i}` }, new Date(T0 + i * 100))
     }
 
-    await ingestOnce(cid, { now: T0 + 10000 })
-    const made = await flushAggregates(cid, T0 + 320_000)
+    await ingestOnce(db, { channelId: cid, now: T0 + 10000 })
+    const made = await flushAggregates(db, { channelId: cid, now: T0 + 320_000 })
     assert.equal(made, 1)
 
     const { rows: rows_agg } = await db.query(
@@ -866,7 +867,7 @@ describe('fluxo completo e agregação (Postgres)', { skip: !process.env.DATABAS
 
     const longName = 'A Ordem Suprema dos Cavaleiros Lendários de ' + 'A'.repeat(100)
     await insertEvent(cid, 'guild.approved', { guilda: longName, lider: 'João 🛡️' }, new Date(T0 + 400_000))
-    await ingestOnce(cid, { now: T0 + 400_000 })
+    await ingestOnce(db, { channelId: cid, now: T0 + 400_000 })
 
     const { rows: rows2 } = await db.query(
       "SELECT message FROM announce_outbox WHERE channel_id = $1 AND aggregate_count = 1 ORDER BY id DESC LIMIT 1", [cid])
@@ -881,16 +882,20 @@ describe('fluxo completo e agregação (Postgres)', { skip: !process.env.DATABAS
     const type = 'war.ended'
     for (let i = 0; i < 10; i++) await insertEvent(cid, type, { guilda: `G${i}`, vencedor: 'A' }, new Date(T0 + i * 100))
 
-    await ingestOnce(cid, { now: T0 + 10000 })
-    const made = await flushAggregates(cid, T0 + 320_000)
+    await ingestOnce(db, { channelId: cid, now: T0 + 10000 })
+    const made = await flushAggregates(db, { channelId: cid, now: T0 + 320_000 })
     assert.equal(made, 1)
 
     const { rows: [agg] } = await db.query(
       "SELECT id FROM announce_outbox WHERE channel_id = $1 AND status = 'queued' AND aggregate_count = 9", [cid])
 
-    await processOutboxOnce(cid, { now: T0 + 320_000, fetchImpl: async () => ({ status: 500 }) })
-    // Avançamos para garantir que limpa burst e spacing
-    await processOutboxOnce(cid, { now: T0 + 380_000, fetchImpl: async () => ({ status: 204 }) })
+    await processOutboxOnce(db, { channelId: cid, now: T0 + 320_000, fetchImpl: async () => ({ status: 500 }) })
+    // Avançamos para garantir que limpa burst e spacing.
+    // O primeiro (G0) será enviado, o segundo (Aggregate) pegará o spacing e será adiado.
+    await processOutboxOnce(db, { channelId: cid, now: T0 + 380_000, fetchImpl: async () => ({ status: 204 }) })
+    // Terceira chamada para pegar o adiado.
+    await processOutboxOnce(db, { channelId: cid, now: T0 + 410_000, fetchImpl: async () => ({ status: 204 }) })
+
     const row2 = await db.query("SELECT status FROM announce_outbox WHERE id = $1", [agg.id])
     assert.equal(row2.rows[0].status, 'sent')
   })
