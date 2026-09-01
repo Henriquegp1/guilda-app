@@ -9,16 +9,16 @@
 
 	let { guilda, cargo }: { guilda: Guilda; cargo: Cargo } = $props();
 
-	let guerra = minhaGuerra(guilda.id);
+	let guerraStore = $derived(minhaGuerra(guilda.id));
 	let declarando = $state(false);
 	let editandoRoster = $state(false);
 	let ocupado = $state(false);
 	let rosterAtual = $state<WarRosterItem[]>([]);
 
 	async function carregarRoster() {
-		if ($guerra) {
+		if ($guerraStore) {
 			try {
-				const res = await warDetails($guerra.id);
+				const res = await warDetails($guerraStore.id);
 				rosterAtual = res.roster.filter((r) => r.guild_id === guilda.id);
 			} catch (e) {
 				console.error(e);
@@ -27,7 +27,7 @@
 	}
 
 	$effect(() => {
-		if ($guerra && (cargo === 'leader' || cargo === 'officer')) {
+		if ($guerraStore && (cargo === 'leader' || cargo === 'officer')) {
 			carregarRoster();
 		}
 	});
@@ -69,34 +69,34 @@
 </script>
 
 <div class="painel-guerra">
-	{#if $guerra}
-		{@const total = $guerra.score_challenger + $guerra.score_defender}
-		{@const pctChallenger = total > 0 ? ($guerra.score_challenger / total) * 100 : 50}
+	{#if $guerraStore}
+		{@const total = $guerraStore.score_challenger + $guerraStore.score_defender}
+		{@const pctChallenger = total > 0 ? ($guerraStore.score_challenger / total) * 100 : 50}
 		<div class="guerra-ativa">
 			<header class="status-header">
-				<span class="badge {$guerra.status}">{$guerra.status.toUpperCase()}</span>
-				<span class="formato">{$guerra.format.toUpperCase()}</span>
+				<span class="badge {$guerraStore.status}">{$guerraStore.status.toUpperCase()}</span>
+				<span class="formato">{$guerraStore.format.toUpperCase()}</span>
 			</header>
 
 			<div class="combate">
 				<div class="lado">
 					<Brasao tag={guilda.tag} tamanho={64} />
 					<span class="score num">
-						{$guerra.challenger_guild_id === guilda.id
-							? $guerra.score_challenger
-							: $guerra.score_defender}
+						{$guerraStore.challenger_guild_id === guilda.id
+							? $guerraStore.score_challenger
+							: $guerraStore.score_defender}
 					</span>
 				</div>
 				<div class="vs">⚔</div>
 				<div class="lado">
 					<Brasao
-						tag={$guerra.challenger_guild_id === guilda.id ? $guerra.defender.tag : $guerra.challenger.tag}
+						tag={$guerraStore.challenger_guild_id === guilda.id ? $guerraStore.defender.tag : $guerraStore.challenger.tag}
 						tamanho={64}
 					/>
 					<span class="score num">
-						{$guerra.challenger_guild_id === guilda.id
-							? $guerra.score_defender
-							: $guerra.score_challenger}
+						{$guerraStore.challenger_guild_id === guilda.id
+							? $guerraStore.score_defender
+							: $guerraStore.score_challenger}
 					</span>
 				</div>
 			</div>
@@ -106,14 +106,14 @@
 					<div
 						class="preenche challenger"
 						style:width="{pctChallenger}%"
-						style:background-color={$guerra.challenger_guild_id === guilda.id
+						style:background-color={$guerraStore.challenger_guild_id === guilda.id
 							? 'var(--vert)'
 							: 'var(--gules)'}
 					></div>
 					<div
 						class="preenche defender"
 						style:width="{100 - pctChallenger}%"
-						style:background-color={$guerra.defender_guild_id === guilda.id
+						style:background-color={$guerraStore.defender_guild_id === guilda.id
 							? 'var(--vert)'
 							: 'var(--gules)'}
 					></div>
@@ -125,42 +125,42 @@
 			</div>
 
 			<div class="timer-box">
-				{#if $guerra.status === 'pending' || $guerra.status === 'accepted'}
-					{#if $guerra.status === 'pending'}
+				{#if $guerraStore.status === 'pending' || $guerraStore.status === 'accepted'}
+					{#if $guerraStore.status === 'pending'}
 						<p>
-							Desafio expira em: <span class="num">{formatarTempo($guerra.challenge_expires_at)}</span>
+							Desafio expira em: <span class="num">{formatarTempo($guerraStore.challenge_expires_at)}</span>
 						</p>
 					{:else}
-						<p>Começa em: <span class="num">{formatarTempo($guerra.starts_at)}</span></p>
+						<p>Começa em: <span class="num">{formatarTempo($guerraStore.starts_at)}</span></p>
 					{/if}
 
 					{#if cargo === 'leader' || cargo === 'officer'}
 						<button class="ajuste-roster" onclick={() => (editandoRoster = true)}>
-							Escalar Time ({rosterAtual.length}/{$guerra.roster_size})
+							Escalar Time ({rosterAtual.length}/{$guerraStore.roster_size})
 						</button>
-						{#if $guerra.status === 'pending' && $guerra.defender_guild_id === guilda.id}
+						{#if $guerraStore.status === 'pending' && $guerraStore.defender_guild_id === guilda.id}
 							<div class="botoes-pendente">
 								<button
 									class="aceitar"
 									disabled={ocupado}
-									onclick={() => responder($guerra!.id, 'aceitar')}>Aceitar</button
+									onclick={() => responder($guerraStore!.id, 'aceitar')}>Aceitar</button
 								>
 								<button
 									class="recusar"
 									disabled={ocupado}
-									onclick={() => responder($guerra!.id, 'recusar')}>Recusar</button
+									onclick={() => responder($guerraStore!.id, 'recusar')}>Recusar</button
 								>
 							</div>
 						{/if}
 					{/if}
-				{:else if $guerra.status === 'active'}
-					<p>Termina em: <span class="num">{formatarTempo($guerra.ends_at)}</span></p>
+				{:else if $guerraStore.status === 'active'}
+					<p>Termina em: <span class="num">{formatarTempo($guerraStore.ends_at)}</span></p>
 				{/if}
 			</div>
 		</div>
-	{:else if editandoRoster && $guerra}
+	{:else if editandoRoster && $guerraStore}
 		<EscalacaoGuerra
-			war={$guerra}
+			war={$guerraStore}
 			guildaId={guilda.id}
 			currentRoster={rosterAtual}
 			aoSucesso={() => {

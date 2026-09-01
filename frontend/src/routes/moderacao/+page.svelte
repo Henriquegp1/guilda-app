@@ -2,7 +2,7 @@
 	import { onMount } from 'svelte';
 	import Aba from '$lib/ui/Aba.svelte';
 	import Estado from '$lib/ui/Estado.svelte';
-	import { iniciar, onAuth, dadosAuth } from '$lib/twitch';
+	import { iniciar, onAuth } from '$lib/twitch';
 	import SolicitacoesIdentidade from '$lib/telas/SolicitacoesIdentidade.svelte';
 	import FilaFundacao from '$lib/telas/FilaFundacao.svelte';
 	import GestaoGuildas from '$lib/telas/GestaoGuildas.svelte';

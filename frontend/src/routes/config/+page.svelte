@@ -171,9 +171,9 @@
 				</div>
 
 				<div class="controles-mute">
-					<label>Mute Rápido (Raid/Spam)</label>
+					<label for="mute-select">Mute Rápido (Raid/Spam)</label>
 					<div class="linha-btn">
-						<select bind:value={minutosMute}>
+						<select id="mute-select" bind:value={minutosMute}>
 							<option value={10}>10 minutos</option>
 							<option value={30}>30 minutos</option>
 							<option value={60}>1 hora</option>

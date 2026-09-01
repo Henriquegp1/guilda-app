@@ -109,15 +109,16 @@
 									Habilitar este anúncio
 								</label>
 								<div class="field cooldown">
-									<label>Cooldown (segundos)</label>
-									<input type="number" bind:value={ev.cooldown_s} min="30" max="86400" />
+									<label for="cooldown-{ev.event_type}">Cooldown (segundos)</label>
+									<input id="cooldown-{ev.event_type}" type="number" bind:value={ev.cooldown_s} min="30" max="86400" />
 								</div>
 							</div>
 
 							<div class="field">
-								<label>Mensagem Individual</label>
+								<label for="template-{ev.event_type}">Mensagem Individual</label>
 								<div class="input-container">
 									<textarea
+										id="template-{ev.event_type}"
 										maxlength="300"
 										placeholder={ev.default_template}
 										bind:value={ev.template}
@@ -134,9 +135,10 @@
 
 							{#if ev.default_template_agg}
 								<div class="field">
-									<label>Mensagem Agregada (3+ eventos)</label>
+									<label for="template-agg-{ev.event_type}">Mensagem Agregada (3+ eventos)</label>
 									<div class="input-container">
 										<textarea
+											id="template-agg-{ev.event_type}"
 											maxlength="300"
 											placeholder={ev.default_template_agg}
 											bind:value={ev.template_agg}

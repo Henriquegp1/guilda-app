@@ -166,13 +166,14 @@
 		<div class="form-modal">
 			{#if acaoAlvo === 'transferir'}
 				<div class="field">
-					<label>ID do Novo Líder (Twitch ID)</label>
-					<input type="text" bind:value={novoLiderId} placeholder="Ex: 12345678" />
+					<label for="novo-lider-id">ID do Novo Líder (Twitch ID)</label>
+					<input id="novo-lider-id" type="text" bind:value={novoLiderId} placeholder="Ex: 12345678" />
 				</div>
 			{/if}
 			<div class="field">
-				<label>Motivo da Ação</label>
+				<label for="motivo-acao">Motivo da Ação</label>
 				<textarea
+					id="motivo-acao"
 					bind:value={motivoInput}
 					placeholder="Explique o motivo desta decisão administrativa..."
 				></textarea>

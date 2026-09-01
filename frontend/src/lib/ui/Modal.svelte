@@ -21,8 +21,8 @@
 </script>
 
 {#if aberto}
-	<div class="modal-overlay" onclick={fechar} role="presentation">
-		<div class="modal-content" onclick={(e) => e.stopPropagation()} role="dialog">
+	<div class="modal-overlay" onclick={fechar} onkeydown={(e) => e.key === 'Escape' && fechar()} role="presentation">
+		<div class="modal-content" onclick={(e) => e.stopPropagation()} onkeydown={(e) => e.stopPropagation()} role="dialog" aria-modal="true" tabindex="-1">
 			<header>
 				<h3>{titulo}</h3>
 				<button class="btn-fechar" onclick={fechar}>&times;</button>

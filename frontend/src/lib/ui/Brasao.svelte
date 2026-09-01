@@ -119,6 +119,30 @@
 			<circle cx="50" cy="50" r="10" fill="currentColor" />
 			<circle cx="10" cy="10" r="4" fill="currentColor" />
 		</pattern>
+
+		<pattern id="bg--nebula--pattern" patternUnits="objectBoundingBox" patternContentUnits="objectBoundingBox" width="1" height="1" viewBox="0 0 100 100">
+			<rect width="100" height="100" fill="currentColor" opacity="0.3" />
+			<circle cx="30" cy="30" r="40" fill="white" opacity="0.1">
+				<animate attributeName="r" values="30;45;30" dur="5s" repeatCount="indefinite" />
+			</circle>
+			<circle cx="70" cy="70" r="30" fill="white" opacity="0.05" />
+		</pattern>
+
+		<pattern id="bg--circuit--pattern" patternUnits="objectBoundingBox" patternContentUnits="objectBoundingBox" width="0.25" height="0.25" viewBox="0 0 100 100">
+			<path d="M10 10 H90 V90 H10 Z M50 10 V90 M10 50 H90" fill="none" stroke="currentColor" stroke-width="2" opacity="0.5" />
+			<circle cx="10" cy="10" r="3" fill="currentColor" />
+			<circle cx="90" cy="90" r="3" fill="currentColor" />
+		</pattern>
+
+		<filter id="fx--glow">
+			<feGaussianBlur stdDeviation="2" result="blur" />
+			<feComposite in="SourceGraphic" in2="blur" operator="over" />
+		</filter>
+
+		<filter id="fx--smoke" x="-20%" y="-20%" width="140%" height="140%">
+			<feTurbulence type="fractalNoise" baseFrequency="0.05" numOctaves="3" result="noise" />
+			<feDisplacementMap in="SourceGraphic" in2="noise" scale="5" />
+		</filter>
 	</defs>
 
 	<path d={escudoPath} fill="black" opacity="0.3" transform="translate(0, 3)" />
@@ -149,8 +173,17 @@
 				'reaper': 'reaper-scythe'
 			}}
 			{@const fileName = (mapping as any)[slug] || slug}
+			{@const existingIcons = [
+				'axe', 'hydra', 'portal', 'shield', 'phoenix', 'unicorn', 'behemoth', 'crossbow',
+				'fireball', 'ice-bolt', 'bow-arrow', 'evil-book', 'leviathan', 'battle-axe',
+				'broadsword', 'crown-coin', 'heavy-helm', 'holy-grail', 'rune-stone', 'skull-mask',
+				'sword-hilt', 'angel-wings', 'breastplate', 'dragon-head', 'gem-pendant',
+				'mailed-fist', 'medusa-head', 'potion-ball', 'spiked-mace', 'crystal-ball',
+				'monervas-owl', 'skeleton-key', 'treasure-map', 'reaper-scythe', 'griffin-symbol',
+				'kraken-tentacle', 'lightning-storm', 'scroll-unfurled'
+			]}
 			<g transform="translate(48, 52) scale({symbolScale}) translate(-24, -24)">
-				{#if getLayer('symbol').includes('-') || ['sword', 'shield', 'axe', 'bow', 'dagger', 'hammer', 'spear', 'mace', 'staff', 'wand', 'torch', 'lantern', 'scroll', 'potion', 'gem', 'key', 'flag', 'broadsword', 'behemoth', 'phoenix', 'leviathan', 'hydra', 'skull-mask', 'monervas-owl', 'eagle', 'wolf', 'bear', 'boar', 'falcon', 'cerberus', 'griffin', 'unicorn', 'chimera', 'kraken', 'basilisk', 'wyrm', 'colossus', 'titan', 'seraph', 'minotaur', 'reaper', 'dragon'].some(n => getLayer('symbol').includes(n))}
+				{#if existingIcons.includes(fileName)}
 					<image
 						href="/icons/{fileName}.png"
 						width="48" height="48"
@@ -165,6 +198,19 @@
 					/>
 				{/if}
 			</g>
+		{/if}
+
+		{#if !customUrl && getLayer('effect') !== 'effect.none'}
+			{@const fxId = sid(getLayer('effect'))}
+			{#if fxId === 'effect--glow'}
+				<path d={escudoPath} fill="none" stroke="var(--cor-det)" stroke-width="4" opacity="0.3" filter="url(#fx--glow)" />
+			{:else if fxId === 'effect--smoke'}
+				<path d={escudoPath} fill="var(--cor-det)" opacity="0.2" filter="url(#fx--smoke)" />
+			{:else if ['effect--flames', 'effect--sparks', 'effect--embers', 'effect--frost'].includes(fxId)}
+				<rect width="96" height="104" fill="url(#brilho-vidro)" opacity="0.5" />
+				<!-- Simulação visual para efeitos pagos enquanto não há assets dedicados -->
+				<path d={escudoPath} fill="none" stroke="var(--cor-det)" stroke-width="2" stroke-dasharray="2 4" opacity="0.5" />
+			{/if}
 		{/if}
 
 		<path d={escudoPath} fill="url(#brilho-vidro)" pointer-events="none" />
