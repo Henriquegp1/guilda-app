@@ -36,6 +36,13 @@
 		if (log.status === 'expired') return 'Expirado';
 		return log.status.toUpperCase();
 	};
+
+	const latencyClass = (ms: number | null) => {
+		if (!ms) return '';
+		if (ms < 200) return 'fast';
+		if (ms < 500) return 'normal';
+		return 'slow';
+	};
 </script>
 
 <div class="config-historico">
@@ -67,7 +74,9 @@
 				{#each logs as log (log.id)}
 					<tr class={log.status}>
 						<td class="evento">
-							{#if log.dedup_key.startsWith('test:')}🧪{/if}
+							{#if log.dedup_key.startsWith('test:')}
+								<span class="tag-teste" title="Evento de Teste">🧪 TESTE</span>
+							{/if}
 							{log.event_type.replace('.', ' ')}
 						</td>
 						<td class="status">
@@ -77,7 +86,13 @@
 							{/if}
 						</td>
 						<td class="latencia num">
-							{log.latency_ms ? `${log.latency_ms}ms` : '—'}
+							{#if log.latency_ms}
+								<span class="semaforo {latencyClass(log.latency_ms)}">
+									{log.latency_ms}ms
+								</span>
+							{:else}
+								<span class="sem-latencia">—</span>
+							{/if}
 						</td>
 						<td class="data">{quando(log.created_at)}</td>
 					</tr>
@@ -103,9 +118,19 @@
 
 	.tabela { width: 100%; border-collapse: collapse; font-size: 12px; background: var(--sable-2); border: 1px solid var(--borda); }
 	th { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--borda); color: var(--argent-fraco); text-transform: uppercase; font-size: 10px; }
-	td { padding: 8px 12px; border-bottom: 1px solid rgba(255, 255, 255, 0.03); }
+	td { padding: 10px 12px; border-bottom: 1px solid rgba(255, 255, 255, 0.03); vertical-align: middle; }
 
-	.evento { font-weight: bold; text-transform: capitalize; color: var(--argent); }
+	.evento { font-weight: bold; text-transform: capitalize; color: var(--argent); display: flex; align-items: center; gap: 8px; }
+
+	.tag-teste {
+		font-size: 9px;
+		background: var(--sable-3);
+		color: var(--or);
+		padding: 1px 4px;
+		border-radius: 2px;
+		border: 1px solid var(--or);
+		white-space: nowrap;
+	}
 
 	.badge {
 		font-size: 10px;
@@ -120,7 +145,13 @@
 	tr.suppressed .badge { color: var(--argent-fraco); }
 
 	.reason { display: block; font-size: 9px; color: var(--argent-fraco); margin-top: 2px; }
-	.latencia { color: var(--argent-fraco); }
+
+	.semaforo { font-weight: bold; }
+	.semaforo.fast { color: var(--vert); }
+	.semaforo.normal { color: var(--or); }
+	.semaforo.slow { color: var(--gules); }
+	.sem-latencia { color: var(--argent-fraco); opacity: 0.5; }
+
 	.data { color: var(--argent-fraco); font-size: 11px; text-align: right; }
 
 	.btn-mais { width: 100%; margin-top: 12px; padding: 8px; background: var(--sable-2); border: 1px solid var(--borda); color: var(--argent); cursor: pointer; font-size: 11px; }
