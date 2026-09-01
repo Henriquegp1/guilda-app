@@ -11,11 +11,10 @@ ENV NODE_ENV=production
 COPY --from=deps /app/node_modules ./node_modules
 COPY package.json ./
 COPY src ./src
-COPY public ./public
 
-# Garante que as pastas de assets existam para o Fastify e uploads
+# Cria a pasta public e custom-assets no build (evita erro se a pasta estiver vazia no host)
 USER root
-RUN mkdir -p public/custom-assets && chown -R node:node public
+RUN mkdir -p public/custom-assets && chown -R node:node /app/public
 USER node
 
 # `node` já existe na imagem oficial. Root não precisa rodar um servidor HTTP.
