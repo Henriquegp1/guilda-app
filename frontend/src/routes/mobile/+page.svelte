@@ -2,19 +2,29 @@
 	import Painel from '../panel/+page.svelte';
 </script>
 
-<div class="fluido">
-	<Painel />
+<div class="fluido-mobile">
+	<Painel fluido={true} />
 </div>
 
 <style>
-	.fluido :global(.estandarte) {
+	.fluido-mobile {
 		width: 100%;
-		max-width: 520px;
 		height: 100dvh;
-		margin: 0 auto;
+		background: var(--sable);
 	}
 
-	.fluido :global(button) {
-		min-height: 44px;
+	:global(body) {
+		background: var(--sable);
+	}
+
+	/* Ajustes de toque para mobile */
+	.fluido-mobile :global(button) {
+		min-height: 48px;
+	}
+
+	.fluido-mobile :global(input),
+	.fluido-mobile :global(select),
+	.fluido-mobile :global(textarea) {
+		font-size: 16px !important; /* Evita zoom automático no iOS */
 	}
 </style>

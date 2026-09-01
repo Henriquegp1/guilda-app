@@ -14,6 +14,8 @@
 	import { entrarBloco } from '$lib/motion';
 	import { minhaGuilda, ErroApi, type Guilda, type Cargo } from '$lib/api';
 
+	let { fluido = false } = $props();
+
 	let estado = $state<'carregando' | 'pronto' | 'erro'>('carregando');
 	let guilda = $state<(Guilda & { my_role: Cargo }) | null>(null);
 	let erro = $state('');
@@ -54,7 +56,7 @@
 	);
 </script>
 
-<Estandarte>
+<Estandarte {fluido}>
 	{#if estado === 'carregando'}
 		<div class="centro" aria-busy="true">
 			<Brasao tamanho={88} />
@@ -105,5 +107,17 @@
 		display: flex;
 		flex-direction: column;
 		min-height: 0;
+		overflow-y: auto;
+		scrollbar-width: thin;
+		scrollbar-color: var(--or) transparent;
+	}
+
+	.aba-conteudo::-webkit-scrollbar {
+		width: 4px;
+	}
+
+	.aba-conteudo::-webkit-scrollbar-thumb {
+		background: var(--or);
+		border-radius: 2px;
 	}
 </style>

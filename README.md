@@ -1,78 +1,98 @@
-# Twitch Guilds
+# 🛡️ Twitch Guilds — Sistema de Guildas para Streamers
 
-Extensão de Twitch que dá ao chat um sistema de guildas: criação paga em Bits,
-moderação pelo streamer, progressão coletiva, ranking competitivo por temporada,
-guerras e territórios.
+**Twitch Guilds** é uma extensão completa para a Twitch que transforma o chat em um ecossistema competitivo de guildas. Espectadores podem fundar suas próprias comunidades, recrutar membros, ganhar XP coletivo e disputar territórios e posições no ranking por temporadas.
 
-Construída como extensão **genérica** — qualquer streamer instala. No canal de
-origem ela conversa com o RPG já existente, mas nada no núcleo depende dele.
+Este projeto foi construído seguindo rigorosos padrões de segurança (HMAC, RBAC) e limites técnicos da plataforma Twitch (PubSub 5KB, Panel 318px).
 
-## Como ler esta documentação
+---
 
-1. **[docs/ARQUITETURA.md](docs/ARQUITETURA.md)** — leia primeiro. Stack, modelo de
-   dados base, o pipeline `guild_event`, ciclo de vida de nome/TAG, quem chama o EBS.
-2. **[docs/EVENTOS.md](docs/EVENTOS.md)** — o vocabulário de `guild_event.type`.
-   Nenhum tipo entra em código sem estar registrado lá.
-3. Cada `docs/fase-XX-*.md` é um projeto entregável (escopo, modelo de dados, API,
-   regras numeradas, critérios de aceite, o que fica fora). O código correspondente
-   vive em `src/modules/<módulo>/` — ver a tabela de propriedade abaixo.
+## 🚀 Guia Rápido de Instalação (Para Streamers)
 
-## Código
+### 1. Requisitos do Servidor
+O sistema requer um **EBS (Extension Backend Service)** rodando.
+- **Runtime**: Node.js 20+
+- **Banco de Dados**: PostgreSQL 15+
+- **Cache**: Redis (opcional, para ranking ao vivo)
 
-```
-src/
-├── core/          spine compartilhado: db, migrations, auth, guild_event, erros
-├── modules/       um diretório por fase, dono exclusivo dos seus arquivos
-└── server.js      registra os módulos
-```
+### 2. Configuração Inicial
+1.  Clone o repositório e instale as dependências: `npm install`.
+2.  Configure o arquivo `.env` com as chaves da Twitch e credenciais do banco.
+3.  Rode as migrações: `node src/core/migrate.js`.
+4.  Inicie o servidor: `npm start`.
 
-| Fase | Módulo | Migração | Prefixo de rota |
-|---|---|---|---|
-| 01 | `guilds` | `010_guilds.sql` | `/guilds` |
-| 02 | `members` | `020_members.sql` | `/guilds/:gid/members`, `/guilds/:gid/requests`, `/invites` |
-| 03 | `xp` | `030_xp.sql` | `/guilds/:gid/xp`, `/progression` |
-| 04 | `seasons` | `040_seasons.sql` | `/ranking`, `/seasons`, `/achievements` |
-| 05 | `wars` | `050_wars.sql` | `/wars`, `/territories`, `/disputes` |
-| 06 | `identity` | `060_identity.sql` | `/guilds/:gid/emblem`, `/catalog`, `/purchases` |
-| 07 | `announce` | `070_announce.sql` | `/announce` |
+### 3. No Painel do Streamer (Dashboard)
+Após instalar a extensão na Twitch:
+1.  **Crie uma Temporada**: O ranking só ativa quando houver uma temporada rodando.
+2.  **Crie Territórios**: Defina os locais que as guildas disputarão no mapa.
+3.  **Configure Anúncios**: Insira a URL do seu bot (ex: Nightbot/StreamElements) para que a extensão avise no chat quando uma guilda for criada ou uma guerra terminar.
 
-Um módulo nunca edita arquivo de outro. Precisa de algo do vizinho? Consome pelo
-`guild_event` (`docs/EVENTOS.md`) ou pela função exportada no `index.js` dele.
+---
 
-## Roadmap
+## 📖 Como Funciona (Para Espectadores)
 
-| Fase | Projeto | Entrega | Depende de |
-|---|---|---|---|
-| 01 | [fundacao](docs/fase-01-fundacao.md) | Criar guilda, pagar em Bits, fila de aprovação, painel de moderação, auditoria | — |
-| 02 | [membros](docs/fase-02-membros.md) | Entrar/sair, cargos, permissões, modos aberta/aprovação/fechada | 01 |
-| 03 | [progressao](docs/fase-03-progressao.md) | Guild XP, níveis, desbloqueios por nível | 02 |
-| 04 | [competicao](docs/fase-04-competicao.md) | Prestígio, ranking, temporadas, conquistas | 03 |
-| 05 | [guerras](docs/fase-05-guerras.md) | Desafio entre guildas, placar ao vivo, territórios | 04 |
-| 06 | [identidade](docs/fase-06-identidade.md) | Guild Emblem Creator, loja cosmética, economia de Bits | 02 |
-| 07 | [integracao](docs/fase-07-integracao.md) | Eventos para o bot do streamer anunciar no chat | 03 |
+### Fundando sua Guilda
+- Use o comando `!criarguilda <NOME>` ou abra o painel lateral da live.
+- Escolha o nome, TAG e cores. A criação é paga via **Bits**.
+- Sua guilda entrará em uma fila de moderação para garantir que o nome seja adequado.
 
-### Duas ressalvas de ordem
+### Progressão e Conquistas
+- Espectadores ganham XP para a guilda simplesmente assistindo à live ou participando de eventos.
+- Suba de nível para desbloquear mais vagas de membros e novas molduras de brasão.
+- Conquiste medalhas permanentes ou sazonais para o perfil da guilda.
 
-- **A fase 04 depende de uma fonte de vitória que só a 05 produz.** Prestígio vem
-  principalmente de `event.win`, e o gerador robusto disso é a guerra de guildas. Sem
-  isso, ranking de canal pequeno fica parado. Entregar o **objetivo semanal automático**
-  já na fase 04 é o que a torna independente — não é opcional.
-- **A fase 05 pode ser quebrada em 05a (guerras) e 05b (territórios).** Territórios são
-  ~60% do custo da fase e nada depende deles. Corte natural se o prazo apertar.
+### Guerras e Territórios
+- Líderes podem desafiar outras guildas para guerras de 48h.
+- A guilda com mais atividade (Watch Ticks) durante o período vence.
+- Disputas territoriais no Mapa Mundi garantem bônus diário de **Prestígio**.
 
-Fluxo do viewer na v1 (fases 01–04):
+---
+
+## 🛠️ Estrutura do Código
 
 ```
-Viewer → Extensão → Criar/Entrar em Guilda → Moderação → Guild XP → Prestígio
-       → Ranking → Temporadas
+.
+├── src/               # Backend (Node.js + Fastify)
+│   ├── core/          # Núcleo: Banco de Dados, Auth, Migrações e Eventos
+│   └── modules/       # Módulos de domínio (Fases 01 a 07)
+├── frontend/          # Extensão (Svelte 5 + SvelteKit)
+│   ├── src/routes/    # Views: Painel, Overlay, Configuração, Mobile
+│   └── src/lib/       # Componentes UI, Integração Twitch e API
+└── docs/              # Documentação Técnica e Regras de Negócio
 ```
 
-## Princípios que atravessam tudo
+### Principais Tecnologias
+- **Backend**: Node.js, Fastify, PostgreSQL (pg), BullMQ (Jobs).
+- **Frontend**: Svelte 5, SvelteKit, GSAP (Animações), Tailwind-like CSS.
 
-- **Bits nunca compram vantagem.** Criação e cosmético sim; competir e evoluir é grátis.
-- **Servidor é a autoridade.** XP, Prestígio e nível não vêm do cliente.
-- **Tudo é evento.** Uma tabela `guild_event` alimenta XP, ranking, conquistas,
-  guerras e anúncios — não seis contadores paralelos.
-- **Moderação antes de público.** Nome, TAG, descrição e emblema passam por aprovação.
-- **Temporada reseta o competitivo, não a guilda.** Nome, membros, nível, conquistas
-  e histórico permanecem.
+---
+
+## 🛠️ Comandos e Operação
+
+### Comandos de Chat (Viewer)
+- `!criarguilda <NOME>`: Inicia o processo de criação de uma nova guilda.
+
+### Comandos de Manutenção (Admin/Terminal)
+Caso precise realizar manutenções manuais no banco de dados (EBS):
+```sh
+# Rodar migrações pendentes
+node src/core/migrate.js
+
+# Limpar rascunhos de pagamento expirados (Job manual)
+node -e "import('./src/modules/guilds/index.js').then(m => m.reapExpiredDrafts())"
+
+# Recalcular conquistas retroativamente
+node -e "import('./src/modules/seasons/index.js').then(m => m.backfillAchievements())"
+```
+
+## 🛡️ Segurança e Governança
+- **RBAC**: Permissões diferenciadas para Broadcaster, Moderator e Líder de Guilda.
+- **Auditoria**: Todas as ações administrativas (Banir, Suspender, Aprovar) são registradas no `audit_log` com motivo obrigatório.
+- **HMAC**: Webhooks para bots são assinados com segredos rotacionáveis, garantindo a integridade dos anúncios.
+
+## 📄 Documentação Detalhada
+1.  **[Arquitetura do Sistema](docs/ARQUITETURA.md)**
+2.  **[Dicionário de Eventos](docs/EVENTOS.md)**
+3.  **[Manual de Design](docs/DESIGN.md)**
+
+---
+*Desenvolvido como uma solução genérica e escalável para engajamento de comunidades na Twitch.*

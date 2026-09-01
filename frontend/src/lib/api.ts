@@ -539,6 +539,11 @@ export const salvarEventoAnuncio = (
 export const rotacionarSegredoAnuncio = () =>
 	post<{ secret: string; retires_at: string }>('/announce/secret/rotate');
 
+export const mutarAnuncios = (minutos: number, motivo: string) =>
+	post<void>('/announce/mute', { minutes: minutos, reason: motivo });
+
+export const desmutarAnuncios = () => chamar<void>('/announce/mute', { metodo: 'DELETE' });
+
 export const testarEventoAnuncio = (type: string) =>
 	post<{ delivery_id: string }>('/announce/test', { event_type: type });
 

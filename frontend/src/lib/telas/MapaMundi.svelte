@@ -79,6 +79,9 @@
 						onclick={() => (selectedId = t.id)}
 						transform="translate({t.map_x}, {t.map_y})"
 					>
+						<!-- Hit Area Invisível para Mobile (Touch Target) -->
+						<circle r="60" fill="transparent" />
+
 						<!-- Aura de Proteção -->
 						{#if protegido}
 							<circle r="40" fill="none" stroke="var(--vert)" stroke-width="2" stroke-dasharray="4 4" opacity="0.6">

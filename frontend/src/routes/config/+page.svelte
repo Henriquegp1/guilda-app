@@ -52,10 +52,33 @@
 			});
 			salvo = 'Configuração salva.';
 			setTimeout(() => (salvo = ''), 3000);
+			// Recarrega para ver se o circuit breaker limpou
+			if (anuncio.fail_streak >= 10) carregar();
 		} catch (e) {
 			erro = e instanceof ErroApi ? e.message : 'Não foi possível salvar.';
 		} finally {
 			ocupado = false;
+		}
+	}
+
+	import { mutarAnuncios, desmutarAnuncios } from '$lib/api';
+	let minutosMute = $state(30);
+
+	async function mutar(m: number) {
+		try {
+			await mutarAnuncios(m, 'Manual via Painel');
+			await carregar();
+		} catch (e) {
+			alert('Erro ao mutar.');
+		}
+	}
+
+	async function desmutar() {
+		try {
+			await desmutarAnuncios();
+			await carregar();
+		} catch (e) {
+			alert('Erro ao desmutar.');
 		}
 	}
 
@@ -79,6 +102,26 @@
 	{:else if estado === 'erro'}
 		<Estado estado="erro" mensagem={erro} acao="Tentar de novo" aoAgir={carregar} />
 	{:else}
+		<!-- ALERTA DE CIRCUIT BREAKER -->
+		{#if anuncio.fail_streak > 0}
+			<div class="alerta-streak" class:critico={anuncio.fail_streak >= 10}>
+				<div class="streak-info">
+					<span class="icone">{anuncio.fail_streak >= 10 ? '🛑' : '⚠️'}</span>
+					<div>
+						<b>{anuncio.fail_streak >= 10 ? 'Anúncios Desativados Automaticamente' : 'Instabilidade Detectada'}</b>
+						<p>
+							O bot falhou {anuncio.fail_streak} vezes consecutivas.
+							{#if anuncio.fail_streak >= 10}
+								O sistema foi desligado para evitar spam de erros. Verifique seu bot e salve a configuração novamente para religar.
+							{:else}
+								Verifique se a URL do Webhook está correta. No 10º erro o sistema será desligado.
+							{/if}
+						</p>
+					</div>
+				</div>
+			</div>
+		{/if}
+
 		<!-- SEÇÃO 1: CONEXÃO -->
 		<section>
 			<h2>Conexão com o Chat</h2>
@@ -114,12 +157,37 @@
 			</div>
 		</section>
 
-		<!-- SEÇÃO 2: HORÁRIO DE SILÊNCIO -->
+		<!-- SEÇÃO 2: HORÁRIO DE SILÊNCIO / MUTE -->
 		<section>
-			<h2>Horário de Silêncio</h2>
+			<h2>Silêncio e Mute</h2>
+			<div class="bloco-mute">
+				<div class="mute-status">
+					{#if anuncio.muted_until && new Date(anuncio.muted_until) > new Date()}
+						<span class="bad-mute">🔇 MUTADO ATÉ {new Date(anuncio.muted_until).toLocaleTimeString('pt-BR')}</span>
+						<button class="btn-micro" onclick={desmutar}>Desativar Mute</button>
+					{:else}
+						<span class="ok-mute">🔊 Anúncios em tempo real habilitados</span>
+					{/if}
+				</div>
+
+				<div class="controles-mute">
+					<label>Mute Rápido (Raid/Spam)</label>
+					<div class="linha-btn">
+						<select bind:value={minutosMute}>
+							<option value={10}>10 minutos</option>
+							<option value={30}>30 minutos</option>
+							<option value={60}>1 hora</option>
+							<option value={240}>4 horas</option>
+						</select>
+						<button class="btn-secundario" onclick={() => mutar(minutosMute)}>Silenciar Agora</button>
+					</div>
+				</div>
+			</div>
+
+			<hr class="divisor" />
+
 			<p class="ajuda">
-				Defina um período em que os anúncios serão suprimidos (ex: durante a madrugada).
-				Eles ainda serão registrados no histórico, mas não enviados ao seu bot.
+				<b>Agendamento:</b> Defina um período em que os anúncios serão suprimidos automaticamente (ex: madrugada).
 			</p>
 			<div class="grade tempo">
 				<label>
@@ -139,7 +207,7 @@
 					</select>
 				</label>
 			</div>
-			<button class="btn-secundario" disabled={ocupado} onclick={salvarGeral}>Aplicar Silêncio</button>
+			<button class="btn-secundario" disabled={ocupado} onclick={salvarGeral}>Salvar Agendamento</button>
 		</section>
 
 		<!-- SEÇÃO 3: SEGURANÇA -->
@@ -245,4 +313,20 @@
 	.vazio { color: var(--argent-fraco); font-style: italic; text-align: center; }
 
 	small { font-size: 11px; text-transform: none; letter-spacing: 0; opacity: 0.8; margin-top: 2px; }
+
+	.alerta-streak { background: rgba(200, 160, 46, 0.1); border: 1px solid var(--or); padding: 16px; border-radius: 4px; margin-bottom: 24px; }
+	.alerta-streak.critico { background: rgba(166, 50, 50, 0.1); border-color: var(--gules); }
+	.streak-info { display: flex; gap: 16px; align-items: flex-start; }
+	.streak-info .icone { font-size: 24px; }
+	.streak-info p { margin: 4px 0 0; font-size: 12px; color: var(--argent); line-height: 1.4; }
+
+	.bloco-mute { display: flex; flex-direction: column; gap: 16px; margin-bottom: 20px; }
+	.mute-status { display: flex; align-items: center; gap: 12px; font-weight: bold; font-size: 13px; }
+	.ok-mute { color: var(--vert); }
+	.bad-mute { color: var(--gules); }
+	.btn-micro { padding: 2px 8px; font-size: 10px; min-height: auto; }
+
+	.controles-mute { background: var(--sable); padding: 12px; border-radius: 2px; }
+	.linha-btn { display: flex; gap: 10px; margin-top: 8px; }
+	.divisor { border: none; border-top: 1px solid var(--borda); margin: 24px 0; }
 </style>

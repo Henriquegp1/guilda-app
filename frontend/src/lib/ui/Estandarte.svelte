@@ -1,8 +1,8 @@
 <script lang="ts">
-	let { children } = $props();
+	let { children, fluido = false } = $props();
 </script>
 
-<div class="estandarte">
+<div class="estandarte" class:fluido>
 	<div class="pano">
 		{@render children()}
 	</div>
@@ -16,6 +16,11 @@
 		overflow: hidden;
 	}
 
+	.estandarte.fluido {
+		width: 100%;
+		height: 100%;
+	}
+
 	.pano {
 		flex: 1;
 		display: flex;
@@ -24,12 +29,12 @@
 		border-left: 2px solid var(--or);
 		padding: 14px var(--px) calc(var(--cauda) + 6px);
 		/* A cauda come ~22px da base. O espaço perdido era margem. */
-		clip-path: polygon(
-			0 0,
-			100% 0,
-			100% 100%,
-			50% calc(100% - var(--cauda)),
-			0 100%
-		);
+		clip-path: polygon(0 0, 100% 0, 100% 100%, 50% calc(100% - var(--cauda)), 0 100%);
+	}
+
+	.fluido .pano {
+		clip-path: none;
+		padding-bottom: 14px;
+		border-right: 2px solid var(--or);
 	}
 </style>

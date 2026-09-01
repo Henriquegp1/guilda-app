@@ -33,12 +33,19 @@
 		border: none;
 		border-bottom: 2px solid transparent;
 		border-radius: 0;
-		min-height: 32px;
+		min-height: 40px;
 		padding: 4px 2px 7px;
 		font-size: 11px;
 		text-transform: uppercase;
 		letter-spacing: 0.07em;
 		color: var(--argent-fraco);
+	}
+
+	@media (max-width: 600px) {
+		button {
+			font-size: 13px;
+			min-height: 48px;
+		}
 	}
 
 	button:hover {
