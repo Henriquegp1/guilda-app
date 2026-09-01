@@ -483,9 +483,70 @@ export type Territory = {
 };
 
 // ---- config.html
-export const configAnuncio = () => get<Record<string, unknown>>('/announce/config');
-export const salvarConfigAnuncio = (corpo: unknown) =>
-	chamar<unknown>('/announce/config', { metodo: 'PUT', corpo });
+export type DeliveryLog = {
+	id: string;
+	event_type: string;
+	status: string;
+	http_status: number | null;
+	latency_ms: number | null;
+	suppress_reason: string | null;
+	message: string | null;
+	dedup_key: string;
+	created_at: string;
+};
+
+export const configAnuncio = () =>
+	get<{
+		enabled: boolean;
+		webhook_url: string | null;
+		hourly_cap: number;
+		quiet_from: string | null;
+		quiet_to: string | null;
+		timezone: string;
+		muted_until: string | null;
+		fail_streak: number;
+		events: {
+			event_type: string;
+			enabled: boolean;
+			template: string | null;
+			template_agg: string | null;
+			cooldown_s: number;
+			priority: string;
+			default_template: string;
+			default_template_agg: string | null;
+		}[];
+	}>('/announce/config');
+
+export const salvarConfigAnuncio = (corpo: {
+	enabled?: boolean;
+	webhook_url?: string | null;
+	hourly_cap?: number;
+	quiet_from?: string | null;
+	quiet_to?: string | null;
+	timezone?: string;
+}) => chamar<unknown>('/announce/config', { metodo: 'PUT', corpo });
+
+export const salvarEventoAnuncio = (
+	type: string,
+	corpo: {
+		enabled?: boolean;
+		template?: string | null;
+		template_agg?: string | null;
+		cooldown_s?: number;
+	}
+) => chamar<unknown>(`/announce/events/${type}`, { metodo: 'PUT', corpo });
+
+export const rotacionarSegredoAnuncio = () =>
+	post<{ secret: string; retires_at: string }>('/announce/secret/rotate');
+
+export const testarEventoAnuncio = (type: string) =>
+	post<{ delivery_id: string }>('/announce/test', { event_type: type });
+
+export const listarEntregasAnuncio = (cursor?: string) =>
+	get<{ items: DeliveryLog[]; next_cursor: string | null }>(
+		`/announce/deliveries${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ''}`
+	);
+
 export const listarTerritorios = () => get<{ items: Territory[] }>('/territories');
 export const criarTerritorio = (corpo: Partial<Territory>) => post<Territory>('/territories', corpo);
 export const atualizarTerritorio = (id: number, corpo: Partial<Territory>) =>

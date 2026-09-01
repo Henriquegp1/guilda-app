@@ -10,21 +10,25 @@
 		type Temporada
 	} from '$lib/api';
 	import GerenciarTerritorios from '$lib/telas/GerenciarTerritorios.svelte';
+	import ConfigSeguranca from '$lib/telas/ConfigSeguranca.svelte';
+	import ConfigTemplates from '$lib/telas/ConfigTemplates.svelte';
+	import ConfigHistorico from '$lib/telas/ConfigHistorico.svelte';
 
 	let estado = $state<'carregando' | 'pronto' | 'erro'>('carregando');
 	let erro = $state('');
 	let salvo = $state('');
+	let ocupado = $state(false);
 
-	let anuncio = $state<{ webhook_url?: string; enabled?: boolean; max_per_hour?: number }>({});
+	let anuncio = $state<any>({});
 	let temporada = $state<Temporada | null>(null);
 
 	async function carregar() {
 		try {
 			const [a, t] = await Promise.all([
-				configAnuncio().catch(() => ({})),
+				configAnuncio(),
 				temporadaAtual().catch(() => null)
 			]);
-			anuncio = a as typeof anuncio;
+			anuncio = a;
 			temporada = t;
 			estado = 'pronto';
 		} catch (e) {
@@ -33,14 +37,25 @@
 		}
 	}
 
-	async function salvar() {
+	async function salvarGeral() {
 		salvo = '';
 		erro = '';
+		ocupado = true;
 		try {
-			await salvarConfigAnuncio(anuncio);
+			await salvarConfigAnuncio({
+				enabled: anuncio.enabled,
+				webhook_url: anuncio.webhook_url,
+				hourly_cap: anuncio.hourly_cap,
+				quiet_from: anuncio.quiet_from,
+				quiet_to: anuncio.quiet_to,
+				timezone: anuncio.timezone
+			});
 			salvo = 'Configuração salva.';
+			setTimeout(() => (salvo = ''), 3000);
 		} catch (e) {
 			erro = e instanceof ErroApi ? e.message : 'Não foi possível salvar.';
+		} finally {
+			ocupado = false;
 		}
 	}
 
@@ -54,9 +69,9 @@
 	<header class="main-header">
 		<div>
 			<h1>Twitch Guilds</h1>
-			<p class="sub">Configuração do canal. As mudanças valem para todos os viewers.</p>
+			<p class="sub">Painel do Streamer: Controle de Anúncios e Territórios.</p>
 		</div>
-		<a href="/moderacao" class="btn-mod">🛡️ Painel de Moderação</a>
+		<a href="/moderacao" class="btn-mod">🛡️ Moderação</a>
 	</header>
 
 	{#if estado === 'carregando'}
@@ -64,213 +79,170 @@
 	{:else if estado === 'erro'}
 		<Estado estado="erro" mensagem={erro} acao="Tentar de novo" aoAgir={carregar} />
 	{:else}
+		<!-- SEÇÃO 1: CONEXÃO -->
 		<section>
-			<h2>Anúncios no chat</h2>
-			<p class="ajuda">
-				A extensão avisa seu bot quando algo acontece — guilda criada, mudança de líder no
-				ranking, guerra encerrada. É assim que quem não abriu o painel descobre que o
-				sistema existe.
-			</p>
+			<h2>Conexão com o Chat</h2>
+			<div class="grade">
+				<label class="linha switch">
+					<input type="checkbox" bind:checked={anuncio.enabled} />
+					Habilitar anúncios automáticos
+				</label>
 
-			<label class="linha">
-				<input type="checkbox" bind:checked={anuncio.enabled} />
-				Enviar anúncios
-			</label>
+				<label>
+					URL do Webhook (HTTPS)
+					<input
+						type="url"
+						placeholder="https://seu-bot.com/guildas"
+						bind:value={anuncio.webhook_url}
+					/>
+					<small>Onde seu bot recebe os dados dos eventos.</small>
+				</label>
 
-			<label>
-				Endereço do bot
-				<input
-					type="url"
-					placeholder="https://seu-bot.exemplo.com/guildas"
-					bind:value={anuncio.webhook_url}
-				/>
-				<small>Recebe um POST assinado. Deixe em branco para desligar.</small>
-			</label>
+				<label>
+					Teto de mensagens por hora
+					<input type="number" min="4" max="20" bind:value={anuncio.hourly_cap} />
+					<small>Limite anti-spam recomendado: 12.</small>
+				</label>
+			</div>
 
-			<label>
-				Máximo por hora
-				<input type="number" min="4" max="20" bind:value={anuncio.max_per_hour} />
-				<small>Acima disso os anúncios viram ruído ao lado da live. Recomendado: 12.</small>
-			</label>
-
-			<div class="acoes">
-				<button onclick={salvar}>Salvar</button>
-				{#if salvo}<span class="ok">{salvo}</span>{/if}
-				{#if erro}<span class="ruim">{erro}</span>{/if}
+			<div class="acoes-geral">
+				<button class="btn-principal" disabled={ocupado} onclick={salvarGeral}>
+					{ocupado ? 'Salvando...' : 'Salvar Configuração'}
+				</button>
+				{#if salvo}<span class="msg-ok">{salvo}</span>{/if}
+				{#if erro}<span class="msg-erro">{erro}</span>{/if}
 			</div>
 		</section>
 
+		<!-- SEÇÃO 2: HORÁRIO DE SILÊNCIO -->
 		<section>
-			<h2>Temporada</h2>
-			{#if temporada}
-				<p class="ajuda">
-					<b>{temporada.name}</b> — termina em
-					{new Date(temporada.ends_at).toLocaleDateString('pt-BR')}. O Prestígio zera na
-					virada; nome, membros, nível e conquistas permanecem.
-				</p>
-			{:else}
-				<p class="ajuda">
-					Nenhuma temporada ativa. O ranking competitivo só começa quando existir uma.
-				</p>
-			{/if}
+			<h2>Horário de Silêncio</h2>
+			<p class="ajuda">
+				Defina um período em que os anúncios serão suprimidos (ex: durante a madrugada).
+				Eles ainda serão registrados no histórico, mas não enviados ao seu bot.
+			</p>
+			<div class="grade tempo">
+				<label>
+					Início
+					<input type="time" bind:value={anuncio.quiet_from} />
+				</label>
+				<label>
+					Fim
+					<input type="time" bind:value={anuncio.quiet_to} />
+				</label>
+				<label>
+					Fuso Horário
+					<select bind:value={anuncio.timezone}>
+						<option value="America/Sao_Paulo">Brasília (GMT-3)</option>
+						<option value="America/Manaus">Manaus (GMT-4)</option>
+						<option value="UTC">UTC / GMT</option>
+					</select>
+				</label>
+			</div>
+			<button class="btn-secundario" disabled={ocupado} onclick={salvarGeral}>Aplicar Silêncio</button>
 		</section>
 
-		<section>
-			<h2>Territórios</h2>
-			<p class="ajuda">
-				Crie os locais que as guildas disputarão. Cada território rende Prestígio por dia para a
-				guilda que o dominar.
-			</p>
+		<!-- SEÇÃO 3: SEGURANÇA -->
+		<ConfigSeguranca />
+
+		<!-- SEÇÃO 4: EVENTOS E TEMPLATES -->
+		<ConfigTemplates events={anuncio.events} />
+
+		<!-- SEÇÃO 5: HISTÓRICO -->
+		<ConfigHistorico />
+
+		<!-- SEÇÃO 6: TERRITÓRIOS (Vindo da fase anterior) -->
+		<section class="territorios">
+			<h2>Gestão de Territórios</h2>
+			<p class="ajuda">Crie os locais que as guildas disputarão no Mapa Mundi.</p>
 			<GerenciarTerritorios />
+		</section>
+
+		<!-- INFO TEMPORADA -->
+		<section class="temporada">
+			<h2>Temporada Atual</h2>
+			{#if temporada}
+				<div class="tag-temporada">
+					<b>{temporada.name}</b> • Finaliza em {new Date(temporada.ends_at).toLocaleDateString('pt-BR')}
+				</div>
+			{:else}
+				<p class="vazio">Nenhuma temporada ativa no momento.</p>
+			{/if}
 		</section>
 	{/if}
 </main>
 
 <style>
 	main {
-		max-width: 640px;
+		max-width: 800px;
 		margin: 0 auto;
-		padding: 22px 16px 48px;
+		padding: 24px 16px 80px;
 		background: var(--sable);
 		min-height: 100vh;
-	}
-
-	h1 {
-		font-size: 26px;
-		margin: 0;
 	}
 
 	.main-header {
 		display: flex;
 		justify-content: space-between;
-		align-items: flex-start;
-		margin-bottom: 24px;
+		align-items: center;
+		margin-bottom: 32px;
 	}
 
+	h1 { font-size: 28px; color: var(--or); margin: 0; }
+	.sub { margin: 4px 0 0; color: var(--argent-fraco); font-size: 14px; }
+
 	.btn-mod {
-		background: var(--sable-3);
+		background: none;
 		border: 1px solid var(--or);
 		color: var(--or);
-		padding: 8px 16px;
 		text-decoration: none;
+		padding: 8px 16px;
 		font-size: 13px;
 		font-weight: bold;
 		border-radius: 4px;
-		transition: all 0.2s;
 	}
-
-	.btn-mod:hover {
-		background: var(--or);
-		color: var(--sable);
-	}
-
-	.sub {
-		margin: 4px 0 0;
-		color: var(--argent-fraco);
-	}
+	.btn-mod:hover { background: var(--or); color: var(--sable); }
 
 	section {
-		padding: 16px;
-		margin-bottom: 14px;
 		background: var(--sable-2);
 		border: 1px solid var(--borda);
-		border-radius: 2px;
+		padding: 24px;
+		border-radius: 4px;
+		margin-bottom: 16px;
 	}
 
-	h2 {
-		margin: 0 0 8px;
-		font-size: 16px;
-		display: flex;
-		align-items: center;
-		gap: 8px;
-	}
+	h2 { font-size: 18px; margin-bottom: 16px; color: var(--argent); border-left: 3px solid var(--or); padding-left: 12px; }
+	.ajuda { font-size: 13px; color: var(--argent-fraco); margin-bottom: 20px; line-height: 1.5; }
 
-	.conta {
-		font-family: var(--texto);
-		font-size: 12px;
-		color: var(--or);
-	}
+	.grade { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+	.grade.tempo { grid-template-columns: 1fr 1fr 2fr; }
 
-	.ajuda {
-		margin: 0 0 14px;
-		font-size: 12px;
-		color: var(--argent-fraco);
-		text-wrap: pretty;
-	}
+	label { display: flex; flex-direction: column; gap: 6px; font-size: 11px; text-transform: uppercase; color: var(--argent-fraco); letter-spacing: 0.05em; }
 
-	label {
-		display: flex;
-		flex-direction: column;
-		gap: 4px;
-		margin-bottom: 12px;
-		font-size: 11px;
-		text-transform: uppercase;
-		letter-spacing: 0.08em;
-		color: var(--argent-fraco);
-	}
-
-	label.linha {
-		flex-direction: row;
-		align-items: center;
-		gap: 8px;
-	}
-
-	input[type='url'],
-	input[type='number'] {
-		font: inherit;
-		font-size: 13px;
-		text-transform: none;
-		letter-spacing: 0;
-		color: var(--argent);
+	input[type='url'], input[type='number'], input[type='time'], select {
 		background: var(--sable);
 		border: 1px solid var(--borda);
+		color: #fff;
+		padding: 10px;
+		font-size: 14px;
 		border-radius: 2px;
-		padding: 8px;
 	}
+	input:focus, select:focus { border-color: var(--or); outline: none; }
 
-	input:focus {
-		border-color: var(--or);
-		outline: none;
-	}
+	.switch { flex-direction: row; align-items: center; gap: 10px; font-size: 13px; color: #fff; text-transform: none; grid-column: span 2; margin-bottom: 10px; }
+	.switch input { width: 18px; height: 18px; cursor: pointer; }
 
-	small {
-		font-size: 11px;
-		text-transform: none;
-		letter-spacing: 0;
-	}
+	.acoes-geral { display: flex; align-items: center; gap: 16px; margin-top: 24px; }
 
-	.acoes {
-		display: flex;
-		align-items: center;
-		gap: 12px;
-	}
+	.btn-principal { background: var(--or); color: var(--sable); font-weight: bold; border: none; padding: 12px 24px; }
+	.btn-secundario { background: none; border: 1px solid var(--borda); color: var(--argent); font-size: 12px; padding: 8px 16px; margin-top: 12px; }
+	.btn-secundario:hover { border-color: var(--or); color: var(--or); }
 
-	.ok {
-		color: var(--vert);
-		font-size: 12px;
-	}
+	.msg-ok { color: var(--vert); font-size: 13px; }
+	.msg-erro { color: var(--gules); font-size: 13px; }
 
-	.ruim {
-		color: var(--gules);
-		font-size: 12px;
-	}
+	.tag-temporada { background: var(--sable-3); padding: 12px; border-radius: 4px; color: var(--or); font-size: 14px; text-align: center; }
+	.vazio { color: var(--argent-fraco); font-style: italic; text-align: center; }
 
-	.terrs {
-		list-style: none;
-		margin: 0;
-		padding: 0;
-		font-size: 13px;
-	}
-
-	.terrs li {
-		display: flex;
-		justify-content: space-between;
-		padding: 6px 0;
-		border-bottom: 1px solid var(--borda);
-	}
-
-	.dono {
-		color: var(--or);
-		font-family: var(--display);
-	}
+	small { font-size: 11px; text-transform: none; letter-spacing: 0; opacity: 0.8; margin-top: 2px; }
 </style>

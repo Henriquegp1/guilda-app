@@ -272,7 +272,7 @@ export default async function announce (app) {
     const limit = Math.min(Number(req.query.limit) || 50, 100)
     const { rows } = await query(
       `SELECT o.id, o.event_type, o.status, o.suppress_reason, o.message, o.aggregate_count,
-              o.created_at, d.http_status, d.latency_ms, d.error
+              o.created_at, o.dedup_key, d.http_status, d.latency_ms, d.error
          FROM announce_outbox o
          LEFT JOIN LATERAL (
            SELECT http_status, latency_ms, error FROM announce_delivery_log
