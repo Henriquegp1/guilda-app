@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Política de Privacidade — Chat Guilds</title>
+    <title>Política de Privacidade — Twitch Guilds</title>
     <style>
       body {
         font-family: Arial, sans-serif;
@@ -25,7 +25,7 @@
         color: #0f172a;
       }
       a {
-        color: #2563eb;
+        color: #c8a02e;
       }
       .nav {
         margin-bottom: 24px;
@@ -39,6 +39,10 @@
       p, li {
         color: #1f2937;
       }
+      .highlight {
+        color: #c8a02e;
+        font-weight: bold;
+      }
     </style>
   </head>
   <body>
@@ -47,57 +51,54 @@
         <a href="../index.html">← Voltar para documentos</a>
       </div>
 
-      <h1>Política de Privacidade — Chat Guilds</h1>
-      <p><strong>Última atualização:</strong> 29 de agosto de 2026</p>
-      <p><strong>Versão:</strong> 1.1</p>
+      <h1>Política de Privacidade — Twitch Guilds</h1>
+      <p><strong>Última atualização:</strong> 01 de setembro de 2026</p>
+      <p><strong>Versão:</strong> 1.2</p>
 
-      <p>A <strong>Chat Guilds</strong> é uma extensão desenvolvida para a plataforma Twitch, com foco em comunidades, guildas, progressão coletiva, rankings e personalização de identidade para canais e seus espectadores.</p>
+      <p>A <strong class="highlight">Twitch Guilds</strong> é uma extensão desenvolvida para a plataforma Twitch, com foco em comunidades, guildas, progressão coletiva, rankings e personalização de identidade para canais e seus espectadores.</p>
       <p>Esta Política de Privacidade descreve como informações relacionadas ao uso da extensão, ao canal, à guilda e aos usuários podem ser coletadas, armazenadas, tratadas e protegidas.</p>
 
       <h2>1. Quem somos</h2>
-      <p>O Chat Guilds é fornecido como solução multicanal para comunidades da Twitch. A extensão pode processar dados do canal, da guilda e dos usuários para operar corretamente.</p>
-      <p><strong>Contato:</strong> chatguilds@gmail.com</p>
+      <p>A Twitch Guilds é fornecida como solução multicanal para comunidades da Twitch. A extensão processa dados do canal, da guilda e dos usuários para operar corretamente.</p>
+      <p><strong>Contato:</strong> twitchguilds@gmail.com</p>
 
       <h2>2. Informações que podemos tratar</h2>
       <p>Dependendo do uso da extensão, podemos tratar informações como:</p>
       <ul>
-        <li>dados da conta Twitch e permissões do usuário;</li>
-        <li>identificação do canal e da comunidade;</li>
-        <li>nome, TAG, descrição e configurações da guilda;</li>
-        <li>participação em eventos, rankings e progressão;</li>
-        <li>dados de moderação e auditoria;</li>
-        <li>informações técnicas necessárias para operação do serviço.</li>
+        <li>identificadores da conta Twitch (User ID, Opaque User ID) e permissões (Role);</li>
+        <li>display names públicos de espectadores e moderadores;</li>
+        <li>identificação do canal e configurações administrativas;</li>
+        <li>nome, TAG, descrição, cores e emblemas das guildas;</li>
+        <li>participação em eventos (Watch Ticks, Vitórias, Conquistas) e rankings;</li>
+        <li>logs de moderação e auditoria de ações administrativas;</li>
+        <li>informações técnicas (IP para segurança SSRF, registros de erro).</li>
       </ul>
 
       <h2>3. Como usamos as informações</h2>
-      <p>Usamos os dados para autenticar usuários, manter a organização das guildas, controlar progressão, registrar eventos, moderar a comunidade e melhorar a experiência de uso.</p>
-      <p>Também utilizamos dados técnicos para diagnosticar erros, manter segurança e evoluir o produto.</p>
+      <p>Usamos os dados para autenticar usuários, manter a organização das guildas, controlar progressão de XP, registrar eventos competitivos, moderar a comunidade e gerar logs de auditoria transparentes para os administradores do canal.</p>
+      <p>Também utilizamos dados técnicos para diagnosticar erros, prevenir abusos (Rate Limiting) e garantir a segurança do sistema.</p>
 
       <h2>4. Compartilhamento de dados</h2>
-      <p>Não vendemos dados pessoais dos usuários. Podemos compartilhar informações quando necessário para operar o serviço, cumprir obrigações legais, proteger a segurança do sistema ou atender regras da plataforma Twitch.</p>
+      <p>Não vendemos dados pessoais. O compartilhamento ocorre apenas quando:</p>
+      <ul>
+        <li><strong>Webhooks do Canal:</strong> Informações públicas de eventos (ex: "Guilda X subiu de nível") são enviadas para o endereço configurado pelo Streamer (Bot de Chat), conforme a configuração da extensão.</li>
+        <li><strong>Plataforma Twitch:</strong> Compartilhamos dados necessários para transações de Bits e validação de identidade via JWT.</li>
+        <li><strong>Obrigação Legal:</strong> Quando necessário para cumprir ordens judiciais ou proteger a integridade do sistema.</li>
+      </ul>
 
       <h2>5. Armazenamento e retenção</h2>
-      <p>Os dados podem ser armazenados em infraestrutura e sistemas usados pelo projeto. A retenção pode variar conforme a finalidade do dado, necessidade de auditoria, histórico da guilda e regras internas do serviço.</p>
+      <p>Os dados são armazenados em infraestrutura segura e bancos de dados PostgreSQL. Registros de auditoria e históricos de guilda são mantidos para preservar a integridade competitiva, enquanto logs de entrega de anúncios são podados periodicamente (30 dias).</p>
 
       <h2>6. Segurança</h2>
-      <p>Adotamos medidas técnicas e organizacionais razoáveis para proteger os dados, incluindo autenticação, validação de permissões e registros de auditoria.</p>
-      <p>Mesmo com medidas adequadas, nenhum sistema conectado à internet é totalmente imune a riscos.</p>
+      <p>Adotamos autenticação JWT, assinaturas HMAC-SHA256 para integração com bots e Controle de Acesso Baseado em Cargos (RBAC) para proteger as ações administrativas.</p>
 
       <h2>7. Direitos do usuário</h2>
-      <p>Você pode solicitar acesso, correção, exclusão ou esclarecimentos sobre dados pessoais relacionados ao seu uso do Chat Guilds, dentro dos limites legais e do funcionamento do serviço.</p>
-      <p>Para isso, utilize o contato indicado abaixo.</p>
+      <p>Você pode solicitar informações ou exclusão de dados pessoais através do contato indicado, respeitando as limitações técnicas e a necessidade de manutenção do histórico competitivo do canal.</p>
 
-      <h2>8. Menores de idade</h2>
-      <p>O uso do Chat Guilds deve seguir as regras de idade e requisitos aplicáveis da Twitch e da legislação local.</p>
+      <h2>8. Alterações nesta Política</h2>
+      <p>Esta Política pode ser atualizada. Alterações relevantes serão sinalizadas pela revisão da data de atualização no topo deste documento.</p>
 
-      <h2>9. Alterações nesta Política</h2>
-      <p>Esta Política pode ser atualizada periodicamente. Quando houver alterações relevantes, a data e a versão serão revisadas.</p>
-
-      <h2>10. Contato</h2>
-      <p>Para dúvidas, solicitações, pedidos de acesso ou exclusão de dados, entre em contato:</p>
-      <p><strong>E-mail:</strong> chatguilds@gmail.com</p>
-
-      <p>O Chat Guilds depende de serviços e regras da plataforma Twitch. Os termos e políticas da Twitch continuam aplicáveis ao uso da plataforma e de seus recursos.</p>
+      <p>A Twitch Guilds depende de serviços da Twitch. Os termos e políticas da Twitch continuam aplicáveis integralmente.</p>
     </div>
   </body>
 </html>
