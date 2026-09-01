@@ -333,7 +333,7 @@ async function requestIdentityChange (req, field) {
       [channelId, guild.id, field, current, next, paid.purchaseId, state, userId,
         reclaiming ? 'system:reclaim' : null])
 
-    if (reclaiming) await applyIdentity(c, { channelId, guild, field, next, actorUserId: userId, action: 'reclaimed' })
+    if (reclaiming) await applyIdentity(c, { channelId, guild, field, next, actorUserId: userId, actorRole: req.auth.role, action: 'reclaimed' })
 
     return { request_id: rows[0].id, state, credit_used: paid.creditUsed, purchase_id: paid.purchaseId }
   })
@@ -343,7 +343,7 @@ async function requestIdentityChange (req, field) {
  * Efetiva nome/TAG: troca o valor vivo, coloca o antigo em quarentena de 30 dias
  * (R12) e libera a quarentena do novo. R16: `guild.id` nunca muda.
  */
-async function applyIdentity (c, { channelId, guild, field, next, actorUserId, action }) {
+async function applyIdentity (c, { channelId, guild, field, next, actorUserId, actorRole = null, action }) {
   const previous = field === 'name' ? guild.name : guild.tag
   const col = field === 'name' ? 'name' : 'tag'
 
@@ -366,6 +366,7 @@ async function applyIdentity (c, { channelId, guild, field, next, actorUserId, a
   await audit(c, {
     channelId,
     actorUserId: actorUserId ?? 'system',
+    actorRole,
     action: `identity.${action}`,
     target: `guild:${guild.id}:${field}`,
     before: { [field]: previous },
@@ -719,7 +720,7 @@ export default async function identity (app) {
         [rows[0].guild_id, rows[0].id])
       await c.query('UPDATE guild_emblem SET is_active = true WHERE id = $1', [rows[0].id])
       await audit(c, {
-        channelId, actorUserId: req.auth.userId, action: 'emblem.approved', target: `emblem:${rows[0].id}`,
+        channelId, actorUserId: req.auth.userId, actorRole: req.auth.role, action: 'emblem.approved', target: `emblem:${rows[0].id}`,
       })
       await emit(c, {
         channelId,
@@ -744,6 +745,7 @@ export default async function identity (app) {
       field: r.field,
       next: r.new_value,
       actorUserId: req.auth.userId,
+      actorRole: req.auth.role,
       action: 'approved',
     })
     await c.query(
@@ -775,7 +777,7 @@ export default async function identity (app) {
          RETURNING id, guild_id`, [id, channelId])
       if (!rows[0]) throw conflict('REQUEST_ALREADY_RESOLVED', 'Este brasão já foi processado ou não está pendente')
       await audit(c, {
-        channelId, actorUserId: req.auth.userId, action: 'emblem.rejected', target: `emblem:${rows[0].id}`,
+        channelId, actorUserId: req.auth.userId, actorRole: req.auth.role, action: 'emblem.rejected', target: `emblem:${rows[0].id}`,
         after: { reason: req.body?.reason ?? null },
       })
       await emit(c, {
@@ -816,7 +818,7 @@ export default async function identity (app) {
       purchaseId: r.purchase_id,
     })
     await audit(c, {
-      channelId, actorUserId: req.auth.userId, action: 'identity.rejected',
+      channelId, actorUserId: req.auth.userId, actorRole: req.auth.role, action: 'identity.rejected',
       target: `guild:${r.guild_id}:${r.field}`,
       before: { [r.field]: r.old_value }, after: { requested: r.new_value, credit_bits: credited },
     })
@@ -852,7 +854,7 @@ export default async function identity (app) {
         layers: applyFallbacks(prev.rows[0].layers), userId: req.auth.userId,
       })
       await audit(c, {
-        channelId, actorUserId: req.auth.userId, action: 'emblem.reverted',
+        channelId, actorUserId: req.auth.userId, actorRole: req.auth.role, action: 'emblem.reverted',
         target: `guild:${guild.id}:emblem`, before: { emblem_id: cur.rows[0].id },
         after: { emblem_id: emblem.id, reason },
       })
@@ -875,7 +877,7 @@ export default async function identity (app) {
        VALUES ($1, $2, $3, $4, $5, 'approved', $6, $6, now(), $7)`,
       [channelId, guild.id, field, field === 'name' ? guild.name : guild.tag, back, req.auth.userId, reason])
 
-    await applyIdentity(c, { channelId, guild, field, next: back, actorUserId: req.auth.userId, action: 'reverted' })
+    await applyIdentity(c, { channelId, guild, field, next: back, actorUserId: req.auth.userId, actorRole: req.auth.role, action: 'reverted' })
     return { reverted_to: back }
   }))
 

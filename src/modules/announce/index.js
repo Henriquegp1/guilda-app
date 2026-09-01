@@ -27,16 +27,17 @@ async function channelPkByTwitchId (twitchChannelId) {
 
 /** Cria a config e semeia os eventos do catálogo com o padrão da §3. */
 async function ensureConfig (channelId) {
-  await tx(async (c) => {
-    await c.query('INSERT INTO announce_config (channel_id) VALUES ($1) ON CONFLICT DO NOTHING', [channelId])
+  const c = { query }
+  await tx(async (tc) => {
+    await tc.query('INSERT INTO announce_config (channel_id) VALUES ($1) ON CONFLICT DO NOTHING', [channelId])
     for (const [type, cat] of Object.entries(CATALOG)) {
-      await c.query(
+      await tc.query(
         `INSERT INTO announce_event_config (channel_id, event_type, enabled, cooldown_s)
          VALUES ($1,$2,$3,$4) ON CONFLICT DO NOTHING`,
         [channelId, type, cat.enabled, cat.cooldownS])
     }
   })
-  return getConfig(channelId)
+  return getConfig(c, channelId)
 }
 
 const publicConfig = (cfg, events) => ({
@@ -158,7 +159,7 @@ export default async function announce (app) {
       [channelId, enabled, url, cap, quietFrom, quietTo, b.timezone ?? before.timezone, activating])
 
     await tx(c => audit(c, {
-      channelId, actorUserId: req.auth.userId, action: 'announce.config_updated',
+      channelId, actorUserId: req.auth.userId, actorRole: req.auth.role, action: 'announce.config_updated',
       target: `channel:${channelId}`, before: publicConfig(before, []), after: publicConfig(cfg, []),
     }))
     return publicConfig(cfg, await listEvents(channelId))
@@ -216,7 +217,7 @@ export default async function announce (app) {
         `INSERT INTO announce_secret (channel_id, secret_enc, status) VALUES ($1,$2,'active')`,
         [channelId, encryptSecret(plain)])
       await audit(c, {
-        channelId, actorUserId: req.auth.userId, action: 'announce.secret_rotated',
+        channelId, actorUserId: req.auth.userId, actorRole: req.auth.role, action: 'announce.secret_rotated',
         target: `channel:${channelId}`,
       })
     })
@@ -288,7 +289,7 @@ async function setMute (channelId, until, actorUserId, reason) {
     await c.query('UPDATE announce_config SET muted_until = $2, updated_at = now() WHERE channel_id = $1',
       [channelId, until])
     await audit(c, {
-      channelId, actorUserId: actorUserId ?? 'bot', action: 'announce.muted',
+      channelId, actorUserId: actorUserId ?? 'bot', actorRole: actorUserId ? 'broadcaster' : 'bot', action: 'announce.muted',
       target: `channel:${channelId}`, after: { muted_until: until, reason: reason ?? null },
     })
   })

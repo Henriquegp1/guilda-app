@@ -62,9 +62,9 @@ export async function emitOnce (client, ev, code = 'EVENT_ALREADY_APPLIED') {
   return row
 }
 
-export async function audit (client, { channelId, actorUserId, action, target, before = null, after = null }) {
+export async function audit (client, { channelId, actorUserId, actorRole = null, action, target, before = null, after = null }) {
   await client.query(
-    `INSERT INTO audit_log (channel_id, actor_user_id, action, target, before, after)
-     VALUES ($1, $2, $3, $4, $5, $6)`,
-    [channelId, actorUserId, action, target, before, after])
+    `INSERT INTO audit_log (channel_id, actor_user_id, actor_role, action, target, before, after)
+     VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+    [channelId, actorUserId, actorRole, action, target, before, after])
 }

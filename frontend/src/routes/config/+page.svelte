@@ -51,8 +51,13 @@
 </script>
 
 <main>
-	<h1>Twitch Guilds</h1>
-	<p class="sub">Configuração do canal. As mudanças valem para todos os viewers.</p>
+	<header class="main-header">
+		<div>
+			<h1>Twitch Guilds</h1>
+			<p class="sub">Configuração do canal. As mudanças valem para todos os viewers.</p>
+		</div>
+		<a href="/moderacao" class="btn-mod">🛡️ Painel de Moderação</a>
+	</header>
 
 	{#if estado === 'carregando'}
 		<Estado estado="carregando" />
@@ -132,10 +137,35 @@
 
 	h1 {
 		font-size: 26px;
+		margin: 0;
+	}
+
+	.main-header {
+		display: flex;
+		justify-content: space-between;
+		align-items: flex-start;
+		margin-bottom: 24px;
+	}
+
+	.btn-mod {
+		background: var(--sable-3);
+		border: 1px solid var(--or);
+		color: var(--or);
+		padding: 8px 16px;
+		text-decoration: none;
+		font-size: 13px;
+		font-weight: bold;
+		border-radius: 4px;
+		transition: all 0.2s;
+	}
+
+	.btn-mod:hover {
+		background: var(--or);
+		color: var(--sable);
 	}
 
 	.sub {
-		margin: 4px 0 24px;
+		margin: 4px 0 0;
 		color: var(--argent-fraco);
 	}
 

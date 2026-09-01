@@ -14,12 +14,12 @@ function withGuild (req, fn) {
   return tx(async (c) => {
     const channel = await getChannel(c, req.auth)
     const g = await loadGuild(c, channel.id, req.params.id, true)
-    return fn(c, channel, g, req.auth.userId)
+    return fn(c, channel, g, req.auth)
   })
 }
 
 /** approve/reject/suspend/unsuspend/ban só diferem no que gravam junto do status. */
-async function moveStatus (c, channel, g, actor, { action, auditAction, set = {}, before = {}, after = {}, eventType }) {
+async function moveStatus (c, channel, g, auth, { action, auditAction, set = {}, before = {}, after = {}, eventType }) {
   const to = nextStatus(action, g.status)
   const cols = Object.keys(set)
   const sets = ['status = $2', ...cols.map((k, i) => `${k} = $${i + 3}`)].join(', ')
@@ -30,15 +30,16 @@ async function moveStatus (c, channel, g, actor, { action, auditAction, set = {}
     guildId: g.id,
     type: eventType,
     payload: eventType === 'guild.moderated'
-      ? { action: auditAction, actor_user_id: actor }
+      ? { action: auditAction, actor_user_id: auth.userId }
       // bits_amount viaja no payload: a fase 06 calcula o crédito de rejeição a
       // partir dele e não deve ler coluna de outro módulo (docs/EVENTOS.md).
-      : { actor_user_id: actor, ...after, ...(eventType === 'guild.rejected' ? { bits_amount: g.bits_amount } : {}) },
-    actorUserId: actor,
+      : { actor_user_id: auth.userId, ...after, ...(eventType === 'guild.rejected' ? { bits_amount: g.bits_amount } : {}) },
+    actorUserId: auth.userId,
   })
   await audit(c, {
     channelId: channel.id,
-    actorUserId: actor,
+    actorUserId: auth.userId,
+    actorRole: auth.role,
     action: auditAction,
     target: `guild:${g.id}`,
     before: { status: g.status, ...before },
@@ -77,47 +78,52 @@ export default async function modRoutes (app) {
     }
   })
 
-  app.post('/mod/guilds/:id/approve', async (req) => withGuild(req, (c, channel, g, actor) => {
+  app.post('/mod/guilds/:id/approve', async (req) => withGuild(req, (c, channel, g, auth) => {
     if (g.payment_status !== 'paid') {
       throw new AppError(409, 'GUILD_NOT_PENDING', 'guilda sem pagamento confirmado')
     }
-    return moveStatus(c, channel, g, actor, {
+    return moveStatus(c, channel, g, auth, {
       action: 'approve',
       auditAction: 'guild.approve',
       eventType: 'guild.approved',
-      set: { reviewed_by_user_id: actor, reviewed_at: new Date(), reject_reason: null },
+      set: { reviewed_by_user_id: auth.userId, reviewed_at: new Date(), reject_reason: null },
     })
   }))
 
-  app.post('/mod/guilds/:id/reject', async (req) => withGuild(req, (c, channel, g, actor) => {
+  app.post('/mod/guilds/:id/reject', async (req) => withGuild(req, (c, channel, g, auth) => {
     const reason = req.body?.reason
     const fields = req.body?.fields ?? []
     if (typeof reason !== 'string' || !reason.trim() || reason.length > 280) {
-      throw badRequest('VALIDATION_ERROR', 'reason: 1–280 caracteres')
+      throw badRequest('VALIDATION_ERROR', 'reason: 1–280 caracteres (obrigatório)')
     }
     if (!Array.isArray(fields) || fields.some((f) => !['name', 'description', 'emblem'].includes(f))) {
       throw badRequest('VALIDATION_ERROR', 'fields: name | description | emblem')
     }
-    return moveStatus(c, channel, g, actor, {
+    return moveStatus(c, channel, g, auth, {
       action: 'reject',
       auditAction: 'guild.reject',
       eventType: 'guild.rejected',
-      set: { reject_reason: reason, reviewed_by_user_id: actor, reviewed_at: new Date() },
+      set: { reject_reason: reason, reviewed_by_user_id: auth.userId, reviewed_at: new Date() },
       before: { reject_reason: g.reject_reason },
       after: { reject_reason: reason, fields },
     })
   }))
 
-  app.post('/mod/guilds/:id/suspend', async (req) => withGuild(req, (c, channel, g, actor) =>
-    moveStatus(c, channel, g, actor, {
+  app.post('/mod/guilds/:id/suspend', async (req) => withGuild(req, (c, channel, g, auth) => {
+    const reason = req.body?.reason
+    if (typeof reason !== 'string' || !reason.trim() || reason.length > 280) {
+      throw badRequest('VALIDATION_ERROR', 'reason: 1–280 caracteres (obrigatório)')
+    }
+    return moveStatus(c, channel, g, auth, {
       action: 'suspend',
       auditAction: 'guild.suspend',
       eventType: 'guild.moderated',
-      after: { reason: req.body?.reason ?? null },
-    })))
+      after: { reason },
+    })
+  }))
 
-  app.post('/mod/guilds/:id/unsuspend', async (req) => withGuild(req, (c, channel, g, actor) =>
-    moveStatus(c, channel, g, actor, {
+  app.post('/mod/guilds/:id/unsuspend', async (req) => withGuild(req, (c, channel, g, auth) =>
+    moveStatus(c, channel, g, auth, {
       action: 'unsuspend',
       auditAction: 'guild.unsuspend',
       eventType: 'guild.moderated',
@@ -125,16 +131,24 @@ export default async function modRoutes (app) {
     })))
 
   // R13: guild_member fica intacto e nome/TAG seguem bloqueados pelo índice do core.
-  app.post('/mod/guilds/:id/ban', async (req) => withGuild(req, (c, channel, g, actor) =>
-    moveStatus(c, channel, g, actor, {
-      action: 'ban',
-      auditAction: 'guild.ban',
-      eventType: 'guild.moderated',
-      after: { reason: req.body?.reason ?? null },
-    })))
+  app.post('/mod/guilds/:id/ban', async (req) => {
+    requireBroadcaster(req)
+    const reason = req.body?.reason
+    if (typeof reason !== 'string' || !reason.trim() || reason.length > 280) {
+      throw badRequest('VALIDATION_ERROR', 'reason: 1–280 caracteres (obrigatório)')
+    }
+    return withGuild(req, (c, channel, g, auth) =>
+      moveStatus(c, channel, g, auth, {
+        action: 'ban',
+        auditAction: 'guild.ban',
+        eventType: 'guild.moderated',
+        after: { reason },
+      }))
+  })
 
-  app.patch('/mod/guilds/:id', async (req) => withGuild(req, async (c, channel, g, actor) => {
+  app.patch('/mod/guilds/:id', async (req) => withGuild(req, async (c, channel, g, auth) => {
     const body = req.body ?? {}
+    const actor = auth.userId
     const editable = ['name', 'description', 'emblem_preset']
     const form = parseForm(
       Object.fromEntries(Object.entries(body).filter(([k]) => editable.includes(k))),
@@ -170,40 +184,48 @@ export default async function modRoutes (app) {
   }))
 
   // R18: o alvo já precisa ser membro; os dois trocam de cargo.
-  app.post('/mod/guilds/:id/transfer-leader', async (req) => withGuild(req, async (c, channel, g, actor) => {
-    const target = String(req.body?.user_id ?? '')
-    if (!target) throw badRequest('VALIDATION_ERROR', 'user_id obrigatório')
-    if (target === g.leader_user_id) return { leader_user_id: target }
+  app.post('/mod/guilds/:id/transfer-leader', async (req) => {
+    requireBroadcaster(req)
+    const reason = req.body?.reason
+    if (typeof reason !== 'string' || !reason.trim() || reason.length > 280) {
+      throw badRequest('VALIDATION_ERROR', 'reason: 1–280 caracteres (obrigatório)')
+    }
+    return withGuild(req, async (c, channel, g, auth) => {
+      const target = String(req.body?.user_id ?? '')
+      if (!target) throw badRequest('VALIDATION_ERROR', 'user_id obrigatório')
+      if (target === g.leader_user_id) return { leader_user_id: target }
 
-    const { rows: [member] } = await c.query(
-      'SELECT role FROM guild_member WHERE guild_id = $1 AND user_id = $2', [g.id, target])
-    if (!member) throw new AppError(422, 'USER_NOT_MEMBER', 'alvo não é membro da guilda')
+      const { rows: [member] } = await c.query(
+        'SELECT role FROM guild_member WHERE guild_id = $1 AND user_id = $2', [g.id, target])
+      if (!member) throw new AppError(422, 'USER_NOT_MEMBER', 'alvo não é membro da guilda')
 
-    // Rebaixa antes de promover: guild_member_leader_uk não tolera dois líderes.
-    await c.query('UPDATE guild_member SET role = $3 WHERE guild_id = $1 AND user_id = $2',
-      [g.id, g.leader_user_id, member.role])
-    await c.query(`UPDATE guild_member SET role = 'leader' WHERE guild_id = $1 AND user_id = $2`,
-      [g.id, target])
-    await c.query('UPDATE guild SET leader_user_id = $2 WHERE id = $1', [g.id, target])
-      .catch(onUnique('guild_one_per_leader_uk', 'ALREADY_HAS_GUILD', 'o alvo já lidera outra guilda neste canal'))
+      // Rebaixa antes de promover: guild_member_leader_uk não tolera dois líderes.
+      await c.query('UPDATE guild_member SET role = $3 WHERE guild_id = $1 AND user_id = $2',
+        [g.id, g.leader_user_id, member.role])
+      await c.query(`UPDATE guild_member SET role = 'leader' WHERE guild_id = $1 AND user_id = $2`,
+        [g.id, target])
+      await c.query('UPDATE guild SET leader_user_id = $2 WHERE id = $1', [g.id, target])
+        .catch(onUnique('guild_one_per_leader_uk', 'ALREADY_HAS_GUILD', 'o alvo já lidera outra guilda neste canal'))
 
-    await emit(c, {
-      channelId: channel.id,
-      guildId: g.id,
-      type: 'guild.moderated',
-      payload: { action: 'guild.transfer_leader', actor_user_id: actor },
-      actorUserId: actor,
+      await emit(c, {
+        channelId: channel.id,
+        guildId: g.id,
+        type: 'guild.moderated',
+        payload: { action: 'guild.transfer_leader', actor_user_id: auth.userId, reason },
+        actorUserId: auth.userId,
+      })
+      await audit(c, {
+        channelId: channel.id,
+        actorUserId: auth.userId,
+        actorRole: auth.role,
+        action: 'guild.transfer_leader',
+        target: `guild:${g.id}`,
+        before: { leader_user_id: g.leader_user_id },
+        after: { leader_user_id: target, reason },
+      })
+      return { leader_user_id: target }
     })
-    await audit(c, {
-      channelId: channel.id,
-      actorUserId: actor,
-      action: 'guild.transfer_leader',
-      target: `guild:${g.id}`,
-      before: { leader_user_id: g.leader_user_id },
-      after: { leader_user_id: target },
-    })
-    return { leader_user_id: target }
-  }))
+  })
 
   app.get('/mod/audit-log', async (req) => {
     requireModerator(req)

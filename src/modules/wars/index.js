@@ -725,6 +725,7 @@ export default async function wars (app) {
       await audit(c, {
         channelId: req.auth.channelId,
         actorUserId: req.auth.userId,
+        actorRole: req.auth.role,
         action: 'war.cancel',
         target: `war:${war.id}`,
         before: { status: war.status },
@@ -827,6 +828,7 @@ export default async function wars (app) {
     await audit(c, {
       channelId: cid,
       actorUserId: actor,
+      actorRole: req.auth.role,
       action: 'territory.holding',
       target: `territory:${t.id}`,
       before: { guild_id: previous?.guild_id ?? null },

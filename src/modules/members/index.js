@@ -156,7 +156,7 @@ export default async function members (app) {
     })
     if (mod) {
       await audit(c, {
-        channelId: cid, actorUserId: actorId, action: 'members.request_approve',
+        channelId: cid, actorUserId: actorId, actorRole: req.auth.role, action: 'members.request_approve',
         target: `guild:${guild.id}/user:${pedido.user_id}`, after: { role: 'recruit' },
       })
     }
@@ -354,7 +354,7 @@ export default async function members (app) {
     await removeMember(c, guild, alvo, { reason: 'kicked', actorUserId: actorId })
     if (mod) {
       await audit(c, {
-        channelId: cid, actorUserId: actorId, action: 'members.kick',
+        channelId: cid, actorUserId: actorId, actorRole: req.auth.role, action: 'members.kick',
         target: `guild:${guild.id}/user:${alvo.user_id}`,
         before: { role: alvo.role }, after: null,
       })
@@ -388,7 +388,7 @@ export default async function members (app) {
     })
     if (mod) {
       await audit(c, {
-        channelId: cid, actorUserId: actorId, action: 'members.role',
+        channelId: cid, actorUserId: actorId, actorRole: req.auth.role, action: 'members.role',
         target: `guild:${guild.id}/user:${alvo.user_id}`,
         before: { role: alvo.role }, after: { role: to },
       })
@@ -417,7 +417,7 @@ export default async function members (app) {
       mod ? 'succession' : 'manual', actorId)
     if (mod) {
       await audit(c, {
-        channelId: cid, actorUserId: actorId, action: 'guild.leadership_transferred',
+        channelId: cid, actorUserId: actorId, actorRole: req.auth.role, action: 'guild.leadership_transferred',
         target: `guild:${guild.id}`,
         before: { leader_user_id: lider.user_id }, after: { leader_user_id: alvo.user_id },
       })
@@ -448,7 +448,7 @@ export default async function members (app) {
           actorUserId: actorId,
         })
         await audit(c, {
-          channelId: cid, actorUserId: actorId, action: 'guild.join_mode_changed',
+          channelId: cid, actorUserId: actorId, actorRole: req.auth.role, action: 'guild.join_mode_changed',
           target: `guild:${guild.id}`, before: { join_mode: guild.join_mode }, after: { join_mode: modo },
         })
         const vagas = guild.member_limit - guild.member_count
@@ -479,7 +479,7 @@ export default async function members (app) {
           WHERE id = $1`, [guild.id, description ?? null, motto ?? null])
       if (mod) {
         await audit(c, {
-          channelId: cid, actorUserId: actorId, action: 'guild.text_edit',
+          channelId: cid, actorUserId: actorId, actorRole: req.auth.role, action: 'guild.text_edit',
           target: `guild:${guild.id}`,
           before: { description: guild.description, motto: guild.motto },
           after: { description: description ?? guild.description, motto: motto ?? guild.motto },
@@ -598,7 +598,7 @@ export async function runSuccession (client) {
     if (!herdeiro) continue   // guilda só com o líder: R18 cuida quando ele sair
     await transferLeadership(client, guild, guild.leader_user_id, herdeiro.user_id, 'succession', 'system')
     await audit(client, {
-      channelId: guild.channel_id, actorUserId: 'system', action: 'guild.leadership_transferred',
+      channelId: guild.channel_id, actorUserId: 'system', actorRole: 'system', action: 'guild.leadership_transferred',
       target: `guild:${guild.id}`,
       before: { leader_user_id: guild.leader_user_id }, after: { leader_user_id: herdeiro.user_id },
     })

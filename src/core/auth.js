@@ -110,3 +110,10 @@ export function requireModerator (req) {
     throw new AppError(403, 'FORBIDDEN', 'requer broadcaster ou moderator')
   }
 }
+
+/** R8: ações destrutivas ou críticas exigem o dono do canal. */
+export function requireBroadcaster (req) {
+  if (req.auth.source !== 'extension' || req.auth.role !== 'broadcaster') {
+    throw new AppError(403, 'FORBIDDEN', 'requer broadcaster')
+  }
+}

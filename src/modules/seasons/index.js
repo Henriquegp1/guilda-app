@@ -569,6 +569,7 @@ export default async function seasons (app) {
     await audit(c, {
       channelId: cid,
       actorUserId: req.auth.userId,
+      actorRole: req.auth.role,
       action: 'season.create',
       target: `season:${season.id}`,
       after: { name, starts_at: starts, ends_at: ends, status },
@@ -595,6 +596,7 @@ export default async function seasons (app) {
     await audit(c, {
       channelId: req.auth.channelId,
       actorUserId: req.auth.userId,
+      actorRole: req.auth.role,
       action: 'season.update',
       target: `season:${season.id}`,
       before: { name: season.name, ends_at: season.ends_at },
@@ -616,6 +618,7 @@ export default async function seasons (app) {
     await audit(c, {
       channelId: req.auth.channelId,
       actorUserId: req.auth.userId,
+      actorRole: req.auth.role,
       action: 'season.close',
       target: `season:${season.id}`,
       after: { reason: String(req.body?.reason ?? ''), ends_at: ends },
@@ -662,6 +665,7 @@ export default async function seasons (app) {
     await audit(c, {
       channelId: cid,
       actorUserId: req.auth.userId,
+      actorRole: req.auth.role,
       action: 'prestige.adjust',
       target: `guild:${guild.id}`,
       after: { points, reason, prestige: p?.prestige ?? 0 },

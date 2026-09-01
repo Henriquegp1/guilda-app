@@ -353,6 +353,7 @@ export default async function xp (app) {
     await audit(c, {
       channelId: cid,
       actorUserId: actorId,
+      actorRole: req.auth.role,
       action: 'xp.adjust',
       target: `guild:${guild.id}`,
       before: { xp: num(guild.xp), level: guild.level },

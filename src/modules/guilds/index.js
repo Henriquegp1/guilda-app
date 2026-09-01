@@ -87,6 +87,7 @@ export async function markRefunded (channelId, transactionId) {
     await audit(c, {
       channelId,
       actorUserId: 'system',
+      actorRole: 'system',
       action: 'guild.refund_suspend',
       target: `guild:${g.id}`,
       before: { payment_status: g.payment_status, status: g.status },

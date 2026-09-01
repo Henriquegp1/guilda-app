@@ -422,7 +422,13 @@ export type IdentityRequest = {
 	created_at: string;
 };
 
-export const filaModeracao = () => get<{ items: GuildaPendente[] }>('/mod/guilds?status=pending');
+export const filaModeracao = (status: string = 'pending', cursor?: string) => {
+	const params = new URLSearchParams({ status });
+	if (cursor) params.set('cursor', cursor);
+	return get<{ items: (Guilda & { creator_user_id: string; created_at: string })[]; total: number; next_cursor: string | null }>(
+		`/mod/guilds?${params.toString()}`
+	);
+};
 export const filaIdentidade = () => get<{ items: IdentityRequest[] }>('/mod/identity/queue');
 export const aprovarIdentidade = (id: string) => post<unknown>(`/mod/identity/${id}/approve`);
 export const rejeitarIdentidade = (id: string, reason: string) =>
@@ -431,10 +437,32 @@ export const rejeitarIdentidade = (id: string, reason: string) =>
 export const aprovarGuilda = (id: number) => post<unknown>(`/mod/guilds/${id}/approve`);
 export const rejeitarGuilda = (id: number, reason: string, fields: string[] = ['name']) =>
 	post<unknown>(`/mod/guilds/${id}/reject`, { reason, fields });
-export const auditoria = () =>
-	get<{ items: { id: number; actor_user_id: string; action: string; target: string; created_at: string }[] }>(
-		'/mod/audit-log'
-	);
+
+export const suspenderGuilda = (id: number, reason: string) =>
+	post<unknown>(`/mod/guilds/${id}/suspend`, { reason });
+export const reativarGuilda = (id: number) => post<unknown>(`/mod/guilds/${id}/unsuspend`);
+export const banirGuilda = (id: number, reason: string) => post<unknown>(`/mod/guilds/${id}/ban`, { reason });
+export const transferirLiderancaMod = (id: number, userId: string, reason: string) =>
+	post<unknown>(`/mod/guilds/${id}/transfer-leader`, { user_id: userId, reason });
+
+export const auditoria = (filtros: { target?: string; actor?: string; cursor?: string } = {}) => {
+	const params = new URLSearchParams();
+	if (filtros.target) params.set('target', filtros.target);
+	if (filtros.actor) params.set('actor', filtros.actor);
+	if (filtros.cursor) params.set('cursor', filtros.cursor);
+	return get<{ items: AuditLogItem[]; next_cursor: string | null }>(`/mod/audit-log?${params.toString()}`);
+};
+
+export type AuditLogItem = {
+	id: number;
+	actor_user_id: string;
+	actor_role: string | null;
+	action: string;
+	target: string;
+	before: any;
+	after: any;
+	created_at: string;
+};
 
 export type Territory = {
 	id: number;
