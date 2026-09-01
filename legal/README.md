@@ -1,6 +1,6 @@
 # Documentos Legais
 
-Este diretório reúne os documentos legais e de conformidade do projeto Chat Guilds.
+Este diretório reúne os documentos legais e de conformidade do projeto Twitch Guilds.
 
 ## Índice
 
@@ -20,8 +20,8 @@ Esses documentos regulam o uso da extensão, as regras de comunidade, o tratamen
 
 Para dúvidas, solicitações e questões legais ou de privacidade, envie um e-mail para:
 
-- chatguilds@gmail.com
+- twitchguilds@gmail.com
 
 ## Observação
 
-O Chat Guilds depende de serviços e regras da plataforma Twitch. Os termos da Twitch continuam aplicáveis quando houver uso da plataforma e de seus recursos.
+O Twitch Guilds depende de serviços e regras da plataforma Twitch. Os termos da Twitch continuam aplicáveis quando houver uso da plataforma e de seus recursos.

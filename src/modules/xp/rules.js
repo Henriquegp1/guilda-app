@@ -22,7 +22,8 @@ const BITS_PER_XP = 10
  * `lifetime: true` conta a vida inteira no canal, não o dia (follow).
  */
 export const RULES = {
-  'watch.tick': { xp: 1, cap: { count: 18 } },
+  'watch.tick': { xp: 2, cap: { count: 18 } },
+  'chat.message': { xp: 1, cap: { count: 15 } },
   'event.participate': { xp: 5, cap: { count: 4 } },
   'event.win': { xp: 10, cap: { count: 2 } },
   'channel.follow': { xp: 25, cap: { count: 1 }, lifetime: true },
@@ -39,7 +40,8 @@ const int = (v) => Math.max(0, Math.trunc(Number(v)) || 0)
 /** XP bruto do evento, antes de qualquer limite. */
 export function baseXp (type, payload = {}) {
   switch (type) {
-    case 'watch.tick': return 1
+    case 'watch.tick': return 2
+    case 'chat.message': return 1
     case 'event.participate': return 5
     case 'event.win': return 10
     case 'channel.follow': return 25

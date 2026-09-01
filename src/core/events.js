@@ -14,7 +14,7 @@ export const EVENT_TYPES = new Set([
   'guild.leadership_transferred', 'guild.join_mode_changed',
   'guild.emptied', 'guild.disbanded', 'guild.recruiting',
   // 03
-  'guild.level_up', 'watch.tick',
+  'guild.level_up', 'watch.tick', 'chat.message',
   // 04
   'event.win', 'event.placement', 'event.participate',
   'weekly.objective_completed', 'prestige.manual_adjust',

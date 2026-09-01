@@ -1,11 +1,11 @@
-# Política de Privacidade — Chat Guilds
+# Política de Privacidade — Twitch Guilds
 
 **Última atualização:** 29 de agosto de 2026  
 **Versão:** 1.1
 
-A **Chat Guilds** ("nós", "nosso" ou "nossa") é uma extensão desenvolvida para a plataforma Twitch, com foco em comunidades, guildas, progressão coletiva, competições, rankings e personalização de identidade para canais e seus espectadores.
+A **Twitch Guilds** ("nós", "nosso" ou "nossa") é uma extensão desenvolvida para a plataforma Twitch, com foco em comunidades, guildas, progressão coletiva, competições, rankings e personalização de identidade para canais e seus espectadores.
 
-Esta Política de Privacidade descreve como informações relacionadas ao uso da extensão, ao canal, à guilda e aos usuários são coletadas, tratadas, armazenadas, compartilhadas e protegidas quando o Chat Guilds é utilizado.
+Esta Política de Privacidade descreve como informações relacionadas ao uso da extensão, ao canal, à guilda e aos usuários são coletadas, tratadas, armazenadas, compartilhadas e protegidas quando o Twitch Guilds é utilizado.
 
 Ao utilizar a extensão, você confirma que leu, compreendeu e concorda com esta Política de Privacidade. Caso não concorde com os termos aqui descritos, não utilize o Serviço.
 
@@ -13,16 +13,16 @@ Ao utilizar a extensão, você confirma que leu, compreendeu e concorda com esta
 
 ## 1. Quem somos
 
-O Chat Guilds é fornecido como uma extensão para a Twitch e pode ser utilizado por diferentes canais e comunidades. A extensão foi desenvolvida como uma solução multi-canal, em que cada canal e sua comunidade possuem seu próprio contexto funcional, dados e regras internas.
+O Twitch Guilds é fornecido como uma extensão para a Twitch e pode ser utilizado por diferentes canais e comunidades. A extensão foi desenvolvida como uma solução multi-canal, em que cada canal e sua comunidade possuem seu próprio contexto funcional, dados e regras internas.
 
-**Responsável pelo tratamento dos dados:** Chat Guilds  
-**E-mail de contato:** chatguilds@gmail.com
+**Responsável pelo tratamento dos dados:** Twitch Guilds  
+**E-mail de contato:** twitchguilds@gmail.com
 
 ---
 
 ## 2. Como a extensão funciona
 
-O Chat Guilds pode permitir a criação e participação em guildas, gestão de membros, progressão por XP, níveis, prestígio, rankings, temporadas, conquistas, moderação, eventos competitivos e personalização visual.
+O Twitch Guilds pode permitir a criação e participação em guildas, gestão de membros, progressão por XP, níveis, prestígio, rankings, temporadas, conquistas, moderação, eventos competitivos e personalização visual.
 
 A extensão depende dos mecanismos de autenticação e autorização disponibilizados pela própria Twitch para identificar o canal, o usuário e as permissões de acesso.
 
@@ -111,7 +111,7 @@ Esses registros são usados para auditoria, detecção de abuso, resolução de 
 
 ### 3.6. Informações relacionadas a Bits e recursos comerciais da Twitch
 
-Algumas funcionalidades do Chat Guilds podem depender de recursos comerciais disponibilizados pela Twitch, incluindo Bits ou outros mecanismos que a própria Twitch autorize.
+Algumas funcionalidades do Twitch Guilds podem depender de recursos comerciais disponibilizados pela Twitch, incluindo Bits ou outros mecanismos que a própria Twitch autorize.
 
 Quando esses recursos forem utilizados, podemos processar as informações necessárias para:
 
@@ -120,7 +120,7 @@ Quando esses recursos forem utilizados, podemos processar as informações neces
 - manter a integridade da funcionalidade;
 - aplicar regras internas do Serviço.
 
-O Chat Guilds não precisa receber ou armazenar dados financeiros completos do usuário, como número de cartão de crédito, para que a funcionalidade funcione. Os pagamentos e transações, quando aplicáveis, são processados pela Twitch conforme suas regras e termos.
+O Twitch Guilds não precisa receber ou armazenar dados financeiros completos do usuário, como número de cartão de crédito, para que a funcionalidade funcione. Os pagamentos e transações, quando aplicáveis, são processados pela Twitch conforme suas regras e termos.
 
 ### 3.7. Informações técnicas e de operação
 
@@ -169,7 +169,7 @@ Usamos os dados para:
 
 ## 5. Autoridade do servidor
 
-O Chat Guilds utiliza uma arquitetura em que valores importantes da progressão são controlados pelo servidor, e não simplesmente pelo cliente ou pelo navegador do usuário.
+O Twitch Guilds utiliza uma arquitetura em que valores importantes da progressão são controlados pelo servidor, e não simplesmente pelo cliente ou pelo navegador do usuário.
 
 Informações como:
 
@@ -213,7 +213,7 @@ Podemos divulgar informações quando houver obrigação legal, ordem judicial, 
 
 ## 7. Armazenamento e retenção de dados
 
-Os dados do Chat Guilds podem ser armazenados em servidores e sistemas de infraestrutura usados pela plataforma.
+Os dados do Twitch Guilds podem ser armazenados em servidores e sistemas de infraestrutura usados pela plataforma.
 
 A arquitetura atual pode incluir:
 
@@ -242,11 +242,11 @@ Guildas ou canais encerrados podem manter determinados registros por período ne
 
 ## 8. Exclusão, correção e acesso aos dados
 
-Você pode solicitar acesso, correção, portabilidade ou exclusão de dados pessoais relacionados ao seu uso do Chat Guilds, dentro dos limites legais e do funcionamento do serviço.
+Você pode solicitar acesso, correção, portabilidade ou exclusão de dados pessoais relacionados ao seu uso do Twitch Guilds, dentro dos limites legais e do funcionamento do serviço.
 
 Para isso, entre em contato pelo e-mail:
 
-**chatguilds@gmail.com**
+**twitchguilds@gmail.com**
 
 Ao receber uma solicitação, poderemos verificar sua identidade e a relação com a conta ou informação envolvida, quando necessário.
 
@@ -266,7 +266,7 @@ Quando não houver base legal para manter determinados dados, eles poderão ser 
 
 ## 9. Segurança
 
-Adotamos medidas técnicas e organizacionais razoáveis para proteger as informações tratadas pelo Chat Guilds.
+Adotamos medidas técnicas e organizacionais razoáveis para proteger as informações tratadas pelo Twitch Guilds.
 
 Entre as medidas previstas ou implementadas estão:
 
@@ -285,7 +285,7 @@ Nenhum sistema conectado à Internet é totalmente imune a ameaças. Embora adot
 
 ## 10. Menores de idade
 
-O Chat Guilds deve ser utilizado conforme as regras e requisitos de idade aplicáveis à Twitch e às leis locais.
+O Twitch Guilds deve ser utilizado conforme as regras e requisitos de idade aplicáveis à Twitch e às leis locais.
 
 Não buscamos coletar consciente e intencionalmente informações adicionais de menores de idade além daquelas estritamente necessárias para autenticação, autorização e operação do serviço.
 
@@ -305,7 +305,7 @@ Quando isso ocorrer, buscaremos aplicar medidas adequadas para proteger os dados
 
 Quando a legislação brasileira for aplicável, o tratamento de dados pessoais será realizado observando a Lei Geral de Proteção de Dados Pessoais (LGPD), Lei nº 13.709/2018, além de demais normas aplicáveis.
 
-Dependendo da situação, o Chat Guilds pode atuar como controlador ou operador para determinados dados, conforme a legislação aplicável.
+Dependendo da situação, o Twitch Guilds pode atuar como controlador ou operador para determinados dados, conforme a legislação aplicável.
 
 Os usuários poderão, quando cabível, exercer seus direitos, incluindo:
 
@@ -347,9 +347,9 @@ Quando uma alteração relevante ocorrer, a data e a versão da política serão
 
 ## 15. Serviços de terceiros e links externos
 
-O Chat Guilds pode depender de serviços de terceiros, incluindo a Twitch e fornecedores de infraestrutura, banco de dados, cache, hospedagem, monitoramento e segurança.
+O Twitch Guilds pode depender de serviços de terceiros, incluindo a Twitch e fornecedores de infraestrutura, banco de dados, cache, hospedagem, monitoramento e segurança.
 
-Esses terceiros possuem suas próprias políticas e termos. O Chat Guilds não controla totalmente as práticas desses serviços, embora tenha como objetivo utilizar provedores confiáveis e relevantes para operar o produto.
+Esses terceiros possuem suas próprias políticas e termos. O Twitch Guilds não controla totalmente as práticas desses serviços, embora tenha como objetivo utilizar provedores confiáveis e relevantes para operar o produto.
 
 ---
 
@@ -357,8 +357,8 @@ Esses terceiros possuem suas próprias políticas e termos. O Chat Guilds não c
 
 Para dúvidas, solicitações, pedidos de acesso ou exclusão de dados, ou qualquer questão relacionada à privacidade, entre em contato:
 
-**Chat Guilds**  
-**E-mail:** chatguilds@gmail.com
+**Twitch Guilds**  
+**E-mail:** twitchguilds@gmail.com
 
 ---
 
@@ -373,6 +373,6 @@ Esta Política de Privacidade entra em vigor em 29 de agosto de 2026 e permanece
 
 ### Observação sobre a Twitch
 
-O Chat Guilds é uma extensão desenvolvida para ser utilizada na plataforma Twitch. A Twitch é uma plataforma independente e possui seus próprios termos, regras e políticas de privacidade.
+O Twitch Guilds é uma extensão desenvolvida para ser utilizada na plataforma Twitch. A Twitch é uma plataforma independente e possui seus próprios termos, regras e políticas de privacidade.
 
-Esta Política de Privacidade trata exclusivamente das informações processadas pelo Chat Guilds e não substitui a política da Twitch ou de quaisquer serviços de terceiros utilizados pelo usuário.
+Esta Política de Privacidade trata exclusivamente das informações processadas pelo Twitch Guilds e não substitui a política da Twitch ou de quaisquer serviços de terceiros utilizados pelo usuário.

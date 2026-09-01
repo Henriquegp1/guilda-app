@@ -149,15 +149,15 @@ describe('tabela de ganho (§3)', () => {
   test('a tabela pública não expõe nada além de regra e teto', () => {
     const t = publicTable()
     assert.equal(t.cap_daily, 200)
-    assert.equal(t.rules.length, 8)
+    assert.equal(t.rules.length, 9)
     assert.ok(t.rules.every(r => 'type' in r && 'xp' in r && 'cap' in r))
   })
 })
 
 describe('limites próprios de cada fonte (§3)', () => {
   test('3 h de live rendem 18 ticks; a 4ª hora rende 0', () => {
-    assert.equal(sourceLimited('watch.tick', 1, { count: 17 }), 1)
-    assert.equal(sourceLimited('watch.tick', 1, { count: 18 }), 0)
+    assert.equal(sourceLimited('watch.tick', 2, { count: 17 }), 2)
+    assert.equal(sourceLimited('watch.tick', 2, { count: 18 }), 0)
   })
 
   test('1.500 Bits em um dia creditam 100, não 150', () => {
@@ -227,13 +227,14 @@ describe('teto diário de 200 (§4.1)', () => {
     assert.equal(dailyLimited(0, 0), 0)
   })
 
-  test('o perfil "ativo sem gastar" da §3 fecha em 73 XP', () => {
+  test('o perfil "ativo sem gastar" da §3 fecha em 106 XP', () => {
     const dia =
-      18 * 1 +                                                   // watch
+      18 * 2 +                                                   // watch (2 XP)
       4 * 5 +                                                    // event.participate
       2 * 10 +                                                   // event.win
-      3 * 5                                                      // resgate
-    assert.equal(dia, 73)
+      3 * 5 +                                                    // resgate
+      15 * 1                                                     // chat (15 msgs)
+    assert.equal(dia, 106)
   })
 })
 

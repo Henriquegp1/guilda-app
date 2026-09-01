@@ -32,6 +32,7 @@ uma fase é uma integração quebrada esperando acontecer.
 | `ranking.top1_changed` | 04 | 07 | — | `{ tag, tag_anterior }` |
 | `ranking.top3_entered` | 04 | 07 | — | `{ tag }` |
 | `watch.tick` | 03 | — | — | `{ user_id }` |
+| `chat.message` | 03 (via bot) | 03 | — | `{ user_id, message_id }` |
 | `event.win` | 04/05 | 03, 04 (Primeiro Sangue, Dominadores) | id do evento | `{ event_id }` |
 | `event.placement` | 04/05 | 03, 04 | id do evento | `{ event_id, rank }` |
 | `event.participate` | 04/05 | 03, 04 | id do evento | `{ event_id, user_id }` |

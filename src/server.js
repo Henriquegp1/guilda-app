@@ -39,6 +39,9 @@ export async function build (opts = {}) {
 }
  
 if (import.meta.filename === process.argv[1]) {
+  const { migrate } = await import('./core/migrate.js')
+  await migrate()
+
   const app = await build()
   const stopJobs = startJobs({ log: app.log })
  

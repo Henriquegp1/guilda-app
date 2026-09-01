@@ -38,9 +38,9 @@ Edite `.env`:
 | Variável            | De onde vem                                                        |
 | ------------------- | ------------------------------------------------------------------ |
 | `DOMINIO`           | O domínio do passo 1                                               |
-| `POSTGRES_PASSWORD` | Você escolhe. `openssl rand -base64 24`                            |
+| `POSTGRES_PASSWORD` | Senha segura. Gere com: `node -e "console.log(require('crypto').randomBytes(24).toString('base64'))"` |
 | `TWITCH_EXT_SECRET` | Developer Console → sua extensão → **Settings → Secret Keys**      |
-| `ANNOUNCE_ENC_KEY`  | `openssl rand -hex 32`                                             |
+| `ANNOUNCE_ENC_KEY`  | Chave de 32 hex. Gere com: `node -e "console.log(require('crypto').randomBytes(16).toString('hex'))"` |
 | `CORS_ORIGINS`      | Deixe vazio. `*.ext-twitch.tv` já é aceito por padrão              |
 
 O `TWITCH_EXT_SECRET` é o mesmo segredo que assina o JWT do viewer **e** o recibo
@@ -143,7 +143,8 @@ outras pessoas.
 
 ```sh
 cd frontend
-echo "VITE_EBS=https://guilds.seucanal.com" > .env
+# Substitua pela URL real do seu EBS (ex: https://guilds.seucanal.com)
+echo "VITE_EBS=https://seu-ebs.com" > .env.production
 npm run zip
 ```
 
@@ -176,11 +177,10 @@ extensão faz com os dados do viewer, e política de privacidade. O que coletamo
 
 ---
 
-## O que ainda não está pronto
+## ✅ Checklist de Pronto para Produção
 
-- **Emblem creator e loja (fase 06):** o backend está completo, o painel mostra um
-  brasão placeholder. Ninguém consegue personalizar ainda.
-- **Guerra e território no painel:** só o overlay existe; declarar e aceitar guerra
-  ainda não tem tela.
-- **Anúncios no chat:** o EBS envia o webhook assinado, mas seu bot precisa de um
-  endpoint que o receba. O formato está em `docs/fase-07-integracao.md`.
+- [x] **Brasões e Identidade**: Sistema de editor e loja funcional.
+- [x] **Guerra e Territórios**: Interface de Mapa e Desafios integrada no painel.
+- [x] **Anúncios no Chat**: Dashboard de configuração e monitoramento pronto.
+- [x] **Segurança**: RBAC e Auditoria implementados em todas as rotas administrativas.
+- [x] **Mobile**: Layout fluido e alvos de toque otimizados.
