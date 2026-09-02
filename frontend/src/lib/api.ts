@@ -383,7 +383,7 @@ export const recusarGuerra = (id: number, reason?: string) =>
 	post<Guerra>(`/wars/${id}/decline`, { reason });
 export const editarRoster = (id: number, user_ids: string[]) =>
 	chamar<{ roster: WarRosterItem[] }>(`/wars/${id}/roster`, { metodo: 'PUT', corpo: { user_ids } });
-export const guerrasAtivas = () => get<{ items: Guerra[] }>('/wars/active');
+export const guerrasAtivas = () => get<{ wars: Guerra[] }>('/wars/active');
 export const warScore = (id: number) => get<WarScore>(`/wars/${id}/score`);
 export const warDetails = (id: number) => get<WarDetails>(`/wars/${id}`);
 export const listarGuerras = (filtros: { guild_id?: number; status?: WarStatus; cursor?: string }) => {

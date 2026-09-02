@@ -9,12 +9,8 @@ const corrigir = (corpo) =>
 	corpo
 		.replaceAll(ANCHOR, ANCHOR_FIX)
 		.replace(/^(\s*)(__sveltekit_[a-z0-9]+)( = )/m, '$1window.$2$3')
-		.replace(
-								/(window\.__sveltekit_[a-z0-9]+ = )\{\s*base: [^\n]+\s*\};/,
-				`const twitchRoute = location.pathname.match(/\\/(config|panel|overlay|mobile|live|moderacao|lab|teste-identidade)\\b/);
-			if (twitchRoute) history.replaceState(history.state, '', '/' + twitchRoute[1] + '/' + location.search);
-						$1{ base: '' };`
-		);
+		.replace(/base\s*:\s*["']\s*["']/g, 'base:""')
+		.replace(/base\s*:\s*new\s*URL\s*\(\s*["']\.\.["']\s*,\s*location\s*\)\.pathname\.slice\(\s*0\s*,\s*-1\s*\)/g, 'base:""');
 
 async function* arquivosDe(dir, extensao) {
 	for (const item of await readdir(dir, { withFileTypes: true })) {

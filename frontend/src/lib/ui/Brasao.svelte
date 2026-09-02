@@ -31,7 +31,26 @@
 	const paletaId = $derived(getLayer('palette'));
 	const cores = $derived(PALETAS[paletaId] || FALLBACK_PALETTE);
 	const sid = (id: string) => id.replace('.', '--');
-	const spriteUrl = $derived($catalog?.sprite_url || '');
+
+	// Descobre a URL real do catálogo SVG na Twitch de forma infalível
+	const getCatalogUrl = () => {
+		if (typeof window === 'undefined') return 'catalog.svg';
+		const p = window.location.pathname;
+		const root = p.substring(0, p.lastIndexOf('/', p.lastIndexOf('/') - 1));
+		return `${window.location.origin}${root}/catalog.svg`;
+	};
+
+	const spriteUrl = $derived(getCatalogUrl());
+
+	// Gera uma URL absoluta completa para o ícone.
+	// Isso impede que o navegador tente resolver caminhos relativos errados na Twitch.
+	const getIconUrl = (name: string) => {
+		if (typeof window === 'undefined') return '';
+		const p = window.location.pathname;
+		// Remove tudo após a penúltima barra para chegar na raiz da extensão
+		const root = p.substring(0, p.lastIndexOf('/', p.lastIndexOf('/') - 1));
+		return `${window.location.origin}${root}/icons/${name}.png`;
+	};
 
 	const SHAPE_PATHS: Record<string, string> = {
 		'shape.heater': 'M8 6 H88 V44 C88 74 68 88 48 98 C28 88 8 74 8 44 Z',
@@ -59,6 +78,10 @@
 	};
 	const borderId = $derived(getLayer('border'));
 	const borderStyle = $derived(BORDER_STROKES[borderId] ?? null);
+
+	$effect(() => {
+		if (tag) console.log('[Guilda] Renderizando brasão para', tag, 'com base:', base);
+	});
 </script>
 
 <svg
@@ -210,7 +233,7 @@
 			<g transform="translate(48, 52) scale({symbolScale}) translate(-24, -24)">
 				{#if verifiedIcons.has(fileName)}
 					<image
-						href="{base}/icons/{fileName}.png"
+						href={getIconUrl(fileName)}
 						width="48" height="48"
 						style:filter="brightness(0) invert(1) drop-shadow(0 2px 2px rgba(0,0,0,0.5))"
 					/>

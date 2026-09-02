@@ -9,7 +9,9 @@ function createWarStore() {
 	const load = async () => {
 		try {
 			const res = await guerrasAtivas();
-			set(res.items.map(normalizarGuerra));
+			// O backend retorna as guerras na propriedade 'wars'
+			const lista = res?.wars || [];
+			set(lista.map(normalizarGuerra));
 		} catch (e) {
 			console.error('Falha ao carregar guerras:', e);
 		}

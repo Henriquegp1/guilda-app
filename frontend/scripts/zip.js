@@ -22,11 +22,34 @@ async function* arquivos(dir) {
 const zip = new JSZip();
 let n = 0;
 
+// Lista de pastas que representam páginas da extensão
+const paginas = ['config', 'lab', 'live', 'mobile', 'moderacao', 'overlay', 'panel', 'teste-identidade'];
+
 for await (const caminho of arquivos('build')) {
-	// Zip usa barra normal em qualquer sistema; no Windows o path vem com "\".
 	const nome = relative('build', caminho).split(sep).join('/');
-	zip.file(nome, await readFile(caminho));
+	const data = await readFile(caminho);
+
+	// Adiciona o arquivo original
+	zip.file(nome, data);
 	n++;
+
+	// Se for um ícone, replicamos para dentro de cada pasta de página
+	// Isso garante que caminhos relativos como "icons/..." funcionem sempre
+	if (nome.startsWith('icons/')) {
+		const baseNome = nome.replace('icons/', '');
+		for (const p of paginas) {
+			zip.file(`${p}/icons/${baseNome}`, data);
+			n++;
+		}
+	}
+
+	// Fazemos o mesmo para o catálogo SVG
+	if (nome === 'catalog.svg') {
+		for (const p of paginas) {
+			zip.file(`${p}/catalog.svg`, data);
+			n++;
+		}
+	}
 }
 
 const saida = 'extensao.zip';

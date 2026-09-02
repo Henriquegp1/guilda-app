@@ -112,95 +112,176 @@
 		}
 	}
 
+	const SHAPE_PATHS: Record<string, string> = {
+		'shape.heater': 'M8 6 H88 V44 C88 74 68 88 48 98 C28 88 8 74 8 44 Z',
+		'shape.round': 'M48 6 C24 6 8 26 8 52 C8 78 24 98 48 98 C72 98 88 78 88 52 C88 26 72 6 48 6 Z',
+		'shape.square': 'M8 6 H88 V90 H8 Z',
+		'shape.pointed': 'M8 6 H88 V60 L48 98 L8 60 Z',
+		'shape.kite': 'M48 6 L88 44 L48 98 L8 44 Z',
+		'shape.lozenge': 'M48 8 L88 52 L48 96 L8 52 Z',
+		'shape.banner': 'M8 6 H88 V82 L48 98 L8 82 Z'
+	};
+
 	const estaBloqueado = (asset: Asset) => {
 		if (asset.tier === 'level') return nivelGuilda < (asset.unlock_level || 0);
 		if (asset.tier === 'paid') return !posses.has(asset.id);
 		return false;
 	};
+
+	// Lógica de deduplicação para símbolos (evita mostrar ícones repetidos)
+	const getVisualKey = (asset: Asset) => {
+		if (asset.layer !== 'symbol') return asset.id;
+		const slug = asset.id.split('.')[1] || '';
+		const mapping: Record<string, string> = {
+			'sword': 'sword-hilt', 'dagger': 'sword-hilt', 'spear': 'sword-hilt',
+			'hammer': 'battle-axe', 'mace': 'spiked-mace', 'staff': 'spiked-mace',
+			'wand': 'potion-ball', 'torch': 'fireball', 'lantern': 'crystal-ball',
+			'scroll': 'scroll-unfurled', 'potion': 'potion-ball', 'gem': 'gem-pendant',
+			'key': 'skeleton-key', 'flag': 'shield', 'eagle': 'angel-wings',
+			'falcon': 'angel-wings', 'seraph': 'angel-wings', 'wolf': 'skull-mask',
+			'bear': 'skull-mask', 'boar': 'skull-mask', 'cerberus': 'skull-mask',
+			'chimera': 'skull-mask', 'basilisk': 'skull-mask', 'minotaur': 'skull-mask',
+			'dragon': 'dragon-head', 'wyrm': 'dragon-head', 'griffin': 'griffin-symbol',
+			'kraken': 'kraken-tentacle', 'reaper': 'reaper-scythe', 'colossus': 'mailed-fist',
+			'titan': 'mailed-fist'
+		};
+		return mapping[slug] || slug;
+	};
+
+	const assetsFiltrados = $derived.by(() => {
+		const todos = ($assetsByLayer as any)[abaAtiva] || [];
+		if (abaAtiva !== 'symbol') return todos;
+
+		const vistos = new Set<string>();
+		return todos.filter((a: Asset) => {
+			const key = getVisualKey(a);
+			if (vistos.has(key)) return false;
+			vistos.add(key);
+			return true;
+		});
+	});
+
+	import { PALETAS, FALLBACK_PALETTE } from '../ui/paletas';
 </script>
 
 <div class="editor">
-	<div class="preview">
-		<Brasao layers={rascunho} customUrl={abaAtiva === 'custom' ? customUrlInput : null} tamanho={120} />
-		<div class="info">
-			<h3>{guilda.name}</h3>
-			<p>Nível {nivelGuilda}</p>
+	<div class="cabecalho">
+		<div class="preview">
+			<Brasao layers={rascunho} customUrl={abaAtiva === 'custom' ? customUrlInput : null} tamanho={80} tag={guilda.tag} />
+			<div class="info">
+				<h3>{guilda.name}</h3>
+				<p>Nível {nivelGuilda}</p>
+			</div>
+		</div>
+
+		<nav class="abas">
+			{#each categorias as cat}
+				<button class:ativa={abaAtiva === cat.id} onclick={() => (abaAtiva = cat.id)}>
+					{cat.rotulo}
+				</button>
+			{/each}
+		</nav>
+	</div>
+
+	<div class="corpo-selecao">
+		<div class="grade">
+			{#if abaAtiva === 'name' || abaAtiva === 'tag'}
+				<div class="secao-nome">
+					<TrocarNome {guilda} tipo={abaAtiva} aoSucesso={aoSalvar} />
+				</div>
+			{:else if abaAtiva === 'custom'}
+				<div class="secao-custom">
+					<p class="instrucao">Cole a URL de um PNG transparente.</p>
+					<input type="url" placeholder="https://..." bind:value={customUrlInput} />
+					<button class="btn-preview" onclick={() => (customUrlInput = customUrlInput.trim())}>Simular Preview</button>
+				</div>
+			{:else}
+				{#each assetsFiltrados as asset}
+				{@const bloqueado = estaBloqueado(asset)}
+				<button
+					class="asset"
+					class:selecionado={rascunho[abaAtiva] === asset.id}
+					class:bloqueado
+					class:pago={asset.tier === 'paid' && !posses.has(asset.id)}
+					onclick={() => !bloqueado && selecionar(asset)}
+				>
+					<div class="visual">
+						{#if abaAtiva === 'palette'}
+							{@const c = PALETAS[asset.id] || FALLBACK_PALETTE}
+							<div class="amostra" style:background={c.primária}>
+								<div class="det" style:background={c.detalhe}></div>
+							</div>
+						{:else if ['shape', 'symbol', 'background', 'border'].includes(abaAtiva)}
+							<div class="mini-item">
+								<Brasao layers={{...rascunho, [abaAtiva]: asset.id}} tamanho={32} />
+							</div>
+						{:else}
+							<span class="id">{asset.id.split('.')[1]}</span>
+						{/if}
+					</div>
+					{#if bloqueado}
+						<div class="trava-status">
+							{asset.tier === 'level' ? `Nv ${asset.unlock_level}` : `${asset.price_bits} B`}
+						</div>
+					{/if}
+				</button>
+				{/each}
+			{/if}
 		</div>
 	</div>
 
-	<nav class="abas">
-		{#each categorias as cat}
-			<button class:ativa={abaAtiva === cat.id} onclick={() => (abaAtiva = cat.id)}>
-				{cat.rotulo}
-			</button>
-		{/each}
-	</nav>
-
-	<div class="grade">
-		{#if abaAtiva === 'name' || abaAtiva === 'tag'}
-			<div class="secao-nome">
-				<TrocarNome {guilda} tipo={abaAtiva} aoSucesso={aoSalvar} />
-			</div>
-		{:else if abaAtiva === 'custom'}
-			<div class="secao-custom">
-				<p class="instrucao">Cole a URL de um PNG transparente.</p>
-				<input type="url" placeholder="https://..." bind:value={customUrlInput} />
-				<button class="btn-preview" onclick={() => (customUrlInput = customUrlInput.trim())}>Simular Preview</button>
-			</div>
-		{:else}
-			{#each ($assetsByLayer as any)[abaAtiva] || [] as asset}
-			{@const bloqueado = estaBloqueado(asset)}
-			<button
-				class="asset"
-				class:selecionado={rascunho[abaAtiva] === asset.id}
-				class:bloqueado
-				class:pago={asset.tier === 'paid' && !posses.has(asset.id)}
-				onclick={() => !bloqueado && selecionar(asset)}
-			>
-				<div class="visual"><span class="id">{asset.id.split('.')[1]}</span></div>
-				{#if bloqueado}
-					<div class="trava">
-						<span class={asset.tier === 'level' ? 'nv' : 'preco'}>
-							{asset.tier === 'level' ? `Nv ${asset.unlock_level}` : `${asset.price_bits} B`}
-						</span>
-					</div>
-				{/if}
-			</button>
-			{/each}
-		{/if}
-	</div>
-
-	<div class="acoes">
+	<div class="rodape">
 		{#if erro}<p class="erro">{erro}</p>{/if}
-		<button class="salvar" disabled={ocupado} onclick={salvar}>
-			{ocupado ? 'Salvando...' : 'Salvar Alterações'}
-		</button>
-	</div>
+		<div class="salvar-container">
+			<button class="salvar" disabled={ocupado} onclick={salvar}>
+				{ocupado ? 'Salvando...' : 'Salvar'}
+			</button>
 
-	<div class="secao-creditos"><Creditos /></div>
+			<details class="creditos-footer">
+				<summary>ℹ️ Créditos</summary>
+				<div class="creditos-content"><Creditos /></div>
+			</details>
+		</div>
+	</div>
 </div>
 
 <style>
-	.editor { display: flex; flex-direction: column; height: 100%; background: var(--sable); }
-	.preview { display: flex; align-items: center; padding: 20px; gap: 20px; background: linear-gradient(to bottom, var(--sable-2), var(--sable)); border-bottom: 1px solid var(--borda); }
-	.info h3 { margin: 0; font-family: var(--display); color: var(--or); }
-	.info p { margin: 4px 0 0; font-size: 12px; color: var(--argent-fraco); }
-	.abas { display: flex; overflow-x: auto; background: var(--sable-2); border-bottom: 1px solid var(--borda); }
-	.abas button { flex: 1; padding: 12px 8px; font-size: 11px; text-transform: uppercase; border: none; border-bottom: 2px solid transparent; background: none; color: var(--argent-fraco); cursor: pointer; }
-	.abas button.ativa { color: var(--or); border-bottom-color: var(--or); background: rgba(212, 175, 55, 0.05); }
-	.grade { flex: 1; display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; padding: 12px; overflow-y: auto; }
-	.asset { aspect-ratio: 1; background: var(--sable-2); border: 1px solid var(--borda); position: relative; display: flex; align-items: center; justify-content: center; cursor: pointer; }
-	.asset.selecionado { border-color: var(--or); background: rgba(212, 175, 55, 0.1); }
-	.asset.bloqueado { opacity: 0.5; cursor: not-allowed; }
-	.visual .id { font-size: 10px; color: var(--argent); }
-	.trava { position: absolute; bottom: 4px; right: 4px; background: rgba(0, 0, 0, 0.8); padding: 2px 4px; font-size: 9px; }
-	.nv { color: var(--or); }
-	.preco { color: var(--vert); }
-	.acoes { padding: 16px; border-top: 1px solid var(--borda); }
+	.editor { display: flex; flex-direction: column; height: 100%; background: var(--sable); overflow: hidden; }
+
+	.cabecalho { flex-shrink: 0; background: var(--sable-2); border-bottom: 1px solid var(--borda); }
+
+	.preview { display: flex; align-items: center; padding: 12px 16px; gap: 16px; }
+	.info h3 { margin: 0; font-family: var(--display); color: var(--or); font-size: 16px; }
+	.info p { margin: 2px 0 0; font-size: 11px; color: var(--argent-fraco); }
+
+	.abas { display: grid; grid-template-columns: repeat(3, 1fr); background: var(--borda); gap: 1px; }
+	.abas button { padding: 10px 4px; font-size: 9px; text-transform: uppercase; border: none; background: var(--sable-2); color: var(--argent-fraco); cursor: pointer; }
+	.abas button.ativa { color: var(--or); background: var(--sable); box-shadow: inset 0 -2px 0 var(--or); }
+
+	.corpo-selecao { flex: 1; overflow-y: auto; overflow-x: hidden; scrollbar-width: thin; scrollbar-color: var(--or) transparent; }
+	.corpo-selecao::-webkit-scrollbar { width: 4px; }
+	.corpo-selecao::-webkit-scrollbar-thumb { background: var(--or); border-radius: 4px; }
+
+	.grade { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; padding: 16px; align-content: start; }
+	.asset { width: 100%; min-height: 80px; background: var(--sable-2); border: 1px solid var(--borda); position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: pointer; border-radius: 4px; padding: 6px; }
+	.asset.selecionado { border-color: var(--or); background: rgba(212, 175, 55, 0.05); }
+	.asset.bloqueado { opacity: 0.7; }
+
+	.visual { flex: 1; width: 100%; display: flex; align-items: center; justify-content: center; overflow: hidden; pointer-events: none; }
+	.visual .id { font-size: 10px; color: var(--argent); text-align: center; word-break: break-all; margin-top: 4px; }
+
+	.mini-item { transform: scale(1); filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3)); }
+	.amostra { width: 40px; height: 40px; border-radius: 50%; position: relative; border: 2px solid rgba(255,255,255,0.1); overflow: hidden; }
+	.amostra .det { position: absolute; top: 0; right: 0; width: 50%; height: 100%; }
+
+	.trava-status { font-size: 9px; color: var(--or); font-weight: bold; background: rgba(0,0,0,0.6); width: 100%; text-align: center; padding: 2px 0; border-radius: 0 0 4px 4px; margin-top: 4px; }
+
+	.rodape { flex-shrink: 0; padding: 8px 16px; border-top: 1px solid var(--borda); background: var(--sable-2); }
+	.salvar-container { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 	.secao-nome, .secao-custom { grid-column: 1 / -1; }
-	.secao-custom { display: flex; flex-direction: column; gap: 8px; }
-	.btn-preview { background: var(--sable-2); border: 1px solid var(--or); color: var(--or); padding: 6px; cursor: pointer; }
-	.salvar { width: 100%; padding: 12px; background: var(--or); color: var(--sable); font-weight: bold; border: none; }
-	.erro { color: var(--gules); font-size: 12px; }
-	.secao-creditos { padding: 20px; border-top: 1px dashed var(--borda); }
+	.salvar { flex: 1; padding: 10px; background: var(--or); color: var(--sable); font-weight: 800; text-transform: uppercase; letter-spacing: 0.1em; border: none; border-radius: 4px; cursor: pointer; font-size: 13px; }
+	.erro { color: var(--gules); font-size: 11px; margin-bottom: 4px; text-align: center; }
+
+	.creditos-footer { flex-shrink: 0; }
+	summary { font-size: 8px; color: var(--argent-fraco); cursor: pointer; list-style: none; opacity: 0.6; padding: 4px; border: 1px solid var(--borda); border-radius: 2px; }
 </style>

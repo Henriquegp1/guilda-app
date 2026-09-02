@@ -81,7 +81,7 @@
 {#if editando}
 	<div class="editor-overlay" in:entrarBloco>
 		<header class="editor-header">
-			<button class="voltar" onclick={() => (editando = false)}>← Voltar</button>
+			<button class="voltar" onclick={() => (editando = false)} aria-label="Voltar">←</button>
 			<h2>Identidade</h2>
 		</header>
 		<EditorBrasao {guilda} aoSalvar={() => { editando = false; aoAtualizar(); }} />
@@ -342,7 +342,7 @@
 	.editor-overlay {
 		position: absolute;
 		inset: 0;
-		z-index: 10;
+		z-index: 100;
 		background: var(--sable);
 		display: flex;
 		flex-direction: column;
@@ -351,26 +351,39 @@
 	.editor-header {
 		display: flex;
 		align-items: center;
-		padding: 10px;
+		justify-content: center;
+		padding: 12px;
 		border-bottom: 1px solid var(--borda);
 		background: var(--sable-2);
+		position: relative;
+		min-height: 48px;
 	}
 
 	.editor-header h2 {
 		margin: 0;
 		font-size: 14px;
 		text-transform: uppercase;
-		letter-spacing: 0.1em;
-		flex: 1;
-		text-align: center;
-		padding-right: 40px; /* compensa o botão voltar */
+		letter-spacing: 0.15em;
+		color: var(--argent);
+		font-weight: 700;
 	}
 
 	.voltar {
+		position: absolute;
+		left: 8px;
+		top: 50%;
+		transform: translateY(-50%);
 		background: none;
 		border: none;
 		color: var(--or);
-		font-size: 12px;
+		font-size: 24px;
 		cursor: pointer;
+		padding: 8px;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		transition: opacity 0.2s;
 	}
+
+	.voltar:hover { opacity: 0.7; }
 </style>
