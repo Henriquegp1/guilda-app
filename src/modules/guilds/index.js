@@ -292,11 +292,15 @@ export default async function guilds (app) {
   app.get('/guilds', async (req) => {
     const channel = await getChannel(pool, req.auth)
     const limit = pageLimit(req.query.limit)
+
+    // Blindagem extra: garantimos que apenas status 'active' e 'overflow' (guilda cheia)
+    // apareçam na listagem pública. 'pending' e 'awaiting' ficam invisíveis.
     const { rows } = await query(
       `SELECT * FROM guild
-        WHERE channel_id = $1 AND status = 'active' AND ($2::bigint IS NULL OR id > $2)
-        ORDER BY id LIMIT $3`,
-      [channel.id, req.query.cursor || null, limit])
+        WHERE channel_id = $1 AND status = ANY($2::guild_status[])
+          AND ($3::bigint IS NULL OR id > $3)
+        ORDER BY id LIMIT $4`,
+      [channel.id, ['active', 'overflow'], req.query.cursor || null, limit])
 
     return {
       items: rows.map((g) => view(g)),
