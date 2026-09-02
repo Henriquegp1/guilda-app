@@ -378,34 +378,36 @@
 		border-bottom: 1px solid var(--borda);
 		background: var(--sable-2);
 		position: relative;
-		min-height: 48px;
+		min-height: 54px;
 	}
 
 	.editor-header h2 {
 		margin: 0;
-		font-size: 14px;
+		font-size: 16px;
 		text-transform: uppercase;
-		letter-spacing: 0.15em;
+		letter-spacing: 0.2em;
 		color: var(--argent);
-		font-weight: 700;
+		font-weight: 800;
+		text-align: center;
 	}
 
 	.voltar {
 		position: absolute;
-		left: 8px;
+		left: 12px;
 		top: 50%;
 		transform: translateY(-50%);
 		background: none;
 		border: none;
 		color: var(--or);
-		font-size: 24px;
+		font-size: 32px;
 		cursor: pointer;
-		padding: 8px;
+		padding: 4px;
+		line-height: 1;
 		display: flex;
 		align-items: center;
 		justify-content: center;
-		transition: opacity 0.2s;
+		transition: transform 0.2s;
 	}
 
-	.voltar:hover { opacity: 0.7; }
+	.voltar:hover { transform: translateY(-50%) scale(1.1); }
 </style>

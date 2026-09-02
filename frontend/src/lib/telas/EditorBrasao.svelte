@@ -276,12 +276,14 @@
 
 	.trava-status { font-size: 9px; color: var(--or); font-weight: bold; background: rgba(0,0,0,0.6); width: 100%; text-align: center; padding: 2px 0; border-radius: 0 0 4px 4px; margin-top: 4px; }
 
-	.rodape { flex-shrink: 0; padding: 8px 16px; border-top: 1px solid var(--borda); background: var(--sable-2); }
-	.salvar-container { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+	.rodape { flex-shrink: 0; padding: 12px 16px; border-top: 1px solid var(--borda); background: var(--sable-2); position: relative; }
+	.salvar-container { display: flex; align-items: center; justify-content: center; width: 100%; position: relative; }
 	.secao-nome, .secao-custom { grid-column: 1 / -1; }
-	.salvar { flex: 1; padding: 10px; background: var(--or); color: var(--sable); font-weight: 800; text-transform: uppercase; letter-spacing: 0.1em; border: none; border-radius: 4px; cursor: pointer; font-size: 13px; }
+	.salvar { width: 140px; padding: 8px; background: var(--or); color: var(--sable); font-weight: 800; text-transform: uppercase; letter-spacing: 0.1em; border: none; border-radius: 4px; cursor: pointer; font-size: 12px; transition: transform 0.1s; }
+	.salvar:active { transform: scale(0.98); }
 	.erro { color: var(--gules); font-size: 11px; margin-bottom: 4px; text-align: center; }
 
-	.creditos-footer { flex-shrink: 0; }
-	summary { font-size: 8px; color: var(--argent-fraco); cursor: pointer; list-style: none; opacity: 0.6; padding: 4px; border: 1px solid var(--borda); border-radius: 2px; }
+	.creditos-footer { position: absolute; right: 0; bottom: 0; }
+	summary { font-size: 8px; color: var(--argent-fraco); cursor: pointer; list-style: none; opacity: 0.5; padding: 4px 8px; border: 1px solid transparent; border-radius: 2px; }
+	summary:hover { opacity: 1; color: var(--or); }
 </style>

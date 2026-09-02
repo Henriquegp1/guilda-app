@@ -202,7 +202,7 @@ export default async function modRoutes (app) {
       // Rebaixa antes de promover: guild_member_leader_uk não tolera dois líderes.
       await c.query('UPDATE guild_member SET role = $3 WHERE guild_id = $1 AND user_id = $2',
         [g.id, g.leader_user_id, member.role])
-      await c.query(`UPDATE guild_member SET role = 'leader' WHERE guild_id = $1 AND user_id = $2`,
+      await c.query(`UPDATE guild_member SET role = 'lider' WHERE guild_id = $1 AND user_id = $2`,
         [g.id, target])
       await c.query('UPDATE guild SET leader_user_id = $2 WHERE id = $1', [g.id, target])
         .catch(onUnique('guild_one_per_leader_uk', 'ALREADY_HAS_GUILD', 'o alvo já lidera outra guilda neste canal'))

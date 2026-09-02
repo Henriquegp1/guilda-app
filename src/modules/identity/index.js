@@ -275,7 +275,7 @@ async function requestIdentityChange (req, field) {
 
   return tx(async (c) => {
     // R21: rename e TAG são exclusivos do líder.
-    const { channelId, guild, userId } = await scope(c, req, { roles: ['leader'], eligible: true })
+    const { channelId, guild, userId } = await scope(c, req, { roles: ['lider'], eligible: true })
     const current = field === 'name' ? guild.name : guild.tag
     if (norm(current) === norm(next)) throw badRequest(`${ERR}_INVALID`, 'valor igual ao atual')
 
@@ -456,7 +456,7 @@ export default async function identity (app) {
     if (!Number.isInteger(slot) || slot < 1 || slot > MAX_SLOTS) throw badRequest('SLOT_NOT_OWNED', 'slot inexistente')
 
     return tx(async (c) => {
-      const { channelId, guild, userId } = await scope(c, req, { roles: ['leader', 'officer'], eligible: true })
+      const { channelId, guild, userId } = await scope(c, req, { roles: ['lider', 'sub-lider'], eligible: true })
       const ents = await entitlements(c, guild.id)
       if (slot > 1 && !ents.slots.has(`slot:${slot}`)) throw forbidden('SLOT_NOT_OWNED', `slot ${slot} não comprado`)
 
@@ -496,7 +496,7 @@ export default async function identity (app) {
     const asset = await ingestCustomImage(source_url)
 
     return tx(async (c) => {
-      const { channelId, guild, userId } = await scope(c, req, { roles: ['leader', 'officer'], eligible: true })
+      const { channelId, guild, userId } = await scope(c, req, { roles: ['lider', 'sub-lider'], eligible: true })
       const ents = await entitlements(c, guild.id)
       if (s > 1 && !ents.slots.has(`slot:${s}`)) throw forbidden('SLOT_NOT_OWNED', `slot ${s} não comprado`)
 
@@ -509,7 +509,7 @@ export default async function identity (app) {
 
   // R6 — trocar o brasão ativo é grátis e instantâneo, 10×/hora.
   app.post('/guilds/:id/emblem/active', async (req) => tx(async (c) => {
-    const { channelId, guild, userId } = await scope(c, req, { roles: ['leader'], eligible: true })
+    const { channelId, guild, userId } = await scope(c, req, { roles: ['lider'], eligible: true })
     const slot = Number(req.body?.slot)
 
     const target = await c.query(
@@ -538,7 +538,7 @@ export default async function identity (app) {
 
   // -------------------------------------------------- loja
   app.post('/guilds/:id/emblem/slots', async (req) => tx(async (c) => {
-    const { channelId, guild, userId } = await scope(c, req, { roles: ['leader'], eligible: true })
+    const { channelId, guild, userId } = await scope(c, req, { roles: ['lider'], eligible: true })
     const ents = await entitlements(c, guild.id)
     const next = slotsOwned(ents) + 1                    // R5: slots só em ordem
     if (next > MAX_SLOTS) throw conflict('SLOT_LIMIT_REACHED', `máximo de ${MAX_SLOTS} slots`)
@@ -562,7 +562,7 @@ export default async function identity (app) {
   }))
 
   app.post('/guilds/:id/store/assets', async (req) => tx(async (c) => {
-    const { channelId, guild, userId } = await scope(c, req, { roles: ['leader', 'officer'], eligible: true })
+    const { channelId, guild, userId } = await scope(c, req, { roles: ['lider', 'sub-lider'], eligible: true })
     const { asset_id: assetId, asset_ids: assetIds, transaction_receipt: receipt, use_credit: useCredit = false } = req.body ?? {}
     const ents = await entitlements(c, guild.id)
 

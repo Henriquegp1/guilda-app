@@ -18,7 +18,7 @@ const isMod = (req) => { try { requireModerator(req); return true } catch { retu
 /** Cargo efetivo do ator dentro da guilda. Mod do canal joga como líder. */
 async function actorRole (client, req, guild) {
   const member = req.auth.userId ? await memberIn(client, guild.id, req.auth.userId) : null
-  if (isMod(req)) return { role: 'leader', member, mod: !member || member.role !== 'leader' }
+  if (isMod(req)) return { role: 'lider', member, mod: !member || member.role !== 'lider' }
   if (!member) throw forbidden('FORBIDDEN_ROLE', 'não é membro desta guilda')
   return { role: member.role, member, mod: false }
 }
@@ -340,7 +340,7 @@ export default async function members (app) {
       payload: { invite_id: inv.id, invitee_user_id: userId, actor_user_id: userId },
       actorUserId: userId,
     })
-    return { guild_id: guild.id, role: 'recruit' }
+    return { guild_id: guild.id, role: 'vassalo' }
   }))
 
   app.post('/invites/:code/decline', async (req, reply) => tx(async (c) => {
@@ -368,7 +368,7 @@ export default async function members (app) {
     const alvo = await memberIn(c, guild.id, req.params.uid)
     if (!alvo) throw notFound('TARGET_NOT_MEMBER', 'alvo não é membro')
     // R17: o líder não é expulso; o caminho é a transferência de liderança.
-    if (alvo.role === 'leader') throw conflict('CANNOT_KICK_LEADER', 'transfira a liderança antes')
+    if (alvo.role === 'lider') throw conflict('CANNOT_KICK_LEADER', 'transfira a liderança antes')
     assertCan(role, 'kick', alvo.role)
 
     await removeMember(c, guild, alvo, { reason: 'kicked', actorUserId: actorId })
@@ -426,10 +426,10 @@ export default async function members (app) {
 
     const alvo = await memberIn(c, guild.id, String(req.body?.to_user_id ?? ''))
     if (!alvo) throw notFound('TARGET_NOT_MEMBER', 'alvo não é membro')
-    if (alvo.role === 'leader') throw conflict('ALREADY_LEADER', 'alvo já é o líder')
+    if (alvo.role === 'lider') throw conflict('ALREADY_LEADER', 'alvo já é o líder')
 
     const { rows: [lider] } = await c.query(
-      "SELECT user_id FROM guild_member WHERE guild_id = $1 AND role = 'leader'", [guild.id])
+      "SELECT user_id FROM guild_member WHERE guild_id = $1 AND role = 'lider'", [guild.id])
     if (!lider) throw conflict('NO_LEADER', 'guilda sem líder')
 
     // Mod do canal só entra aqui em sucessão travada (matriz §4, nota 4).

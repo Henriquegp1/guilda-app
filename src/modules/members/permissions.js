@@ -3,7 +3,7 @@
  *
  * Regra única por trás dela: ninguém age sobre igual ou superior (R7), e ninguém
  * cria alguém do próprio nível (R8). Broadcaster/mod do canal atua por cima de
- * qualquer guilda e é mapeado para 'leader' pelo handler — a única linha da matriz
+ * qualquer guilda e é mapeado para 'lider' pelo handler — a única linha da matriz
  * em que ele difere do líder ("sair") não se aplica a quem não é membro.
  */
 
@@ -62,8 +62,8 @@ export const prevRole = (role) => (rank(role) > 0 ? ROLES[rank(role) - 1] : null
  */
 export function roleChangeError (actorRole, targetRole, toRole) {
   if (rank(toRole) < 0 || rank(targetRole) < 0) return 'INVALID_ROLE_TRANSITION'
-  // Único caminho para leader é a transferência de liderança (R19).
-  if (toRole === 'leader') return 'INVALID_ROLE_TRANSITION'
+  // Único caminho para lider é a transferência de liderança (R19).
+  if (toRole === 'lider') return 'INVALID_ROLE_TRANSITION'
   // Um degrau por vez, e nunca para o mesmo cargo (R9, R10).
   if (Math.abs(rank(toRole) - rank(targetRole)) !== 1) return 'INVALID_ROLE_TRANSITION'
 
