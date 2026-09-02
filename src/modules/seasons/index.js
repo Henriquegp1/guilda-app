@@ -454,24 +454,24 @@ export default async function seasons (app) {
   /** Card "sua guilda": ao vivo, não sai do snapshot (§5.1). */
   app.get('/guilds/:gid/rank', async (req) => {
     const cid = req.auth.channelId
-    const guild = await getGuild({ query }, cid, req.params.gid)
+    const guild = await getGuild({ query }, cid, req.params.gid).catch(() => null)
+
+    if (!guild) {
+      return { season_id: 0, position: null, prestige: 0, delta_position: null, live: false }
+    }
+
     const season = req.query.season_id
-      ? await getSeason({ query }, cid, req.query.season_id)
+      ? await getSeason({ query }, cid, req.query.season_id).catch(() => null)
       : await currentSeason({ query }, cid)
-    if (!season) throw notFound('SEASON_NOT_FOUND', 'nenhuma temporada')
+
+    if (!season) {
+      return { season_id: 0, position: null, prestige: 0, delta_position: null, live: false }
+    }
 
     const live = await livePosition({ query }, season.id, guild.id)
 
-    // Se a guilda ainda não tem Prestígio (comum em guildas novas),
-    // devolvemos posição nula em vez de 404 para não quebrar o console do devtools.
     if (!live) {
-      return {
-        season_id: season.id,
-        position: null,
-        prestige: 0,
-        delta_position: null,
-        live: true,
-      }
+      return { season_id: season.id, position: null, prestige: 0, delta_position: null, live: true }
     }
 
     const { rows: [prev] } = await query(
