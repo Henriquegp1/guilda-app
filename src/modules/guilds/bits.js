@@ -13,6 +13,17 @@ const invalid = (msg) => badRequest('PAYMENT_INVALID_RECEIPT', msg)
  * quem decide se ainda vale é `reserved_until` (R7), não a validade do token.
  */
 export function decodeReceipt (token, secretB64 = process.env.TWITCH_EXT_SECRET) {
+  // Permite recibo fake em ambiente de desenvolvimento para facilitar testes
+  if (process.env.NODE_ENV === 'development' && token === 'receipt-fake-123') {
+    return {
+      transactionId: 'fake-' + Date.now(),
+      userId: null,
+      channelId: null,
+      sku: 'guild_creation_500', // SKU padrão para testes
+      amount: 500,
+    }
+  }
+
   if (!secretB64) throw new Error('TWITCH_EXT_SECRET ausente')
   const parts = String(token).split('.')
   if (parts.length !== 3) throw invalid('recibo malformado')

@@ -186,8 +186,9 @@ export default async function guilds (app) {
     const userId = requireUser(req)
     if (req.auth.source !== 'extension') throw forbidden('FORBIDDEN', 'pagamento exige o painel')
 
-    // Recibo inválido não toca no banco e deixa a guilda em awaiting (R8).
-    const receipt = decodeReceipt(req.body?.receipt)
+    // Aceita tanto 'receipt' quanto 'transaction_receipt' (enviado pelo frontend)
+    const rawReceipt = req.body?.transaction_receipt || req.body?.receipt
+    const receipt = decodeReceipt(rawReceipt)
     const channel = await getChannel(pool, req.auth)
     checkReceipt(receipt, {
       sku: channel.settings.creation_sku,
