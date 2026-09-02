@@ -345,7 +345,8 @@ export async function evaluateGuild (client, channelId, guildId, sourceEventId =
 export default async function seasons (app) {
   app.get('/seasons/current', async (req) => {
     const season = await currentSeason({ query }, req.auth.channelId)
-    if (!season) throw notFound('NO_ACTIVE_SEASON', 'nenhuma temporada em andamento')
+    if (!season) return null
+
     const { rows: [c] } = await query(
       'SELECT count(*)::int AS n FROM guild_season_prestige WHERE season_id = $1', [season.id])
     return {
@@ -396,9 +397,19 @@ export default async function seasons (app) {
       snapshot = rows[0]
     } else {
       const season = req.query.season_id
-        ? await getSeason({ query }, cid, req.query.season_id)
+        ? await getSeason({ query }, cid, req.query.season_id).catch(() => null)
         : await currentSeason({ query }, cid)
-      if (!season) throw notFound('SEASON_NOT_FOUND', 'nenhuma temporada')
+
+      if (!season) {
+        return {
+          snapshot_id: 0,
+          season_id: 0,
+          taken_at: new Date(),
+          is_final: false,
+          items: [],
+          next_cursor: null,
+        }
+      }
       const { rows } = await query(
         `SELECT * FROM ranking_snapshot WHERE season_id = $1
           ORDER BY is_final DESC, taken_at DESC LIMIT 1`, [season.id])
