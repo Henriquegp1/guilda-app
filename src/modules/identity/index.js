@@ -403,7 +403,7 @@ export default async function identity (app) {
         svg_symbol_id: a.svgSymbolId, is_layer_fallback: a.isFallback,
         author: a.author
       })),
-      sprite_url: 'http://localhost:5173/catalog.svg',
+      sprite_url: '/catalog.svg',
       denied_combos_hash: createHash('sha256').update(JSON.stringify(rows)).digest('hex'),
       bundle: { sku: 'effect.bundle', price_bits: SKU_BITS['effect.bundle'], pick: 3, from: PAID_EFFECTS },
       prices: SKU_BITS,

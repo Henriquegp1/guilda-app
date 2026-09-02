@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { base } from '$app/paths';
 	import { catalog, assetsById } from '$lib/catalog';
 	import { PALETAS, FALLBACK_PALETTE } from './paletas';
 	import type { EmblemLayers } from '$lib/api';
@@ -161,19 +162,43 @@
 		{/if}
 
 		{#if !customUrl && getLayer('symbol') !== 'symbol.blank'}
-			{@const slug = getLayer('symbol').split('.')[1]}
-			{@const mapping = {
+			{@const symbolId = getLayer('symbol')}
+			{@const slug = symbolId.split('.')[1] || ''}
+			{@const mapping: Record<string, string> = {
 				'sword': 'sword-hilt',
-				'bow': 'bow-arrow',
-				'potion': 'potion-ball',
+				'dagger': 'sword-hilt',
+				'spear': 'sword-hilt',
+				'hammer': 'battle-axe',
+				'mace': 'spiked-mace',
+				'staff': 'spiked-mace',
+				'wand': 'potion-ball',
+				'torch': 'fireball',
+				'lantern': 'crystal-ball',
 				'scroll': 'scroll-unfurled',
+				'potion': 'potion-ball',
+				'gem': 'gem-pendant',
+				'key': 'skeleton-key',
+				'flag': 'shield',
+				'eagle': 'angel-wings',
+				'falcon': 'angel-wings',
+				'seraph': 'angel-wings',
+				'wolf': 'skull-mask',
+				'bear': 'skull-mask',
+				'boar': 'skull-mask',
+				'cerberus': 'skull-mask',
+				'chimera': 'skull-mask',
+				'basilisk': 'skull-mask',
+				'minotaur': 'skull-mask',
 				'dragon': 'dragon-head',
+				'wyrm': 'dragon-head',
 				'griffin': 'griffin-symbol',
 				'kraken': 'kraken-tentacle',
-				'reaper': 'reaper-scythe'
+				'reaper': 'reaper-scythe',
+				'colossus': 'mailed-fist',
+				'titan': 'mailed-fist'
 			}}
-			{@const fileName = (mapping as any)[slug] || slug}
-			{@const existingIcons = [
+			{@const fileName = mapping[slug] || slug}
+			{@const verifiedIcons = new Set([
 				'axe', 'hydra', 'portal', 'shield', 'phoenix', 'unicorn', 'behemoth', 'crossbow',
 				'fireball', 'ice-bolt', 'bow-arrow', 'evil-book', 'leviathan', 'battle-axe',
 				'broadsword', 'crown-coin', 'heavy-helm', 'holy-grail', 'rune-stone', 'skull-mask',
@@ -181,21 +206,24 @@
 				'mailed-fist', 'medusa-head', 'potion-ball', 'spiked-mace', 'crystal-ball',
 				'monervas-owl', 'skeleton-key', 'treasure-map', 'reaper-scythe', 'griffin-symbol',
 				'kraken-tentacle', 'lightning-storm', 'scroll-unfurled'
-			]}
+			])}
 			<g transform="translate(48, 52) scale({symbolScale}) translate(-24, -24)">
-				{#if existingIcons.includes(fileName)}
+				{#if verifiedIcons.has(fileName)}
 					<image
-						href="/icons/{fileName}.png"
+						href="{base}/icons/{fileName}.png"
 						width="48" height="48"
 						style:filter="brightness(0) invert(1) drop-shadow(0 2px 2px rgba(0,0,0,0.5))"
 					/>
 				{:else}
+					<!-- Fallback para o símbolo do catálogo SVG ou um marcador se nada existir -->
 					<use
-						href="{spriteUrl}#{sid(getLayer('symbol'))}"
+						href="{spriteUrl}#{sid(symbolId)}"
 						width="48" height="48"
 						fill="var(--cor-det)"
-						style:filter="drop-shadow(0 2px 2px rgba(0,0,0,0.5))"
 					/>
+					{#if !spriteUrl}
+						<rect width="48" height="48" fill="var(--cor-det)" opacity="0.15" rx="4" />
+					{/if}
 				{/if}
 			</g>
 		{/if}

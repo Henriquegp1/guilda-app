@@ -9,11 +9,7 @@
 			rel="stylesheet"
 			href="https://fonts.googleapis.com/css2?family=Grenze:wght@500;600&family=Archivo:wght@400;500;600&display=swap"
 		/>
-		<!--
-			Cria window.Twitch.ext. É o único script externo que a CSP da Twitch
-			permite além de Google Fonts e Analytics, e sem ele não há autenticação
-			nem Bits. Precisa vir antes do bundle.
-		-->
+		<!-- window.Twitch.ext precisa carregar antes do app -->
 		<script src="https://extension-files.twitch.tv/helper/v1/twitch-ext.min.js"></script>
 		%sveltekit.head%
 	</head>

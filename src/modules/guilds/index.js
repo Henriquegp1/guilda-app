@@ -18,6 +18,9 @@ const HOUR = 3600e3
 const DAY = 24 * HOUR
 
 function rateLimit (userId) {
+  // Ignora o rate limit se estivermos em desenvolvimento ou se for um teste local
+  if (process.env.NODE_ENV === 'development') return
+
   const now = Date.now()
   const hits = (buckets.get(userId) ?? []).filter((t) => now - t < DAY)
   if (hits.length >= 10 || hits.filter((t) => now - t < HOUR).length >= 3) {
@@ -114,7 +117,7 @@ export default async function guilds (app) {
     })
 
     return reply.code(201).send({
-      guild_id: guild.row.id,
+      id: guild.row.id,
       sku: guild.channel.settings.creation_sku,
       bits_cost: guild.channel.settings.creation_bits_cost,
       reserved_until: guild.row.reserved_until,
@@ -203,7 +206,7 @@ export default async function guilds (app) {
         if (g.bits_transaction_id !== receipt.transactionId) {
           throw conflict('PAYMENT_ALREADY_USED', 'guilda já paga com outra transação')
         }
-        return { guild_id: g.id, status: g.status }      // reenvio do mesmo recibo (R9)
+        return { id: g.id, status: g.status }      // reenvio do mesmo recibo (R9)
       }
       if (!g.tag) throw badRequest('VALIDATION_ERROR', 'defina a TAG antes de pagar')
 
@@ -224,7 +227,7 @@ export default async function guilds (app) {
         if (Number(prev?.guild_id) !== Number(g.id)) {
           throw conflict('PAYMENT_ALREADY_USED', 'recibo já usado por outra guilda')
         }
-        return { guild_id: g.id, status: g.status }
+        return { id: g.id, status: g.status }
       }
 
       await c.query(
@@ -241,7 +244,7 @@ export default async function guilds (app) {
         [g.id, g.leader_user_id, channel.id])
         .catch(onUnique('guild_member_one_per_channel_uk', 'ALREADY_HAS_GUILD', 'o líder já está em outra guilda'))
 
-      return { guild_id: g.id, status: 'pending' }
+      return { id: g.id, status: 'pending' }
     })
 
     if (out.expired) {

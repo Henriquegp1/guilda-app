@@ -70,16 +70,28 @@ export function produtosBits(): Promise<any[]> {
 
 export function bitsHabilitado(): boolean {
 	const t = (window as any).Twitch?.ext;
-	return !t || t.features.isBitsEnabled;
+	// No modo local (sem t), consideramos habilitado para testes.
+	// No modo Twitch, usamos a flag isBitsEnabled, mas com segurança se features não existir.
+	return !t || !!t.features?.isBitsEnabled;
 }
 
 export function aoMudarRecursos(fn: () => void): () => void {
 	const t = (window as any).Twitch?.ext;
 	if (!t) return () => {};
 	t.onContext((_ctx: any, mudou: string[]) => {
-		if (mudou.includes('isBitsEnabled')) fn();
+		if (mudou.includes('isBitsEnabled') || mudou.includes('features')) fn();
 	});
 	return () => {};
+}
+
+/**
+ * Força o modo de loopback (simulação) para testes de Bits.
+ */
+export function setLoopback(ativo: boolean) {
+	const t = (window as any).Twitch?.ext;
+	if (t?.bits?.setUseLoopback) {
+		t.bits.setUseLoopback(ativo);
+	}
 }
 
 /**

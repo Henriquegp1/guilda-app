@@ -75,7 +75,9 @@
 
 	<ul class="lista-membros">
 		{#each membros as m}
-			<li
+			<button
+				type="button"
+				class="membro-btn-escalacao"
 				class:selecionado={selecionados.has(m.user_id)}
 				class:inativo={!m.is_eligible}
 				onclick={() => alternar(m.user_id, m.is_eligible)}
@@ -88,7 +90,7 @@
 				{#if !m.is_eligible}
 					<span class="tag-erro">Inativo</span>
 				{/if}
-			</li>
+			</button>
 		{/each}
 	</ul>
 
@@ -132,7 +134,7 @@
 		gap: 4px;
 	}
 
-	li {
+	.membro-btn-escalacao {
 		display: flex;
 		align-items: center;
 		gap: 12px;
@@ -141,10 +143,14 @@
 		border: 1px solid var(--borda);
 		border-radius: 2px;
 		cursor: pointer;
+		width: 100%;
+		min-height: auto;
+		font: inherit;
+		color: inherit;
 	}
 
-	li.selecionado { border-color: var(--or); background: rgba(212, 175, 55, 0.1); }
-	li.inativo { opacity: 0.4; cursor: not-allowed; }
+	.membro-btn-escalacao.selecionado { border-color: var(--or); background: rgba(212, 175, 55, 0.1); }
+	.membro-btn-escalacao.inativo { opacity: 0.4; cursor: not-allowed; }
 
 	.check {
 		width: 18px;

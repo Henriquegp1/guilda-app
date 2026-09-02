@@ -61,6 +61,7 @@
 		}
 	}
 
+	import { base } from '$app/paths';
 	import { mutarAnuncios, desmutarAnuncios } from '$lib/api';
 	let minutosMute = $state(30);
 
@@ -94,7 +95,7 @@
 			<h1>Twitch Guilds</h1>
 			<p class="sub">Painel do Streamer: Controle de Anúncios e Territórios.</p>
 		</div>
-		<a href="/moderacao" class="btn-mod">🛡️ Moderação</a>
+		<a href="{base}/moderacao" class="btn-mod">🛡️ Moderação</a>
 	</header>
 
 	{#if estado === 'carregando'}

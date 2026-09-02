@@ -1,7 +1,7 @@
 <script lang="ts">
 	import Brasao from '$lib/ui/Brasao.svelte';
 	import { criarRascunho, confirmarPagamento, ErroApi } from '$lib/api';
-	import { gastarBits, produtosBits, bitsHabilitado, aoMudarRecursos } from '$lib/twitch';
+	import { gastarBits, produtosBits, bitsHabilitado, aoMudarRecursos, setLoopback } from '$lib/twitch';
 
 	let { aoCriar }: { aoCriar: () => void } = $props();
 
@@ -12,6 +12,11 @@
 	let sku = $state('');
 	let custo = $state<number | null>(null);
 	let temBits = $state(true);
+	let loopback = $state(false);
+
+	$effect(() => {
+		setLoopback(loopback);
+	});
 
 	// Cada passo é um estado do backend, não um passo de formulário: o rascunho
 	// já existe no banco antes de o viewer pagar (fase 01).
@@ -27,20 +32,33 @@
 	$effect(() => {
 		produtosBits()
 			.then((ps) => {
-				const p = ps.find((x) => x.sku.startsWith('guild_creation')) ?? ps[0];
+				console.log('[Guilda] Produtos carregados:', ps);
+				if (!ps || ps.length === 0) return;
+
+				// Prioridade: SKU exato 'guild_creation', depois qualquer um que comece com isso
+				const p = ps.find((x) => x.sku === 'guild_creation') ??
+				          ps.find((x) => x.sku.startsWith('guild_creation')) ??
+						  ps[0];
+
 				if (p) {
 					sku = p.sku;
 					custo = Number(p.cost.amount);
+					console.log('[Guilda] SKU selecionado:', sku, 'Custo:', custo, 'InDev:', p.inDevelopment);
 				}
 			})
-			.catch(() => {});
+			.catch((err) => {
+				console.error('[Guilda] Erro ao carregar produtos:', err);
+			});
 	});
 
 	// Espelha a validação do servidor para avisar antes de cobrar Bits. Quem
 	// decide continua sendo o servidor.
 	const nomeOk = $derived(/^[A-Za-z0-9 ]{3,24}$/.test(nome.trim()));
 	const tagOk = $derived(/^[A-Z0-9]{2,5}$/.test(tag));
-	const podeEnviar = $derived(nomeOk && tagOk && passo === 'form' && temBits);
+	// Habilitamos o botão se tivermos um SKU válido e as validações passarem.
+	// Ignoramos a flag temBits se já conseguimos carregar os produtos, pois
+	// a flag pode falhar em reportar true para o streamer no dashboard.
+	const podeEnviar = $derived(nomeOk && tagOk && passo === 'form' && (temBits || sku));
 
 	async function criar() {
 		erro = '';
@@ -55,6 +73,11 @@
 							description: descricao.trim() || undefined
 						})
 					: { id: rascunhoId };
+
+			if (!g?.id) {
+				console.error('[Guilda] Resposta inválida do servidor:', g);
+				throw new Error('Não foi possível obter o ID da guilda rascunho.');
+			}
 			rascunhoId = g.id;
 
 			const recibo = await gastarBits(sku);
@@ -144,6 +167,11 @@
 			{/if}
 		</button>
 
+		<label class="row">
+			<input type="checkbox" bind:checked={loopback} />
+			Simular pagamento (Loopback)
+		</label>
+
 		<p class="nota">Nome, brasão e descrição passam por aprovação do streamer.</p>
 	</form>
 {/if}
@@ -169,6 +197,19 @@
 		text-transform: uppercase;
 		letter-spacing: 0.08em;
 		color: var(--argent-fraco);
+	}
+
+	label.row {
+		flex-direction: row;
+		align-items: center;
+		gap: 8px;
+		text-transform: none;
+		cursor: pointer;
+	}
+
+	label.row input {
+		width: auto;
+		margin: 0;
 	}
 
 	.opc {
