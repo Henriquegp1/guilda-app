@@ -105,34 +105,40 @@ export default async function members (app) {
 
   // ---------------------------------------------------------------- sair
   app.delete('/guilds/:gid/members/me', async (req, reply) => tx(async (c) => {
-    const cid = await channelPk(c, req.auth)
-    const userId = requireUser(req.auth)
-    const guild = await lockGuild(c, cid, req.params.gid)
-    const member = await memberIn(c, guild.id, userId)
-    if (!member) throw notFound('NOT_A_MEMBER', 'não é membro desta guilda')
+    try {
+      const cid = await channelPk(c, req.auth)
+      const userId = requireUser(req.auth)
+      const guild = await lockGuild(c, cid, req.params.gid)
+      const member = await memberIn(c, guild.id, userId)
+      if (!member) throw notFound('NOT_A_MEMBER', 'não é membro desta guilda')
 
-    const isLeader = ['lider', 'leader'].includes(member.role) || guild.leader_user_id === userId
+      const isLeader = ['lider', 'leader'].includes(member.role) || guild.leader_user_id === userId
 
-    // Se o líder está saindo e existem outros membros
-    if (isLeader && guild.member_count > 1) {
-      // Busca o herdeiro (sub-líder primeiro, ou o membro mais antigo)
-      const { rows: [herdeiro] } = await c.query(
-        `SELECT user_id FROM guild_member
-          WHERE guild_id = $1 AND user_id <> $2
-          ORDER BY (CASE WHEN role::text IN ('sub-lider', 'officer') THEN 0 ELSE 1 END), joined_at ASC
-          LIMIT 1`,
-        [guild.id, userId]
-      )
+      // Se o líder está saindo e existem outros membros
+      if (isLeader && guild.member_count > 1) {
+        // Busca o herdeiro (sub-líder primeiro, ou o membro mais antigo)
+        const { rows: [herdeiro] } = await c.query(
+          `SELECT user_id FROM guild_member
+            WHERE guild_id = $1 AND user_id <> $2
+            ORDER BY (CASE WHEN role::text IN ('sub-lider', 'officer') THEN 0 ELSE 1 END), joined_at ASC
+            LIMIT 1`,
+          [guild.id, userId]
+        )
 
-      if (herdeiro) {
-        await transferLeadership(c, guild, userId, herdeiro.user_id, 'succession', userId)
-      } else {
-        await c.query("UPDATE guild SET leader_user_id = NULL WHERE id = $1", [guild.id])
+        if (herdeiro) {
+          await transferLeadership(c, guild, userId, herdeiro.user_id, 'succession', userId)
+        } else {
+          await c.query("UPDATE guild SET leader_user_id = NULL WHERE id = $1", [guild.id])
+        }
       }
-    }
 
-    await removeMember(c, guild, member, { reason: 'left' })
-    reply.code(204)
+      await removeMember(c, guild, member, { reason: 'left' })
+      reply.code(204)
+    } catch (err) {
+      if (err instanceof AppError) throw err
+      console.error('[DELETE /members/me Error]:', err)
+      throw new AppError(500, 'LEAVE_FAILED', err.message || 'Falha ao sair da guilda')
+    }
   }))
 
   // ---------------------------------------------------------------- fila de pedidos
