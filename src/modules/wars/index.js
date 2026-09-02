@@ -1009,13 +1009,6 @@ async function assertMinDistance (c, channelId, x, y, excludeId = null) {
 
 // ------------------------------------------------------------------ auxiliares
 
-function requireBroadcaster (req) {
-  requireModerator(req)
-  if (req.auth.role !== 'broadcaster') throw forbidden('FORBIDDEN', 'requer broadcaster')
-  if (!req.auth.userId) throw forbidden('IDENTITY_REQUIRED', 'requer consentimento de identidade')
-  return req.auth.userId
-}
-
 const slugify = (s) => String(s ?? '').trim().toLowerCase().replace(/[^a-z0-9]+/g, '-')
   .replace(/^-|-$/g, '').slice(0, 40)
 
