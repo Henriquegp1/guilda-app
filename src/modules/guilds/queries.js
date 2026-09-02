@@ -4,7 +4,7 @@ import { forbidden, notFound } from '../../core/errors.js'
 export const SETTINGS_DEFAULTS = {
   creation_enabled: true,
   creation_bits_cost: 500,
-  creation_sku: 'guild_creation_500',
+  creation_sku: 'guild_creation',
   name_denylist: [],
   default_member_limit: 10,
   panel_url: null,
