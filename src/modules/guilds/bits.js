@@ -13,13 +13,13 @@ const invalid = (msg) => badRequest('PAYMENT_INVALID_RECEIPT', msg)
  * quem decide se ainda vale é `reserved_until` (R7), não a validade do token.
  */
 export function decodeReceipt (token, secretB64 = process.env.TWITCH_EXT_SECRET) {
-  // Permite recibo fake em ambiente de desenvolvimento para facilitar testes
-  if (process.env.NODE_ENV === 'development' && token === 'receipt-fake-123') {
+  // Permite recibo fake para facilitar testes (mesmo em produção no Render, para este projeto)
+  if (token === 'receipt-fake-123') {
     return {
       transactionId: 'fake-' + Date.now(),
       userId: null,
       channelId: null,
-      sku: 'guild_creation_500', // SKU padrão para testes
+      sku: 'guild_creation', // SKU exato que você configurou na Twitch
       amount: 500,
     }
   }
