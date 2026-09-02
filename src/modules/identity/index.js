@@ -668,20 +668,24 @@ export default async function identity (app) {
 
     const items = []
     if (!type || type === 'nickname') {
-      const { rows } = await query(
-        `SELECT p.user_id, p.nickname, p.created_at
-           FROM user_profile p
-          WHERE p.channel_id = $1 AND p.status = 'pending_review'
-          ORDER BY p.created_at LIMIT $2`, [channelId, limit])
-      items.push(...rows.map(r => ({
-        request_id: `nickname-${r.user_id}`,
-        type: 'nickname',
-        guild_name: 'Personagem',
-        requested_by: r.user_id,
-        old_value: 'Nenhum',
-        new_value: r.nickname,
-        created_at: r.created_at
-      })))
+      try {
+        const { rows } = await query(
+          `SELECT p.user_id, p.nickname, p.created_at
+             FROM user_profile p
+            WHERE p.channel_id = $1 AND p.status = 'pending_review'
+            ORDER BY p.created_at LIMIT $2`, [channelId, limit])
+        items.push(...rows.map(r => ({
+          request_id: `nickname-${r.user_id}`,
+          type: 'nickname',
+          guild_name: 'Personagem',
+          requested_by: r.user_id,
+          old_value: 'Nenhum',
+          new_value: r.nickname,
+          created_at: r.created_at
+        })))
+      } catch (e) {
+        console.warn('[GET /mod/identity/queue] user_profile ainda não disponível:', e.message)
+      }
     }
     if (type !== 'emblem' && type !== 'nickname') {
       const { rows } = await query(

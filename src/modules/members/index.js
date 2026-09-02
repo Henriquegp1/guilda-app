@@ -36,11 +36,15 @@ export default async function members (app) {
   app.get('/me/profile', async (req) => tx(async (c) => {
     const cid = await channelPk(c, req.auth)
     if (!req.auth.userId) return { nickname: null }
-    const { rows } = await c.query(
-      'SELECT nickname FROM user_profile WHERE channel_id = $1 AND user_id = $2',
-      [cid, req.auth.userId]
-    )
-    return { nickname: rows[0]?.nickname ?? null }
+    try {
+      const { rows } = await c.query(
+        'SELECT nickname FROM user_profile WHERE channel_id = $1 AND user_id = $2',
+        [cid, req.auth.userId]
+      )
+      return { nickname: rows[0]?.nickname ?? null }
+    } catch (e) {
+      return { nickname: null }
+    }
   }))
 
   app.post('/me/profile', async (req) => tx(async (c) => {
@@ -65,16 +69,29 @@ export default async function members (app) {
     await getGuild(c, cid, req.params.gid)
     const limit = page(req.query)
     const cursor = Number.isNaN(Date.parse(req.query.cursor)) ? null : new Date(req.query.cursor)
-    const { rows } = await c.query(
-      `SELECT m.user_id, m.role, m.joined_at, COALESCE(p.nickname, m.user_id) AS nickname
-         FROM guild_member m
-         LEFT JOIN user_profile p ON p.channel_id = m.channel_id AND p.user_id = m.user_id
-        WHERE m.guild_id = $1 AND ($2::timestamptz IS NULL OR m.joined_at > $2)
-        ORDER BY m.joined_at, m.user_id LIMIT $3`,
-      [num(req.params.gid), cursor, limit])
-    return {
-      members: rows,
-      next_cursor: rows.length === limit ? rows.at(-1).joined_at.toISOString() : null,
+    try {
+      const { rows } = await c.query(
+        `SELECT m.user_id, m.role, m.joined_at, COALESCE(p.nickname, m.user_id) AS nickname
+           FROM guild_member m
+           LEFT JOIN user_profile p ON p.channel_id = m.channel_id AND p.user_id = m.user_id AND p.status = 'approved'
+          WHERE m.guild_id = $1 AND ($2::timestamptz IS NULL OR m.joined_at > $2)
+          ORDER BY m.joined_at, m.user_id LIMIT $3`,
+        [num(req.params.gid), cursor, limit])
+      return {
+        members: rows,
+        next_cursor: rows.length === limit ? rows.at(-1).joined_at.toISOString() : null,
+      }
+    } catch (e) {
+      // Fallback gracioso se a tabela user_profile não estiver disponível
+      const { rows } = await c.query(
+        `SELECT user_id, role, joined_at FROM guild_member
+          WHERE guild_id = $1 AND ($2::timestamptz IS NULL OR joined_at > $2)
+          ORDER BY joined_at, user_id LIMIT $3`,
+        [num(req.params.gid), cursor, limit])
+      return {
+        members: rows,
+        next_cursor: rows.length === limit ? rows.at(-1).joined_at.toISOString() : null,
+      }
     }
   }))
 
