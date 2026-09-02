@@ -1,7 +1,10 @@
+import { createHash } from 'node:crypto'
+import { writeFile, mkdir } from 'node:fs/promises'
+import { join } from 'node:path'
 import { query, tx } from '../../core/db.js'
 import { emit, audit } from '../../core/events.js'
 import { AppError, badRequest, conflict, forbidden, notFound } from '../../core/errors.js'
-import { requireModerator } from '../../core/auth.js'
+import { requireBroadcaster, requireModerator } from '../../core/auth.js'
 import { can } from '../members/permissions.js'
 // Só leitura das tabelas puras da fase 04: é o que permite creditar EXATAMENTE o
 // Prestígio do §5 sem hardcodar os números do vizinho (ver `creditPrestige`).
@@ -737,6 +740,41 @@ export default async function wars (app) {
 
   // ------------------------------------------------------------- territórios
 
+const MAP_STORAGE = join(process.cwd(), 'public', 'custom-assets')
+const MAX_MAP_IMAGE_SIZE = 3 * 1024 * 1024 // 3MB para mapa em alta resolução
+
+async function ingestMapImage (sourceUrl) {
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), 8000)
+
+  try {
+    const res = await fetch(sourceUrl, { signal: controller.signal })
+    if (!res.ok) throw badRequest('IMAGE_DOWNLOAD_FAILED', `falha ao baixar imagem (status ${res.status})`)
+
+    const size = Number(res.headers.get('content-length'))
+    if (size > MAX_MAP_IMAGE_SIZE) throw badRequest('IMAGE_TOO_LARGE', 'a imagem do mapa excede o limite de 3MB')
+
+    const type = res.headers.get('content-type')
+    if (!type?.startsWith('image/')) throw badRequest('INVALID_IMAGE_TYPE', 'a imagem deve ser formato PNG, JPG ou WEBP')
+
+    const buffer = Buffer.from(await res.arrayBuffer())
+    if (buffer.length > MAX_MAP_IMAGE_SIZE) throw badRequest('IMAGE_TOO_LARGE', 'a imagem do mapa excede o limite de 3MB')
+
+    const hash = createHash('sha256').update(buffer).digest('hex')
+    const ext = type.includes('png') ? 'png' : (type.includes('webp') ? 'webp' : 'jpg')
+    const filename = `map_${hash}.${ext}`
+    const path = join(MAP_STORAGE, filename)
+
+    await mkdir(MAP_STORAGE, { recursive: true })
+    await writeFile(path, buffer)
+
+    const baseUrl = process.env.BASE_URL ?? 'http://localhost:3000'
+    return `${baseUrl}/public/custom-assets/${filename}`
+  } finally {
+    clearTimeout(timeout)
+  }
+}
+
 const MIN_TERRITORY_DIST = 100 // Distância mínima para não sobrepor territórios no mapa
 
 async function assertMinDistance (c, channelId, x, y, excludeId = null) {
@@ -755,6 +793,37 @@ async function assertMinDistance (c, channelId, x, y, excludeId = null) {
     }
   }
 }
+
+  app.get('/map/config', async (req) => {
+    const cid = req.auth.channelId
+    const { rows } = await query(
+      'SELECT background_url FROM map_config WHERE channel_id = $1', [cid]
+    )
+    return { background_url: rows[0]?.background_url ?? null }
+  })
+
+  app.post('/map/config', async (req) => tx(async (c) => {
+    requireBroadcaster(req)
+    const cid = req.auth.channelId
+    const { source_url } = req.body ?? {}
+    if (!source_url) throw badRequest('VALIDATION_ERROR', 'source_url obrigatória')
+
+    const bgUrl = await ingestMapImage(source_url)
+    await c.query(
+      `INSERT INTO map_config (channel_id, background_url, updated_at)
+       VALUES ($1, $2, now())
+       ON CONFLICT (channel_id) DO UPDATE SET background_url = EXCLUDED.background_url, updated_at = now()`,
+      [cid, bgUrl]
+    )
+    return { background_url: bgUrl }
+  }))
+
+  app.delete('/map/config', async (req, reply) => tx(async (c) => {
+    requireBroadcaster(req)
+    const cid = req.auth.channelId
+    await c.query('DELETE FROM map_config WHERE channel_id = $1', [cid])
+    reply.code(204)
+  }))
 
   app.get('/territories', async (req) => {
     const { rows } = await query(

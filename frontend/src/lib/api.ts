@@ -565,6 +565,10 @@ export const listarEntregasAnuncio = (cursor?: string) =>
 	);
 
 export const listarTerritorios = () => get<{ items: Territory[] }>('/territories');
+export const obterMapConfig = () => get<{ background_url: string | null }>('/map/config');
+export const salvarMapConfig = (source_url: string) =>
+	post<{ background_url: string }>('/map/config', { source_url });
+export const removerMapConfig = () => chamar<void>('/map/config', { metodo: 'DELETE' });
 export const criarTerritorio = (corpo: Partial<Territory>) => post<Territory>('/territories', corpo);
 export const atualizarTerritorio = (id: number, corpo: Partial<Territory>) =>
 	patch<Territory>(`/territories/${id}`, corpo);

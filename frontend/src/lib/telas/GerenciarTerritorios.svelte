@@ -4,6 +4,9 @@
 		criarTerritorio,
 		atualizarTerritorio,
 		excluirTerritorio,
+		obterMapConfig,
+		salvarMapConfig,
+		removerMapConfig,
 		type Territory
 	} from '$lib/api';
 	import { onMount } from 'svelte';
@@ -12,6 +15,11 @@
 	let loading = $state(true);
 	let error = $state('');
 	let editingId = $state<number | null>(null);
+
+	let bgUrlInput = $state('');
+	let bgAtual = $state<string | null>(null);
+	let salvandoBg = $state(false);
+	let msgBg = $state('');
 
 	let form = $state<Partial<Territory>>({
 		name: '',
@@ -23,12 +31,46 @@
 
 	async function load() {
 		try {
-			const res = await listarTerritorios();
+			const [res, cfg] = await Promise.all([
+				listarTerritorios(),
+				obterMapConfig().catch(() => ({ background_url: null }))
+			]);
 			territories = res.items;
+			bgAtual = cfg.background_url;
 		} catch (e) {
 			error = 'Falha ao carregar territórios.';
 		} finally {
 			loading = false;
+		}
+	}
+
+	async function salvarFundo() {
+		if (!bgUrlInput.trim()) return;
+		salvandoBg = true;
+		msgBg = '';
+		try {
+			const res = await salvarMapConfig(bgUrlInput.trim());
+			bgAtual = res.background_url;
+			bgUrlInput = '';
+			msgBg = 'Imagem de fundo atualizada com sucesso!';
+		} catch (e: any) {
+			msgBg = e.message || 'Erro ao baixar/salvar imagem.';
+		} finally {
+			salvandoBg = false;
+		}
+	}
+
+	async function removerFundo() {
+		salvandoBg = true;
+		msgBg = '';
+		try {
+			await removerMapConfig();
+			bgAtual = null;
+			msgBg = 'Imagem de fundo removida.';
+		} catch (e) {
+			msgBg = 'Erro ao remover.';
+		} finally {
+			salvandoBg = false;
 		}
 	}
 
@@ -106,6 +148,43 @@
 </script>
 
 <div class="gerenciar">
+	<div class="map-bg-secao">
+		<h3>🖼️ Imagem de Fundo do Mapa Mundi</h3>
+		<p class="instrucoes-bg">
+			Insira a URL de uma imagem para ser o mapa oficial do canal. O sistema ajusta a imagem automaticamente às coordenadas.
+			<br />
+			<b>Requisitos:</b> Formato <code>PNG, JPG ou WEBP</code> · Resolução Recomendada: <code>1000 × 1000 px (Quadrada)</code> · Tamanho Máximo: <code>3 MB</code>.
+		</p>
+
+		<div class="input-bg-group">
+			<input
+				type="url"
+				placeholder="https://suaimagem.com/mapa.png"
+				bind:value={bgUrlInput}
+				disabled={salvandoBg}
+			/>
+			<button class="primario" disabled={salvandoBg || !bgUrlInput.trim()} onclick={salvarFundo}>
+				{salvandoBg ? 'Baixando...' : 'Salvar Fundo'}
+			</button>
+			{#if bgAtual}
+				<button class="fantasma ruim" disabled={salvandoBg} onclick={removerFundo}>
+					Remover
+				</button>
+			{/if}
+		</div>
+
+		{#if msgBg}
+			<p class="msg-bg" class:sucesso={msgBg.includes('sucesso') || msgBg.includes('removida')}>{msgBg}</p>
+		{/if}
+
+		{#if bgAtual}
+			<div class="preview-bg">
+				<p>Fundo Atual:</p>
+				<img src={bgAtual} alt="Mapa de Fundo Atual" />
+			</div>
+		{/if}
+	</div>
+
 	<div class="form-secao">
 		<h3>{editingId ? 'Editar Território' : 'Novo Território'}</h3>
 		<div class="grade-form">
@@ -180,6 +259,68 @@
 		display: flex;
 		flex-direction: column;
 		gap: 24px;
+	}
+
+	.map-bg-secao {
+		background: var(--sable-2);
+		border: 1px solid var(--borda);
+		border-radius: 4px;
+		padding: 16px;
+	}
+
+	.instrucoes-bg {
+		font-size: 11px;
+		color: var(--argent-fraco);
+		margin: 0 0 12px;
+		line-height: 1.5;
+	}
+
+	.instrucoes-bg code {
+		color: var(--or);
+		background: rgba(0,0,0,0.3);
+		padding: 2px 4px;
+		border-radius: 2px;
+	}
+
+	.input-bg-group {
+		display: flex;
+		gap: 8px;
+		align-items: center;
+	}
+
+	.input-bg-group input {
+		flex: 1;
+	}
+
+	.msg-bg {
+		font-size: 11px;
+		margin: 8px 0 0;
+		color: var(--gules);
+	}
+
+	.msg-bg.sucesso {
+		color: var(--vert);
+	}
+
+	.preview-bg {
+		margin-top: 12px;
+		padding-top: 12px;
+		border-top: 1px solid var(--borda);
+	}
+
+	.preview-bg p {
+		font-size: 10px;
+		color: var(--argent-fraco);
+		text-transform: uppercase;
+		margin: 0 0 8px;
+	}
+
+	.preview-bg img {
+		width: 120px;
+		height: 120px;
+		object-fit: cover;
+		border: 1px solid var(--or);
+		border-radius: 4px;
 	}
 
 	h3 {

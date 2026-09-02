@@ -1,10 +1,11 @@
 <script lang="ts">
-	import { listarTerritorios, entrarDisputa, type Territory } from '$lib/api';
+	import { listarTerritorios, entrarDisputa, obterMapConfig, type Territory } from '$lib/api';
 	import { onMount } from 'svelte';
 	import Brasao from '$lib/ui/Brasao.svelte';
 	import { entrarBloco } from '$lib/motion';
 
 	let territories = $state<Territory[]>([]);
+	let mapBgUrl = $state<string | null>(null);
 	let loading = $state(true);
 	let selectedId = $state<number | null>(null);
 	let ocupado = $state(false);
@@ -12,8 +13,12 @@
 
 	async function load() {
 		try {
-			const res = await listarTerritorios();
+			const [res, cfg] = await Promise.all([
+				listarTerritorios(),
+				obterMapConfig().catch(() => ({ background_url: null }))
+			]);
 			territories = res.items.filter((t) => t.enabled);
+			mapBgUrl = cfg.background_url;
 		} catch (e) {
 			console.error('Erro ao carregar mapa:', e);
 		} finally {
@@ -63,6 +68,19 @@
 				</defs>
 				<!-- Fundo do Mapa com gradiente radial -->
 				<rect width="1000" height="1000" fill="url(#grad-mapa)" />
+
+				{#if mapBgUrl}
+					<!-- Imagem de Fundo Personalizada pelo Streamer -->
+					<image
+						href={mapBgUrl}
+						x="0"
+						y="0"
+						width="1000"
+						height="1000"
+						preserveAspectRatio="xMidYMid slice"
+						opacity="0.85"
+					/>
+				{/if}
 
 				<pattern id="grid" width="100" height="100" patternUnits="userSpaceOnUse">
 					<path d="M 100 0 L 0 0 0 100" fill="none" stroke="var(--or)" stroke-width="0.5" opacity="0.1" />
