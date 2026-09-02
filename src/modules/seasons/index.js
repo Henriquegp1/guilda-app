@@ -461,7 +461,18 @@ export default async function seasons (app) {
     if (!season) throw notFound('SEASON_NOT_FOUND', 'nenhuma temporada')
 
     const live = await livePosition({ query }, season.id, guild.id)
-    if (!live) throw notFound('GUILD_NOT_RANKED', 'guilda sem Prestígio nesta temporada')
+
+    // Se a guilda ainda não tem Prestígio (comum em guildas novas),
+    // devolvemos posição nula em vez de 404 para não quebrar o console do devtools.
+    if (!live) {
+      return {
+        season_id: season.id,
+        position: null,
+        prestige: 0,
+        delta_position: null,
+        live: true,
+      }
+    }
 
     const { rows: [prev] } = await query(
       `SELECT r.position FROM ranking_snapshot_row r
