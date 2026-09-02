@@ -43,3 +43,7 @@ ALTER TABLE guild_member ALTER COLUMN role SET DEFAULT 'vassalo';
 
 CREATE UNIQUE INDEX guild_member_leader_uk
   ON guild_member (guild_id) WHERE role = 'lider';
+
+-- 10. Re-sincroniza a contagem de membros real para todas as guildas existentes (evita desbalanço de member_count)
+UPDATE guild g
+  SET member_count = (SELECT count(*)::int FROM guild_member m WHERE m.guild_id = g.id);

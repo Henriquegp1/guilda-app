@@ -251,7 +251,7 @@ export default async function guilds (app) {
       }
 
       await c.query(
-        `UPDATE guild SET status = 'pending', payment_status = 'paid',
+        `UPDATE guild SET status = 'pending', payment_status = 'paid', member_count = 1,
                           bits_transaction_id = $2, bits_amount = $3, reserved_until = NULL
           WHERE id = $1`,
         [g.id, receipt.transactionId, receipt.amount])

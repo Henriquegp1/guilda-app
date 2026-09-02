@@ -81,7 +81,11 @@ export async function addMember (client, guild, userId, { via, invitedBy = null,
     `INSERT INTO guild_member (guild_id, user_id, channel_id, role, invited_by_user_id)
      VALUES ($1, $2, $3, $4, $5)`,
     [guild.id, userId, guild.channel_id, role, invitedBy])
-  await client.query('UPDATE guild SET member_count = member_count + 1 WHERE id = $1', [guild.id])
+
+  await client.query(
+    `UPDATE guild SET member_count = (SELECT count(*)::int FROM guild_member WHERE guild_id = $1)
+      WHERE id = $1`, [guild.id])
+
   await emit(client, {
     channelId: guild.channel_id,
     guildId: guild.id,
@@ -125,10 +129,13 @@ export async function removeMember (client, guild, member, { reason, actorUserId
     [guild.channel_id, guild.id, member.user_id, member.role, reason, actorUserId,
       member.joined_at, exitCooldown(reason)])
 
-  const { rows } = await client.query(
-    'UPDATE guild SET member_count = member_count - 1 WHERE id = $1 RETURNING member_count',
+  // Recalcula e atualiza a contagem real garantindo que nunca fique negativa
+  const { rows: [upd] } = await client.query(
+    `WITH cnt AS (SELECT count(*)::int AS n FROM guild_member WHERE guild_id = $1)
+     UPDATE guild SET member_count = cnt.n FROM cnt WHERE id = $1
+     RETURNING guild.member_count AS left`,
     [guild.id])
-  const left = rows[0]?.member_count ?? 0
+  const left = upd?.left ?? 0
 
   if (emitEvent) {
     await emit(client, {
