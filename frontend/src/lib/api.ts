@@ -115,7 +115,7 @@ export type Ranking = {
 	next_cursor: string | null;
 };
 
-export type Cargo = 'leader' | 'officer' | 'veteran' | 'member' | 'recruit';
+export type Cargo = 'lider' | 'sub-lider' | 'comandante' | 'vassalo';
 
 export type Membro = { user_id: string; role: Cargo; joined_at: string };
 export type Pedido = { request_id: number; user_id: string; created_at: string };
@@ -290,7 +290,12 @@ export const listarGuildas = (cursor?: string) =>
 	);
 export const entrar = (gid: number) => post<unknown>(`/guilds/${gid}/join`);
 export const sair = (gid: number) => chamar<void>(`/guilds/${gid}/members/me`, { metodo: 'DELETE' });
-export const membros = (gid: number) => get<{ items: Membro[] }>(`/guilds/${gid}/members`);
+export const membros = (gid: number) => get<{ members: Membro[] }>(`/guilds/${gid}/members`);
+export const alterarCargo = (gid: number, uid: string, role: Cargo) =>
+	chamar<{ user_id: string; from_role: Cargo; to_role: Cargo }>(`/guilds/${gid}/members/${uid}/role`, {
+		metodo: 'PATCH',
+		corpo: { role }
+	});
 export const pedidos = (gid: number) => get<{ items: Pedido[] }>(`/guilds/${gid}/requests`);
 export const aprovarPedido = (gid: number, rid: number) =>
 	post<unknown>(`/guilds/${gid}/requests/${rid}/approve`);

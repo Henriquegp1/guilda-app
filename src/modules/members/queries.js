@@ -80,18 +80,21 @@ export async function assertJoinable (client, guild, userId) {
   await assertNoCooldown(client, guild.channel_id, userId, guild.id)
 }
 
-/** R6: toda via entra como recruit. R24: member_count na mesma transação. */
+/** R6: toda via entra como vassalo, exceto o primeiro que entra como sub-lider. */
 export async function addMember (client, guild, userId, { via, invitedBy = null, actorUserId = null }) {
+  // Se a guilda só tem o líder (member_count = 1), o novo membro é sub-lider
+  const role = guild.member_count === 1 ? 'sub-lider' : 'vassalo'
+
   await client.query(
     `INSERT INTO guild_member (guild_id, user_id, channel_id, role, invited_by_user_id)
-     VALUES ($1, $2, $3, 'recruit', $4)`,
-    [guild.id, userId, guild.channel_id, invitedBy])
+     VALUES ($1, $2, $3, $4, $5)`,
+    [guild.id, userId, guild.channel_id, role, invitedBy])
   await client.query('UPDATE guild SET member_count = member_count + 1 WHERE id = $1', [guild.id])
   await emit(client, {
     channelId: guild.channel_id,
     guildId: guild.id,
     type: 'member.joined',
-    payload: { user_id: userId, role: 'recruit', via },
+    payload: { user_id: userId, role, via },
     actorUserId: actorUserId ?? userId,
   })
 }
@@ -139,6 +142,10 @@ export async function removeMember (client, guild, member, { reason, actorUserId
       payload: { actor_user_id: actorUserId, member_count_at_exit: 0 },
       actorUserId,
     })
+  } else if (member.role === 'sub-lider' || member.role === 'lider') {
+    // Se o sub-lider sair, ou se o líder sair (e já tiver passado a coroa),
+    // garantimos que o cargo de sub-lider seja preenchido novamente.
+    await ensureSubLider(client, guild.id, actorUserId)
   }
   return left
 }
@@ -149,17 +156,47 @@ export async function removeMember (client, guild, member, { reason, actorUserId
  * criaria dois líderes por um instante e estouraria a unique.
  */
 export async function transferLeadership (client, guild, fromUserId, toUserId, mode, actorUserId) {
+  // O líder anterior é rebaixado para sub-lider (o cargo vago deixado pelo novo líder)
   await client.query(
-    `UPDATE guild_member SET role = 'officer', role_changed_at = now(), role_changed_by = $3
+    `UPDATE guild_member SET role = 'sub-lider', role_changed_at = now(), role_changed_by = $3
       WHERE guild_id = $1 AND user_id = $2`, [guild.id, fromUserId, actorUserId])
   await client.query(
-    `UPDATE guild_member SET role = 'leader', role_changed_at = now(), role_changed_by = $3
+    `UPDATE guild_member SET role = 'lider', role_changed_at = now(), role_changed_by = $3
       WHERE guild_id = $1 AND user_id = $2`, [guild.id, toUserId, actorUserId])
   await client.query('UPDATE guild SET leader_user_id = $2 WHERE id = $1', [guild.id, toUserId])
+
+  // Garantimos que a guilda continue tendo um sub-lider se o cargo estiver vago
+  // (ex: se o líder sair e o sub-lider assumir, precisamos de um novo sub-lider)
+  await ensureSubLider(client, guild.id, actorUserId)
+
   await emit(client, {
     channelId: guild.channel_id,
     guildId: guild.id,
     type: 'guild.leadership_transferred',
+    payload: { from_user_id: fromUserId, to_user_id: toUserId, mode },
+    actorUserId,
+  })
+}
+
+/** Garante que sempre exista um sub-lider na guilda. */
+async function ensureSubLider(client, guildId, actorId = 'system') {
+	const { rows: [sub] } = await client.query(
+		"SELECT 1 FROM guild_member WHERE guild_id = $1 AND role = 'sub-lider'", [guildId]
+	)
+	if (sub) return
+
+	// Se não houver sub-lider, promove o membro mais antigo (exceto o líder)
+	const { rows: [alvo] } = await client.query(
+		"SELECT user_id FROM guild_member WHERE guild_id = $1 AND role <> 'lider' ORDER BY joined_at LIMIT 1",
+		[guildId]
+	)
+	if (alvo) {
+		await client.query(
+			"UPDATE guild_member SET role = 'sub-lider', role_changed_at = now(), role_changed_by = $3 WHERE guild_id = $1 AND user_id = $2",
+			[guildId, alvo.user_id, actorId]
+		)
+	}
+}
     payload: { from_user_id: fromUserId, to_user_id: toUserId, mode },
     actorUserId,
   })

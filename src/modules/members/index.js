@@ -63,7 +63,7 @@ export default async function members (app) {
       await assertJoinable(c, guild, userId)
       await addMember(c, guild, userId, { via: 'open' })
       reply.code(201)
-      return { status: 'joined', role: 'recruit' }
+      return { status: 'joined', role: guild.member_count === 1 ? 'sub-lider' : 'vassalo' }
     }
 
     // approval: pedido entra na fila mesmo com a guilda cheia (R4).
@@ -111,10 +111,30 @@ export default async function members (app) {
     const member = await memberIn(c, guild.id, userId)
     if (!member) throw notFound('NOT_A_MEMBER', 'não é membro desta guilda')
 
-    // R17/R18: líder só sai se for o último. Senão, transfere antes.
-    if (member.role === 'leader' && guild.member_count > 1) {
-      throw conflict('LEADER_MUST_TRANSFER', 'transfira a liderança antes de sair')
+    // R17/R18: líder saindo.
+    if (member.role === 'lider' && guild.member_count > 1) {
+      // Se houver mais membros, tentamos achar o sub-lider para passar a coroa
+      const { rows: [sub] } = await c.query(
+        "SELECT user_id FROM guild_member WHERE guild_id = $1 AND role = 'sub-lider'", [guild.id]
+      )
+
+      if (sub) {
+        // Sucessão automática para o sub-lider
+        await transferLeadership(c, guild, userId, sub.user_id, 'succession', userId)
+      } else {
+        // Se não houver sub-lider (improvável pelo addMember), pega o membro mais antigo
+        const { rows: [herdeiro] } = await c.query(
+          "SELECT user_id FROM guild_member WHERE guild_id = $1 AND user_id <> $2 ORDER BY joined_at LIMIT 1",
+          [guild.id, userId]
+        )
+        if (herdeiro) {
+          await transferLeadership(c, guild, userId, herdeiro.user_id, 'succession', userId)
+        } else {
+          // Só sobrou ele? removeMember cuidará de suspender a guilda
+        }
+      }
     }
+
     await removeMember(c, guild, member, { reason: 'left' })
     reply.code(204)
   }))
@@ -157,7 +177,7 @@ export default async function members (app) {
     if (mod) {
       await audit(c, {
         channelId: cid, actorUserId: actorId, actorRole: req.auth.role, action: 'members.request_approve',
-        target: `guild:${guild.id}/user:${pedido.user_id}`, after: { role: 'recruit' },
+        target: `guild:${guild.id}/user:${pedido.user_id}`, after: { role: guild.member_count === 1 ? 'sub-lider' : 'vassalo' },
       })
     }
     return { status: 'approved' }
@@ -588,14 +608,14 @@ export async function runSuccession (client) {
       FOR UPDATE`)
 
   const promovidos = []
-  for (const guild of rows) {
-    const { rows: [herdeiro] } = await client.query(
-      `SELECT user_id FROM guild_member
-        WHERE guild_id = $1 AND role <> 'leader'
-        ORDER BY array_position(ARRAY['officer','veteran','member','recruit']::guild_role[], role),
-                 joined_at
-        LIMIT 1`, [guild.id])
-    if (!herdeiro) continue   // guilda só com o líder: R18 cuida quando ele sair
+    for (const guild of rows) {
+      const { rows: [herdeiro] } = await client.query(
+        `SELECT user_id FROM guild_member
+          WHERE guild_id = $1 AND role <> 'lider'
+          ORDER BY array_position(ARRAY['sub-lider','comandante','vassalo']::guild_role[], role),
+                   joined_at
+          LIMIT 1`, [guild.id])
+      if (!herdeiro) continue   // guilda só com o líder: R18 cuida quando ele sair
     await transferLeadership(client, guild, guild.leader_user_id, herdeiro.user_id, 'succession', 'system')
     await audit(client, {
       channelId: guild.channel_id, actorUserId: 'system', actorRole: 'system', action: 'guild.leadership_transferred',

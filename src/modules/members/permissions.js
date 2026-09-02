@@ -8,7 +8,7 @@
  */
 
 /** Escada de cargos, do menor para o maior (R9). */
-export const ROLES = ['recruit', 'member', 'veteran', 'officer', 'leader']
+export const ROLES = ['vassalo', 'comandante', 'sub-lider', 'lider']
 
 export const rank = (role) => ROLES.indexOf(role)
 
@@ -18,22 +18,22 @@ export const rank = (role) => ROLES.indexOf(role)
  * target = 'below' exige alvo estritamente inferior ao ator (R7).
  */
 export const ACTIONS = {
-  members_view:        { min: 'recruit' },
-  requests_view:       { min: 'veteran' },
-  leave:               { min: 'recruit', max: 'officer' },
-  invite_create:       { min: 'veteran' },
-  invite_revoke_own:   { min: 'veteran' },
-  invite_revoke_any:   { min: 'officer' },
-  request_approve:     { min: 'officer' },
-  request_reject:      { min: 'officer' },
-  kick:                { min: 'officer', target: 'below' },
-  promote:             { min: 'officer', target: 'below' },
-  demote:              { min: 'officer', target: 'below' },
-  text_edit:           { min: 'officer' },
-  war_declare:         { min: 'officer' },
-  join_mode_change:    { min: 'leader' },
-  leadership_transfer: { min: 'leader' },
-  disband:             { min: 'leader' },
+  members_view:        { min: 'vassalo' },
+  requests_view:       { min: 'comandante' },
+  leave:               { min: 'vassalo', max: 'sub-lider' },
+  invite_create:       { min: 'comandante' },
+  invite_revoke_own:   { min: 'comandante' },
+  invite_revoke_any:   { min: 'sub-lider' },
+  request_approve:     { min: 'sub-lider' },
+  request_reject:      { min: 'sub-lider' },
+  kick:                { min: 'sub-lider', target: 'below' },
+  promote:             { min: 'sub-lider', target: 'below' },
+  demote:              { min: 'sub-lider', target: 'below' },
+  text_edit:           { min: 'sub-lider' },
+  war_declare:         { min: 'sub-lider' },
+  join_mode_change:    { min: 'lider' },
+  leadership_transfer: { min: 'lider' },
+  disband:             { min: 'lider' },
 }
 
 /** Código de erro da negação, ou null se permitido. */

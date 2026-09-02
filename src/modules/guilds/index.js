@@ -260,7 +260,7 @@ export default async function guilds (app) {
       // R18: a linha do líder nasce aqui, na mesma transação do pagamento.
       await c.query(
         `INSERT INTO guild_member (guild_id, user_id, channel_id, role)
-         VALUES ($1, $2, $3, 'leader')`,
+         VALUES ($1, $2, $3, 'lider')`,
         [g.id, g.leader_user_id, channel.id])
         .catch(onUnique('guild_member_one_per_channel_uk', 'ALREADY_HAS_GUILD', 'o líder já está em outra guilda'))
 

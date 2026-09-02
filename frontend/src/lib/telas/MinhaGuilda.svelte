@@ -1,6 +1,7 @@
 <script lang="ts">
 	import Brasao from '$lib/ui/Brasao.svelte';
 	import EditorBrasao from './EditorBrasao.svelte';
+	import GestaoMembros from './GestaoMembros.svelte';
 	import Conquistas from './Conquistas.svelte';
 	import {
 		progressao,
@@ -28,6 +29,7 @@
 	let barra = $state<HTMLDivElement>();
 	let editando = $state(false);
 	let vendoConquistas = $state(false);
+	let vendoMembros = $state(false);
 
 	$effect(() => {
 		// Falha aqui não derruba a tela: o essencial já está na prop `guilda`.
@@ -85,6 +87,14 @@
 			<h2>Identidade</h2>
 		</header>
 		<EditorBrasao {guilda} aoSalvar={() => { editando = false; aoAtualizar(); }} />
+	</div>
+{:else if vendoMembros}
+	<div class="editor-overlay" in:entrarBloco>
+		<header class="editor-header">
+			<button class="voltar" onclick={() => (vendoMembros = false)} aria-label="Voltar">←</button>
+			<h2>Membros</h2>
+		</header>
+		<GestaoMembros {guilda} cargoAtor={cargo} aoSair={aoSair} aoAtualizar={aoAtualizar} />
 	</div>
 {:else if vendoConquistas}
 	<Conquistas guildaId={guilda.id} aoVoltar={() => (vendoConquistas = false)} />
@@ -171,11 +181,15 @@
 {/if}
 
 <div class="acoes">
-	{#if cargo === 'leader' || cargo === 'officer'}
+	{#if cargo === 'lider' || cargo === 'sub-lider'}
+		<button class="primario" onclick={() => (vendoMembros = true)}>Gestão de Membros</button>
+	{/if}
+
+	{#if cargo === 'lider' || cargo === 'sub-lider' || cargo === 'comandante'}
 		<button class="secundario" onclick={() => (editando = true)}>Editar Identidade</button>
 	{/if}
 
-	{#if cargo === 'leader'}
+	{#if cargo === 'lider'}
 		<!-- Líder não sai sem transferir (fase 02, R17): o servidor recusa, e a
 		     interface não oferece a ação para não prometer o que não entrega. -->
 		<p class="nota">Como líder, transfira a liderança antes de sair.</p>
@@ -336,6 +350,14 @@
 		background: none;
 		border: 1px solid var(--borda);
 		color: var(--argent);
+		margin-bottom: 8px;
+	}
+
+	.acoes button.primario {
+		background: var(--or);
+		color: var(--sable);
+		font-weight: bold;
+		border: none;
 		margin-bottom: 8px;
 	}
 
