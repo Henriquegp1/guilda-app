@@ -50,7 +50,6 @@
 
 	onMount(async () => {
 		if (!guilda) return;
-		// Sincroniza rascunho apenas após montar
 		if (guilda.emblem_preset) {
 			try {
 				const salvo = JSON.parse(guilda.emblem_preset);
@@ -128,7 +127,6 @@
 		return false;
 	};
 
-	// Lógica de deduplicação para símbolos (evita mostrar ícones repetidos)
 	const getVisualKey = (asset: Asset) => {
 		if (asset.layer !== 'symbol') return asset.id;
 		const slug = asset.id.split('.')[1] || '';
@@ -165,15 +163,15 @@
 </script>
 
 <div class="editor">
-	<div class="cabecalho">
-		<div class="preview">
-			<Brasao layers={rascunho} customUrl={abaAtiva === 'custom' ? customUrlInput : null} tamanho={80} tag={guilda.tag} />
-			<div class="info">
-				<h3>{guilda.name}</h3>
-				<p>Nível {nivelGuilda}</p>
-			</div>
+	<div class="preview">
+		<Brasao layers={rascunho} customUrl={abaAtiva === 'custom' ? customUrlInput : null} tamanho={72} tag={guilda.tag} />
+		<div class="info">
+			<h3>{guilda.name}</h3>
+			<p>Nível {nivelGuilda}</p>
 		</div>
+	</div>
 
+	<div class="corpo-rolavel">
 		<nav class="abas">
 			{#each categorias as cat}
 				<button class:ativa={abaAtiva === cat.id} onclick={() => (abaAtiva = cat.id)}>
@@ -181,9 +179,7 @@
 				</button>
 			{/each}
 		</nav>
-	</div>
 
-	<div class="corpo-selecao">
 		<div class="grade">
 			{#if abaAtiva === 'name' || abaAtiva === 'tag'}
 				<div class="secao-nome">
@@ -228,62 +224,253 @@
 				{/each}
 			{/if}
 		</div>
-	</div>
 
-	<div class="rodape">
-		{#if erro}<p class="erro">{erro}</p>{/if}
-		<div class="salvar-container">
-			<button class="salvar" disabled={ocupado} onclick={salvar}>
-				{ocupado ? 'Salvando...' : 'Salvar'}
-			</button>
+		<div class="rodape">
+			{#if erro}<p class="erro">{erro}</p>{/if}
+			<div class="salvar-container">
+				<button class="salvar" disabled={ocupado} onclick={salvar}>
+					{ocupado ? 'Salvando...' : 'Salvar Alterações'}
+				</button>
 
-			<details class="creditos-footer">
-				<summary>ℹ️ Créditos</summary>
-				<div class="creditos-content"><Creditos /></div>
-			</details>
+				<details class="creditos-footer">
+					<summary>ℹ️ Créditos</summary>
+					<div class="creditos-content"><Creditos /></div>
+				</details>
+			</div>
 		</div>
 	</div>
 </div>
 
 <style>
-	.editor { display: flex; flex-direction: column; height: 100%; background: var(--sable); overflow: hidden; }
+	.editor {
+		display: flex;
+		flex-direction: column;
+		height: 100%;
+		background: var(--sable);
+		overflow: hidden;
+	}
 
-	.cabecalho { flex-shrink: 0; background: var(--sable-2); border-bottom: 1px solid var(--borda); }
+	.preview {
+		flex-shrink: 0;
+		display: flex;
+		align-items: center;
+		padding: 10px 16px;
+		gap: 14px;
+		background: var(--sable-2);
+		border-bottom: 1px solid var(--borda);
+		z-index: 10;
+	}
 
-	.preview { display: flex; align-items: center; padding: 12px 16px; gap: 16px; }
-	.info h3 { margin: 0; font-family: var(--display); color: var(--or); font-size: 16px; }
-	.info p { margin: 2px 0 0; font-size: 11px; color: var(--argent-fraco); }
+	.info h3 {
+		margin: 0;
+		font-family: var(--display);
+		color: var(--or);
+		font-size: 15px;
+	}
 
-	.abas { display: grid; grid-template-columns: repeat(3, 1fr); background: var(--borda); gap: 1px; }
-	.abas button { padding: 10px 4px; font-size: 9px; text-transform: uppercase; border: none; background: var(--sable-2); color: var(--argent-fraco); cursor: pointer; }
-	.abas button.ativa { color: var(--or); background: var(--sable); box-shadow: inset 0 -2px 0 var(--or); }
+	.info p {
+		margin: 2px 0 0;
+		font-size: 11px;
+		color: var(--argent-fraco);
+	}
 
-	.corpo-selecao { flex: 1; overflow-y: auto; overflow-x: hidden; scrollbar-width: thin; scrollbar-color: var(--or) transparent; }
-	.corpo-selecao::-webkit-scrollbar { width: 4px; }
-	.corpo-selecao::-webkit-scrollbar-thumb { background: var(--or); border-radius: 4px; }
+	.corpo-rolavel {
+		flex: 1;
+		overflow-y: auto;
+		overflow-x: hidden;
+		display: flex;
+		flex-direction: column;
+		scrollbar-width: thin;
+		scrollbar-color: var(--or) transparent;
+	}
 
-	.grade { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; padding: 16px; align-content: start; }
-	.asset { width: 100%; min-height: 80px; background: var(--sable-2); border: 1px solid var(--borda); position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: pointer; border-radius: 4px; padding: 6px; }
-	.asset.selecionado { border-color: var(--or); background: rgba(212, 175, 55, 0.05); }
-	.asset.bloqueado { opacity: 0.7; }
+	.corpo-rolavel::-webkit-scrollbar {
+		width: 4px;
+	}
 
-	.visual { flex: 1; width: 100%; display: flex; align-items: center; justify-content: center; overflow: hidden; pointer-events: none; }
-	.visual .id { font-size: 10px; color: var(--argent); text-align: center; word-break: break-all; margin-top: 4px; }
+	.corpo-rolavel::-webkit-scrollbar-thumb {
+		background: var(--or);
+		border-radius: 4px;
+	}
 
-	.mini-item { transform: scale(1); filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3)); }
-	.amostra { width: 40px; height: 40px; border-radius: 50%; position: relative; border: 2px solid rgba(255,255,255,0.1); overflow: hidden; }
-	.amostra .det { position: absolute; top: 0; right: 0; width: 50%; height: 100%; }
+	.abas {
+		display: grid;
+		grid-template-columns: repeat(3, 1fr);
+		background: var(--borda);
+		gap: 1px;
+		flex-shrink: 0;
+	}
 
-	.trava-status { font-size: 9px; color: var(--or); font-weight: bold; background: rgba(0,0,0,0.6); width: 100%; text-align: center; padding: 2px 0; border-radius: 0 0 4px 4px; margin-top: 4px; }
+	.abas button {
+		padding: 8px 4px;
+		font-size: 9px;
+		text-transform: uppercase;
+		border: none;
+		background: var(--sable-2);
+		color: var(--argent-fraco);
+		cursor: pointer;
+		font-weight: 600;
+	}
 
-	.rodape { flex-shrink: 0; padding: 12px 16px; border-top: 1px solid var(--borda); background: var(--sable-2); position: relative; }
-	.salvar-container { display: flex; align-items: center; justify-content: center; width: 100%; position: relative; }
-	.secao-nome, .secao-custom { grid-column: 1 / -1; }
-	.salvar { width: 140px; padding: 8px; background: var(--or); color: var(--sable); font-weight: 800; text-transform: uppercase; letter-spacing: 0.1em; border: none; border-radius: 4px; cursor: pointer; font-size: 12px; transition: transform 0.1s; }
-	.salvar:active { transform: scale(0.98); }
-	.erro { color: var(--gules); font-size: 11px; margin-bottom: 4px; text-align: center; }
+	.abas button.ativa {
+		color: var(--or);
+		background: var(--sable);
+		box-shadow: inset 0 -2px 0 var(--or);
+	}
 
-	.creditos-footer { position: absolute; right: 0; bottom: 0; }
-	summary { font-size: 8px; color: var(--argent-fraco); cursor: pointer; list-style: none; opacity: 0.5; padding: 4px 8px; border: 1px solid transparent; border-radius: 2px; }
-	summary:hover { opacity: 1; color: var(--or); }
+	.grade {
+		display: grid;
+		grid-template-columns: repeat(3, 1fr);
+		gap: 10px;
+		padding: 14px 16px;
+		align-content: start;
+	}
+
+	.asset {
+		width: 100%;
+		min-height: 76px;
+		background: var(--sable-2);
+		border: 1px solid var(--borda);
+		position: relative;
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		justify-content: center;
+		cursor: pointer;
+		border-radius: 4px;
+		padding: 6px;
+	}
+
+	.asset.selecionado {
+		border-color: var(--or);
+		background: rgba(212, 175, 55, 0.08);
+	}
+
+	.asset.bloqueado {
+		opacity: 0.6;
+	}
+
+	.visual {
+		flex: 1;
+		width: 100%;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		overflow: hidden;
+		pointer-events: none;
+	}
+
+	.visual .id {
+		font-size: 10px;
+		color: var(--argent);
+		text-align: center;
+		word-break: break-all;
+	}
+
+	.mini-item {
+		filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3));
+	}
+
+	.amostra {
+		width: 36px;
+		height: 36px;
+		border-radius: 50%;
+		position: relative;
+		border: 2px solid rgba(255, 255, 255, 0.1);
+		overflow: hidden;
+	}
+
+	.amostra .det {
+		position: absolute;
+		top: 0;
+		right: 0;
+		width: 50%;
+		height: 100%;
+	}
+
+	.trava-status {
+		font-size: 9px;
+		color: var(--or);
+		font-weight: bold;
+		background: rgba(0, 0, 0, 0.6);
+		width: 100%;
+		text-align: center;
+		padding: 2px 0;
+		border-radius: 0 0 4px 4px;
+		margin-top: 4px;
+	}
+
+	.rodape {
+		margin-top: auto;
+		padding: 16px;
+		border-top: 1px solid var(--borda);
+		background: var(--sable-2);
+		display: flex;
+		flex-direction: column;
+		gap: 8px;
+	}
+
+	.salvar-container {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 12px;
+	}
+
+	.salvar {
+		flex: 1;
+		padding: 12px;
+		background: var(--or);
+		color: var(--sable);
+		font-weight: 800;
+		text-transform: uppercase;
+		letter-spacing: 0.1em;
+		border: none;
+		border-radius: 4px;
+		cursor: pointer;
+		font-size: 13px;
+	}
+
+	.erro {
+		color: var(--gules);
+		font-size: 11px;
+		margin: 0;
+		text-align: center;
+	}
+
+	.creditos-footer {
+		flex-shrink: 0;
+	}
+
+	summary {
+		font-size: 9px;
+		color: var(--argent-fraco);
+		cursor: pointer;
+		list-style: none;
+		opacity: 0.6;
+		padding: 4px 8px;
+		border: 1px solid var(--borda);
+		border-radius: 2px;
+	}
+
+	summary:hover {
+		opacity: 1;
+		color: var(--or);
+	}
+
+	.creditos-content {
+		position: absolute;
+		bottom: 50px;
+		right: 16px;
+		width: 240px;
+		max-height: 180px;
+		overflow-y: auto;
+		font-size: 10px;
+		background: var(--sable-2);
+		border: 1px solid var(--borda);
+		padding: 12px;
+		border-radius: 4px;
+		box-shadow: 0 4px 20px rgba(0, 0, 0, 0.8);
+		z-index: 50;
+	}
 </style>
