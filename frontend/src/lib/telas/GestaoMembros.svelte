@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { membros, alterarCargo, sair, expulsar, ErroApi, type Guilda, type Membro, type Cargo } from '$lib/api';
+	import { membros, alterarCargo, sair, expulsar, salvarSettingsGuilda, ErroApi, type Guilda, type Membro, type Cargo } from '$lib/api';
 	import { entrarBloco } from '$lib/motion';
 	import { onAuth } from '$lib/twitch';
 
@@ -10,6 +10,23 @@
 	let meuId = $state('');
 	let ocupado = $state(false);
 	let erro = $state('');
+	let modoEntrada = $state(guilda.join_mode ?? 'approval');
+	let alterandoModo = $state(false);
+
+	async function mudarModoEntrada(novoModo: 'open' | 'approval' | 'closed') {
+		alterandoModo = true;
+		erro = '';
+		try {
+			await salvarSettingsGuilda(guilda.id, { join_mode: novoModo });
+			modoEntrada = novoModo;
+			guilda.join_mode = novoModo;
+			aoAtualizar();
+		} catch (e) {
+			erro = 'Erro ao alterar modo de entrada.';
+		} finally {
+			alterandoModo = false;
+		}
+	}
 
 	// Estados para modais de confirmação internos (Sem usar window.confirm/alert que a Twitch bloqueia)
 	let confirmandoSair = $state(false);
@@ -91,6 +108,22 @@
 </script>
 
 <div class="gestao" in:entrarBloco>
+	{#if ['lider', 'sub-lider'].includes(cargoAtor)}
+		<div class="secao-modo">
+			<label for="select-modo">Modo de Entrada no Clã</label>
+			<select
+				id="select-modo"
+				value={modoEntrada}
+				disabled={alterandoModo}
+				onchange={(e) => mudarModoEntrada(e.currentTarget.value as any)}
+			>
+				<option value="open">🟢 Entrada Livre (Qualquer pessoa entra)</option>
+				<option value="approval">🟡 Por Aprovação (Viewer pede autorização)</option>
+				<option value="closed">🔴 Fechado (Apenas por convite)</option>
+			</select>
+		</div>
+	{/if}
+
 	{#if erro}<p class="erro">{erro}</p>{/if}
 
 	<div class="lista">
@@ -170,6 +203,10 @@
 
 <style>
 	.gestao { flex: 1; display: flex; flex-direction: column; padding: 12px; min-height: 0; overflow-x: hidden; position: relative; }
+	.secao-modo { display: flex; flex-direction: column; gap: 4px; margin-bottom: 10px; padding: 10px; background: var(--sable-2); border: 1px solid var(--borda); border-radius: 4px; }
+	.secao-modo label { font-size: 10px; text-transform: uppercase; color: var(--or); font-weight: bold; letter-spacing: 0.05em; }
+	.secao-modo select { background: var(--sable); color: var(--argent); border: 1px solid var(--borda); font-size: 10px; padding: 6px; border-radius: 2px; width: 100%; outline: none; }
+
 	.erro { color: var(--gules); font-size: 11px; margin-bottom: 8px; text-align: center; }
 	.lista { flex: 1; overflow-y: auto; overflow-x: hidden; display: flex; flex-direction: column; gap: 6px; padding-bottom: 12px; }
 	.membro { display: flex; align-items: center; justify-content: space-between; padding: 10px; background: var(--sable-2); border: 1px solid var(--borda); border-radius: 4px; width: 100%; }

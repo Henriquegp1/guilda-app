@@ -34,7 +34,7 @@ export const isMod = (req) =>
   req.auth.source === 'extension' && ['broadcaster', 'moderator'].includes(req.auth.role)
 
 const PUBLIC_FIELDS = [
-  'id', 'name', 'tag', 'description', 'motto',
+  'id', 'name', 'tag', 'description', 'motto', 'join_mode',
   'color_primary', 'color_secondary', 'emblem_preset', 'status',
   'leader_user_id', 'level', 'xp', 'prestige', 'member_limit', 'created_at',
 ]

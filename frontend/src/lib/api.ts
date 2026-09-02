@@ -84,6 +84,7 @@ export type Guilda = {
 	name: string;
 	tag: string;
 	status: 'awaiting' | 'pending' | 'active' | 'overflow' | 'suspended' | 'banned';
+	join_mode?: 'open' | 'approval' | 'closed';
 	level: number;
 	xp: number;
 	prestige: number;
@@ -288,7 +289,7 @@ export const listarGuildas = (cursor?: string) =>
 	get<{ items: Guilda[]; next_cursor: string | null }>(
 		`/guilds${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ''}`
 	);
-export const entrar = (gid: number) => post<unknown>(`/guilds/${gid}/join`);
+export const entrar = (gid: number) => post<{ status: 'joined' | 'pending'; request_id?: number }>(`/guilds/${gid}/join`);
 export const sair = (gid: number) => chamar<void>(`/guilds/${gid}/members/me`, { metodo: 'DELETE' });
 export const expulsar = (gid: number, uid: string) =>
 	chamar<void>(`/guilds/${gid}/members/${uid}`, { metodo: 'DELETE' });
@@ -298,6 +299,8 @@ export const alterarCargo = (gid: number, uid: string, role: Cargo) =>
 		metodo: 'PATCH',
 		corpo: { role }
 	});
+export const salvarSettingsGuilda = (gid: number, corpo: { join_mode?: string; description?: string; motto?: string }) =>
+	patch<{ join_mode: string }>(`/guilds/${gid}/settings`, corpo);
 export const pedidos = (gid: number) => get<{ items: Pedido[] }>(`/guilds/${gid}/requests`);
 export const aprovarPedido = (gid: number, rid: number) =>
 	post<unknown>(`/guilds/${gid}/requests/${rid}/approve`);

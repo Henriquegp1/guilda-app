@@ -31,7 +31,7 @@ export const ACTIONS = {
   demote:              { min: 'sub-lider', target: 'below' },
   text_edit:           { min: 'sub-lider' },
   war_declare:         { min: 'sub-lider' },
-  join_mode_change:    { min: 'lider' },
+  join_mode_change:    { min: 'sub-lider' },
   leadership_transfer: { min: 'lider' },
   disband:             { min: 'lider' },
 }

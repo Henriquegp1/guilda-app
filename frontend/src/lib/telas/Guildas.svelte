@@ -33,11 +33,13 @@
 		entrando = g.id;
 		aviso = '';
 		try {
-			await entrar(g.id);
-			aoEntrar();
+			const res = await entrar(g.id);
+			if (res.status === 'pending') {
+				aviso = 'Pedido de entrada enviado com sucesso! Aguarde a aprovação do Líder.';
+			} else {
+				aoEntrar();
+			}
 		} catch (e) {
-			// Guilda cheia, cooldown e identidade têm cada um sua mensagem — o
-			// cliente da API já traduz o código.
 			aviso = e instanceof ErroApi ? e.message : 'Não foi possível entrar.';
 		} finally {
 			entrando = null;
@@ -91,16 +93,27 @@
 	<h2>Guildas do canal</h2>
 	<ul>
 		{#each guildas as g (g.id)}
+			{@const modo = g.join_mode ?? 'approval'}
 			<li>
 				<span class="nome">
 					<b>{g.name}</b>
 					<small>[{g.tag}] · Nv.{g.level} · {g.member_count}/{g.member_limit}</small>
 				</span>
 				<button
-					disabled={cheia(g) || entrando === g.id}
+					disabled={cheia(g) || modo === 'closed' || entrando === g.id}
 					onclick={() => tentarEntrar(g)}
 				>
-					{cheia(g) ? 'Cheia' : entrando === g.id ? '...' : 'Entrar'}
+					{#if cheia(g)}
+						Cheia
+					{:else if entrando === g.id}
+						...
+					{:else if modo === 'closed'}
+						Fechada
+					{:else if modo === 'approval'}
+						Pedir Entrada
+					{:else}
+						Entrar
+					{/if}
 				</button>
 			</li>
 		{/each}
