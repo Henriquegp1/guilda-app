@@ -131,7 +131,7 @@
 			<div class="membro" class:eu={m.user_id === meuId}>
 				<div class="info">
 					<span class="id">
-						{m.user_id === meuId ? '🛡️ VOCÊ' : `ID: ${m.user_id}`}
+						{m.user_id === meuId ? `🛡️ VOCÊ (${m.nickname || m.user_id})` : (m.nickname || `ID: ${m.user_id}`)}
 					</span>
 					<span class="cargo-atual">{m.role}</span>
 				</div>

@@ -12,7 +12,7 @@
 	import MapaMundi from '$lib/telas/MapaMundi.svelte';
 	import { iniciar, onAuth } from '$lib/twitch';
 	import { entrarBloco } from '$lib/motion';
-	import { minhaGuilda, ErroApi, type Guilda, type Cargo } from '$lib/api';
+	import { minhaGuilda, obterPerfil, salvarPerfil, ErroApi, type Guilda, type Cargo } from '$lib/api';
 
 	let { fluido = false } = $props();
 
@@ -21,16 +21,47 @@
 	let erro = $state('');
 	let aba = $state('minha');
 
+	let nickname = $state<string | null>(null);
+	let precisaCriarNome = $state(false);
+	let novoNome = $state('');
+	let salvandoNome = $state(false);
+	let erroNome = $state('');
+
 	async function carregar() {
 		try {
-			guilda = await minhaGuilda();
+			const [gRes, perfRes] = await Promise.all([
+				minhaGuilda(),
+				obterPerfil().catch(() => ({ nickname: null }))
+			]);
+			guilda = gRes;
+			nickname = perfRes.nickname;
+			if (!nickname) {
+				precisaCriarNome = true;
+			}
 			estado = 'pronto';
-			// Quem não tem guilda começa procurando uma, não numa tela vazia.
 			if (!guilda && (aba === 'minha' || aba === 'criar')) aba = 'guildas';
 			if (guilda && (aba === 'guildas' || aba === 'criar')) aba = 'minha';
 		} catch (e) {
 			erro = e instanceof ErroApi ? e.message : 'Algo deu errado. Tente de novo.';
 			estado = 'erro';
+		}
+	}
+
+	async function salvarPersonagem() {
+		if (!novoNome.trim()) {
+			erroNome = 'Digite um nome para o seu personagem.';
+			return;
+		}
+		salvandoNome = true;
+		erroNome = '';
+		try {
+			const res = await salvarPerfil(novoNome.trim());
+			nickname = res.nickname;
+			precisaCriarNome = false;
+		} catch (e: any) {
+			erroNome = e.message || 'Erro ao salvar nome.';
+		} finally {
+			salvandoNome = false;
 		}
 	}
 
@@ -85,6 +116,27 @@
 			</div>
 		{/key}
 	{/if}
+
+	{#if precisaCriarNome}
+		<div class="modal-personagem" in:entrarBloco>
+			<div class="box-personagem">
+				<Brasao tamanho={64} />
+				<h2>Crie seu Personagem</h2>
+				<p>Escolha o nome pelo qual você será conhecido no canal e entre as guildas.</p>
+				<input
+					type="text"
+					placeholder="Ex: Sir_Lancelot"
+					bind:value={novoNome}
+					maxlength={20}
+					disabled={salvandoNome}
+				/>
+				{#if erroNome}<p class="erro-p">{erroNome}</p>{/if}
+				<button class="btn-salvar-p" disabled={salvandoNome || !novoNome.trim()} onclick={salvarPersonagem}>
+					{salvandoNome ? 'Salvando...' : 'Confirmar Personagem'}
+				</button>
+			</div>
+		</div>
+	{/if}
 </Estandarte>
 
 <style>
@@ -119,5 +171,74 @@
 	.aba-conteudo::-webkit-scrollbar-thumb {
 		background: var(--or);
 		border-radius: 2px;
+	}
+
+	.modal-personagem {
+		position: absolute;
+		inset: 0;
+		background: rgba(14, 11, 19, 0.95);
+		z-index: 2000;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		padding: 20px;
+	}
+
+	.box-personagem {
+		background: var(--sable-2);
+		border: 1px solid var(--or);
+		border-radius: 8px;
+		padding: 20px;
+		width: 100%;
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		text-align: center;
+		gap: 12px;
+		box-shadow: 0 4px 20px rgba(0,0,0,0.8);
+	}
+
+	.box-personagem h2 {
+		color: var(--or);
+		font-size: 16px;
+		margin: 0;
+	}
+
+	.box-personagem p {
+		font-size: 11px;
+		color: var(--argent-fraco);
+		margin: 0;
+		line-height: 1.4;
+	}
+
+	.box-personagem input {
+		width: 100%;
+		padding: 10px;
+		background: var(--sable);
+		border: 1px solid var(--borda);
+		color: var(--argent);
+		font-family: inherit;
+		font-size: 13px;
+		text-align: center;
+		border-radius: 4px;
+	}
+
+	.erro-p {
+		color: var(--gules);
+		font-size: 11px;
+		margin: 0;
+	}
+
+	.btn-salvar-p {
+		width: 100%;
+		padding: 12px;
+		background: var(--or);
+		color: var(--sable);
+		font-weight: bold;
+		border: none;
+		border-radius: 4px;
+		cursor: pointer;
+		text-transform: uppercase;
+		font-size: 12px;
 	}
 </style>

@@ -118,7 +118,7 @@ export type Ranking = {
 
 export type Cargo = 'lider' | 'sub-lider' | 'comandante' | 'vassalo';
 
-export type Membro = { user_id: string; role: Cargo; joined_at: string };
+export type Membro = { user_id: string; role: Cargo; joined_at: string; nickname?: string };
 export type Pedido = { request_id: number; user_id: string; created_at: string };
 export type Convite = {
 	invite_id: number;
@@ -285,6 +285,8 @@ export type Emblem = {
 
 // ---- viewer
 export const minhaGuilda = () => get<(Guilda & { my_role: Cargo }) | null>('/me/guild');
+export const obterPerfil = () => get<{ nickname: string | null }>('/me/profile');
+export const salvarPerfil = (nickname: string) => post<{ nickname: string }>('/me/profile', { nickname });
 export const listarGuildas = (cursor?: string) =>
 	get<{ items: Guilda[]; next_cursor: string | null }>(
 		`/guilds${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ''}`

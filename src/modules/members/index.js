@@ -32,6 +32,33 @@ function assertCan (role, action, targetRole = null) {
 const page = (q) => Math.min(Math.max(Number(q.limit) || 25, 1), 100)
 
 export default async function members (app) {
+  // ---------------------------------------------------------------- perfil do personagem
+  app.get('/me/profile', async (req) => tx(async (c) => {
+    const cid = await channelPk(c, req.auth)
+    if (!req.auth.userId) return { nickname: null }
+    const { rows } = await c.query(
+      'SELECT nickname FROM user_profile WHERE channel_id = $1 AND user_id = $2',
+      [cid, req.auth.userId]
+    )
+    return { nickname: rows[0]?.nickname ?? null }
+  }))
+
+  app.post('/me/profile', async (req) => tx(async (c) => {
+    const cid = await channelPk(c, req.auth)
+    const userId = requireUser(req.auth)
+    const nick = String(req.body?.nickname ?? '').trim()
+    if (!/^[A-Za-z0-9_ ]{2,20}$/.test(nick)) {
+      throw badRequest('INVALID_NICKNAME', 'Nome de personagem deve ter entre 2 e 20 caracteres (apenas letras, números e espaços)')
+    }
+    await c.query(
+      `INSERT INTO user_profile (channel_id, user_id, nickname)
+       VALUES ($1, $2, $3)
+       ON CONFLICT (channel_id, user_id) DO UPDATE SET nickname = EXCLUDED.nickname`,
+      [cid, userId, nick]
+    )
+    return { nickname: nick }
+  }))
+
   // ---------------------------------------------------------------- listagem
   app.get('/guilds/:gid/members', async (req) => tx(async (c) => {
     const cid = await channelPk(c, req.auth)
@@ -39,9 +66,11 @@ export default async function members (app) {
     const limit = page(req.query)
     const cursor = Number.isNaN(Date.parse(req.query.cursor)) ? null : new Date(req.query.cursor)
     const { rows } = await c.query(
-      `SELECT user_id, role, joined_at FROM guild_member
-        WHERE guild_id = $1 AND ($2::timestamptz IS NULL OR joined_at > $2)
-        ORDER BY joined_at, user_id LIMIT $3`,
+      `SELECT m.user_id, m.role, m.joined_at, COALESCE(p.nickname, m.user_id) AS nickname
+         FROM guild_member m
+         LEFT JOIN user_profile p ON p.channel_id = m.channel_id AND p.user_id = m.user_id
+        WHERE m.guild_id = $1 AND ($2::timestamptz IS NULL OR m.joined_at > $2)
+        ORDER BY m.joined_at, m.user_id LIMIT $3`,
       [num(req.params.gid), cursor, limit])
     return {
       members: rows,
