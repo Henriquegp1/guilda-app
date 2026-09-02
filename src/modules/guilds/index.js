@@ -110,6 +110,20 @@ export default async function guilds (app) {
       if (!channel.settings.creation_enabled) {
         throw forbidden('CREATION_DISABLED', 'criação de guildas desativada neste canal')
       }
+
+      // Busca se já existe um rascunho "awaiting" para este usuário
+      const { rows: [existing] } = await c.query(
+        `SELECT * FROM guild
+          WHERE channel_id = $1 AND leader_user_id = $2
+            AND status = 'awaiting' AND payment_status = 'awaiting'
+            AND reserved_until > now()`,
+        [channel.id, userId]
+      )
+
+      if (existing) {
+        return { row: existing, channel }
+      }
+
       rateLimit(userId)
       // name/tag sempre presentes na chave para o parseForm cobrar os dois.
       const form = parseForm({ name: body.name, tag: body.tag, ...body }, channel.settings)
