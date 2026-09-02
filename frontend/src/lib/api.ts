@@ -290,6 +290,8 @@ export const listarGuildas = (cursor?: string) =>
 	);
 export const entrar = (gid: number) => post<unknown>(`/guilds/${gid}/join`);
 export const sair = (gid: number) => chamar<void>(`/guilds/${gid}/members/me`, { metodo: 'DELETE' });
+export const expulsar = (gid: number, uid: string) =>
+	chamar<void>(`/guilds/${gid}/members/${uid}`, { metodo: 'DELETE' });
 export const membros = (gid: number) => get<{ members: Membro[] }>(`/guilds/${gid}/members`);
 export const alterarCargo = (gid: number, uid: string, role: Cargo) =>
 	chamar<{ user_id: string; from_role: Cargo; to_role: Cargo }>(`/guilds/${gid}/members/${uid}/role`, {

@@ -66,6 +66,11 @@
 	const fracao = $derived(
 		prog && prog.xp_do_nivel > 0 ? Math.min(1, prog.xp_no_nivel / prog.xp_do_nivel) : 0
 	);
+
+	const cNorm = $derived(String(cargo || '').toLowerCase());
+	const podeGerenciar = $derived(['lider', 'sub-lider', 'leader', 'officer'].includes(cNorm));
+	const podeEditar = $derived(['lider', 'sub-lider', 'comandante', 'leader', 'officer', 'veteran'].includes(cNorm));
+	const eLider = $derived(cNorm === 'lider' || cNorm === 'leader');
 	const falta = $derived(prog ? Math.max(0, prog.xp_do_nivel - prog.xp_no_nivel) : null);
 	const lotada = $derived(guilda.member_count >= guilda.member_limit);
 
@@ -181,15 +186,15 @@
 {/if}
 
 <div class="acoes">
-	{#if cargo === 'lider' || cargo === 'sub-lider'}
+	{#if podeGerenciar}
 		<button class="primario" onclick={() => (vendoMembros = true)}>Gestão de Membros</button>
 	{/if}
 
-	{#if cargo === 'lider' || cargo === 'sub-lider' || cargo === 'comandante'}
+	{#if podeEditar}
 		<button class="secundario" onclick={() => (editando = true)}>Editar Identidade</button>
 	{/if}
 
-	{#if cargo === 'lider'}
+	{#if eLider}
 		<!-- Líder não sai sem transferir (fase 02, R17): o servidor recusa, e a
 		     interface não oferece a ação para não prometer o que não entrega. -->
 		<p class="nota">Como líder, transfira a liderança antes de sair.</p>
@@ -364,10 +369,11 @@
 	.editor-overlay {
 		position: absolute;
 		inset: 0;
-		z-index: 100;
+		z-index: 1000;
 		background: var(--sable);
 		display: flex;
 		flex-direction: column;
+		overflow: hidden;
 	}
 
 	.editor-header {

@@ -29,12 +29,36 @@
 html,
 body {
 	margin: 0;
-	background: transparent; /* a Twitch pinta o próprio fundo atrás do iframe */
+	background: transparent;
 	color: var(--argent);
 	font-family: var(--texto);
 	font-size: 13px;
 	line-height: 1.45;
 	-webkit-font-smoothing: antialiased;
+	/* Impede o scroll lateral do iframe mas permite o vertical interno */
+	overflow-x: hidden;
+	height: 100%;
+}
+
+/* Scrollbars Heráldicas - Finas e combinando com o tema */
+::-webkit-scrollbar {
+	width: 4px;
+}
+
+::-webkit-scrollbar-track {
+	background: rgba(0,0,0,0.1);
+}
+
+::-webkit-scrollbar-thumb {
+	background: var(--or);
+	border-radius: 4px;
+}
+
+#svelte-root {
+	display: flex;
+	flex-direction: column;
+	min-height: 100%;
+	width: 100%;
 }
 
 /* Números não podem dançar: placar e posição atualizam ao vivo. */

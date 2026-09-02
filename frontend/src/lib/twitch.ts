@@ -16,10 +16,12 @@ export const viewerStore = writable<{
 	role: 'broadcaster' | 'moderator' | 'viewer';
 	isLoaded: boolean;
 	token: string | null;
+	userId: string | null;
 }>({
 	role: 'viewer',
 	isLoaded: false,
-	token: null
+	token: null,
+	userId: null
 });
 
 let _token: string | null = null;
@@ -29,19 +31,21 @@ export function iniciar() {
 	if (typeof window === 'undefined') return;
 	const t = (window as any).Twitch?.ext;
 
-	const definir = (role: any, token: string) => {
+	const definir = (role: any, token: string, userId: string | null) => {
 		_token = token;
-		viewerStore.set({ role, isLoaded: true, token });
+		viewerStore.set({ role, isLoaded: true, token, userId });
 	};
 
 	if (!t) {
-		definir('broadcaster', 'dev-token');
+		definir('broadcaster', 'dev-token', 'dev-user-id');
 		return;
 	}
 
 	t.onAuthorized((auth: any) => {
 		const role = t.viewer?.role ?? 'viewer';
-		definir(role, auth.token);
+		// Tenta pegar o userId real ou o opaqueUserId
+		const uid = auth.userId || auth.opaqueUserId;
+		definir(role, auth.token, uid);
 	});
 }
 
