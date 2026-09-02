@@ -115,13 +115,18 @@ export default async function guilds (app) {
       const { rows: [existing] } = await c.query(
         `SELECT * FROM guild
           WHERE channel_id = $1 AND leader_user_id = $2
-            AND status = 'awaiting' AND payment_status = 'awaiting'
-            AND reserved_until > now()`,
+            AND status = 'awaiting' AND payment_status = 'awaiting'`,
         [channel.id, userId]
       )
 
       if (existing) {
-        return { row: existing, channel }
+        // Se o rascunho ainda for válido, retorna ele.
+        if (new Date(existing.reserved_until) > new Date()) {
+          return { row: existing, channel }
+        }
+        // Se estiver expirado, removemos para permitir a criação de um novo
+        // (Isso evita o erro 409 Conflict causado por rascunhos velhos)
+        await c.query('DELETE FROM guild WHERE id = $1', [existing.id])
       }
 
       rateLimit(userId)
