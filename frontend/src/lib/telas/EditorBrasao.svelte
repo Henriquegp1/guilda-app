@@ -229,7 +229,7 @@
 			{#if erro}<p class="erro">{erro}</p>{/if}
 			<div class="salvar-container">
 				<button class="salvar" disabled={ocupado} onclick={salvar}>
-					{ocupado ? 'Salvando...' : 'Salvar Alterações'}
+					{ocupado ? 'Salvando...' : 'Salvar'}
 				</button>
 
 				<details class="creditos-footer">
@@ -324,6 +324,11 @@
 		gap: 10px;
 		padding: 14px 16px;
 		align-content: start;
+	}
+
+	.secao-nome, .secao-custom {
+		grid-column: 1 / -1;
+		width: 100%;
 	}
 
 	.asset {

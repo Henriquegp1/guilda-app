@@ -94,13 +94,13 @@ export async function addMember (client, guild, userId, { via, invitedBy = null,
 /** Garante que sempre exista um sub-lider na guilda se houver mais de 1 membro. */
 async function ensureSubLider(client, guildId, actorId = 'system') {
   const { rows: [sub] } = await client.query(
-    "SELECT 1 FROM guild_member WHERE guild_id = $1 AND role IN ('sub-lider', 'officer')", [guildId]
+    "SELECT 1 FROM guild_member WHERE guild_id = $1 AND role::text IN ('sub-lider', 'officer')", [guildId]
   )
   if (sub) return
 
   // Se não houver sub-líder, promove o membro mais antigo que não seja o líder
   const { rows: [alvo] } = await client.query(
-    "SELECT user_id FROM guild_member WHERE guild_id = $1 AND role NOT IN ('lider', 'leader') ORDER BY joined_at ASC LIMIT 1",
+    "SELECT user_id FROM guild_member WHERE guild_id = $1 AND role::text NOT IN ('lider', 'leader') ORDER BY joined_at ASC LIMIT 1",
     [guildId]
   )
   if (alvo) {

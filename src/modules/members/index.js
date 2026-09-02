@@ -119,7 +119,7 @@ export default async function members (app) {
       const { rows: [herdeiro] } = await c.query(
         `SELECT user_id FROM guild_member
           WHERE guild_id = $1 AND user_id <> $2
-          ORDER BY (CASE WHEN role IN ('sub-lider', 'officer') THEN 0 ELSE 1 END), joined_at ASC
+          ORDER BY (CASE WHEN role::text IN ('sub-lider', 'officer') THEN 0 ELSE 1 END), joined_at ASC
           LIMIT 1`,
         [guild.id, userId]
       )
