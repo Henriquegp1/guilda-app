@@ -80,7 +80,10 @@
 			}
 			rascunhoId = g.id;
 
-			const recibo = await gastarBits(sku);
+			// Se o loopback estiver ativo, enviamos o recibo fake direto para o nosso servidor
+			// ignorando a interface de pagamento da Twitch.
+			const recibo = loopback ? 'receipt-fake-123' : await gastarBits(sku);
+
 			passo = 'confirmando';
 			await confirmarPagamento(g.id, recibo);
 			passo = 'pendente';
