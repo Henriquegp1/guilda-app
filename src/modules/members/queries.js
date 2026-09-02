@@ -111,6 +111,26 @@ async function ensureSubLider(client, guildId, actorId = 'system') {
 	}
 }
 
+/** Garante que sempre exista um sub-lider na guilda se houver mais de 1 membro. */
+async function ensureSubLider(client, guildId, actorId = 'system') {
+  const { rows: [sub] } = await client.query(
+    "SELECT 1 FROM guild_member WHERE guild_id = $1 AND role IN ('sub-lider', 'officer')", [guildId]
+  )
+  if (sub) return
+
+  // Se não houver sub-líder, promove o membro mais antigo que não seja o líder
+  const { rows: [alvo] } = await client.query(
+    "SELECT user_id FROM guild_member WHERE guild_id = $1 AND role NOT IN ('lider', 'leader') ORDER BY joined_at ASC LIMIT 1",
+    [guildId]
+  )
+  if (alvo) {
+    await client.query(
+      "UPDATE guild_member SET role = 'sub-lider', role_changed_at = now(), role_changed_by = $3 WHERE guild_id = $1 AND user_id = $2",
+      [guildId, alvo.user_id, actorId]
+    )
+  }
+}
+
 /**
  * Saída de um membro: histórico + cooldown + contagem + evento, tudo na mesma
  * transação (R22). Emite guild.emptied e suspende a guilda se esvaziou (R18).
@@ -128,7 +148,7 @@ export async function removeMember (client, guild, member, { reason, actorUserId
   const { rows } = await client.query(
     'UPDATE guild SET member_count = member_count - 1 WHERE id = $1 RETURNING member_count',
     [guild.id])
-  const left = rows[0].member_count
+  const left = rows[0]?.member_count ?? 0
 
   if (emitEvent) {
     await emit(client, {
@@ -143,8 +163,8 @@ export async function removeMember (client, guild, member, { reason, actorUserId
   }
 
   // R18: último membro saiu. Guilda vazia não é 'active' e não tem líder.
-  if (left === 0 && emitEvent) {
-    await client.query("UPDATE guild SET status = 'suspended', leader_user_id = NULL WHERE id = $1",
+  if (left <= 0 && emitEvent) {
+    await client.query("UPDATE guild SET status = 'suspended', leader_user_id = NULL, member_count = 0 WHERE id = $1",
       [guild.id])
     await emit(client, {
       channelId: guild.channel_id,
@@ -153,7 +173,7 @@ export async function removeMember (client, guild, member, { reason, actorUserId
       payload: { actor_user_id: actorUserId, member_count_at_exit: 0 },
       actorUserId,
     })
-  } else if (member.role === 'sub-lider' || member.role === 'lider') {
+  } else if (left > 0) {
     await ensureSubLider(client, guild.id, actorUserId)
   }
   return left
@@ -170,8 +190,6 @@ export async function transferLeadership (client, guild, fromUserId, toUserId, m
     `UPDATE guild_member SET role = 'lider', role_changed_at = now(), role_changed_by = $3
       WHERE guild_id = $1 AND user_id = $2`, [guild.id, toUserId, actorUserId])
   await client.query('UPDATE guild SET leader_user_id = $2 WHERE id = $1', [guild.id, toUserId])
-
-  await ensureSubLider(client, guild.id, actorUserId)
 
   await emit(client, {
     channelId: guild.channel_id,

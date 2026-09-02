@@ -64,22 +64,25 @@
 	import { base } from '$app/paths';
 	import { mutarAnuncios, desmutarAnuncios } from '$lib/api';
 	let minutosMute = $state(30);
+	let erroMute = $state('');
 
 	async function mutar(m: number) {
+		erroMute = '';
 		try {
 			await mutarAnuncios(m, 'Manual via Painel');
 			await carregar();
 		} catch (e) {
-			alert('Erro ao mutar.');
+			erroMute = 'Erro ao mutar.';
 		}
 	}
 
 	async function desmutar() {
+		erroMute = '';
 		try {
 			await desmutarAnuncios();
 			await carregar();
 		} catch (e) {
-			alert('Erro ao desmutar.');
+			erroMute = 'Erro ao desmutar.';
 		}
 	}
 

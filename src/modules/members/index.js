@@ -111,27 +111,23 @@ export default async function members (app) {
     const member = await memberIn(c, guild.id, userId)
     if (!member) throw notFound('NOT_A_MEMBER', 'não é membro desta guilda')
 
-    // R17/R18: líder saindo.
-    if (member.role === 'lider' && guild.member_count > 1) {
-      // Se houver mais membros, tentamos achar o sub-lider para passar a coroa
-      const { rows: [sub] } = await c.query(
-        "SELECT user_id FROM guild_member WHERE guild_id = $1 AND role = 'sub-lider'", [guild.id]
+    const isLeader = ['lider', 'leader'].includes(member.role) || guild.leader_user_id === userId
+
+    // Se o líder está saindo e existem outros membros
+    if (isLeader && guild.member_count > 1) {
+      // Busca o herdeiro (sub-líder primeiro, ou o membro mais antigo)
+      const { rows: [herdeiro] } = await c.query(
+        `SELECT user_id FROM guild_member
+          WHERE guild_id = $1 AND user_id <> $2
+          ORDER BY (CASE WHEN role IN ('sub-lider', 'officer') THEN 0 ELSE 1 END), joined_at ASC
+          LIMIT 1`,
+        [guild.id, userId]
       )
 
-      if (sub) {
-        // Sucessão automática para o sub-lider
-        await transferLeadership(c, guild, userId, sub.user_id, 'succession', userId)
+      if (herdeiro) {
+        await transferLeadership(c, guild, userId, herdeiro.user_id, 'succession', userId)
       } else {
-        // Se não houver sub-lider (improvável pelo addMember), pega o membro mais antigo
-        const { rows: [herdeiro] } = await c.query(
-          "SELECT user_id FROM guild_member WHERE guild_id = $1 AND user_id <> $2 ORDER BY joined_at LIMIT 1",
-          [guild.id, userId]
-        )
-        if (herdeiro) {
-          await transferLeadership(c, guild, userId, herdeiro.user_id, 'succession', userId)
-        } else {
-          // Só sobrou ele? removeMember cuidará de suspender a guilda
-        }
+        await c.query("UPDATE guild SET leader_user_id = NULL WHERE id = $1", [guild.id])
       }
     }
 

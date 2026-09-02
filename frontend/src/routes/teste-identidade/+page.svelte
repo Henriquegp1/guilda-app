@@ -32,7 +32,7 @@
 	</header>
 
 	{#if $catalog}
-		<EditorBrasao guilda={guildaMock} aoSalvar={() => alert('Salvamento Simulado!')} />
+		<EditorBrasao guilda={guildaMock} aoSalvar={() => console.log('Salvamento Simulado!')} />
 	{:else}
 		<p>Carregando catálogo...</p>
 	{/if}

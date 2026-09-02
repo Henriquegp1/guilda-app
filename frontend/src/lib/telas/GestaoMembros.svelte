@@ -11,6 +11,10 @@
 	let ocupado = $state(false);
 	let erro = $state('');
 
+	// Estados para modais de confirmação internos (Sem usar window.confirm/alert que a Twitch bloqueia)
+	let confirmandoSair = $state(false);
+	let membroParaExpulsar = $state<Membro | null>(null);
+
 	const CARGOS: Cargo[] = ['lider', 'sub-lider', 'comandante', 'vassalo'];
 
 	onMount(() => {
@@ -45,9 +49,12 @@
 		}
 	}
 
-	async function acaoExpulsar(m: Membro) {
-		if (!confirm(`Deseja expulsar o membro ${m.user_id}?`)) return;
+	async function acaoExpulsar() {
+		if (!membroParaExpulsar) return;
+		const m = membroParaExpulsar;
+		membroParaExpulsar = null;
 		ocupado = true;
+		erro = '';
 		try {
 			await expulsar(guilda.id, m.user_id);
 			await carregar();
@@ -60,11 +67,9 @@
 	}
 
 	async function acaoSair() {
-		const msg = cargoAtor === 'lider'
-			? 'Você é o líder. Ao sair, a liderança passará para o sub-líder. Confirmar saída?'
-			: 'Deseja realmente sair da guilda?';
-		if (!confirm(msg)) return;
+		confirmandoSair = false;
 		ocupado = true;
+		erro = '';
 		try {
 			await sair(guilda.id);
 			aoSair();
@@ -109,7 +114,7 @@
 								<option value={c}>{c}</option>
 							{/each}
 						</select>
-						<button class="expulsar" onclick={() => acaoExpulsar(m)} title="Expulsar">🗑️</button>
+						<button class="expulsar" onclick={() => (membroParaExpulsar = m)} title="Expulsar">🗑️</button>
 					{/if}
 				</div>
 			</div>
@@ -117,14 +122,54 @@
 	</div>
 
 	<div class="rodape-gestao">
-		<button class="btn-sair" disabled={ocupado} onclick={acaoSair}>
+		<button class="btn-sair" disabled={ocupado} onclick={() => (confirmandoSair = true)}>
 			Sair da Guilda
 		</button>
 	</div>
+
+	{#if confirmandoSair}
+		<div class="modal-backdrop" in:entrarBloco>
+			<div class="modal-box">
+				<h4>Confirmar Saída</h4>
+				<p>
+					{#if cargoAtor === 'lider'}
+						Você é o líder. Ao sair, a liderança passará automaticamente para o sub-líder.
+					{:else}
+						Deseja realmente sair da guilda {guilda.name}?
+					{/if}
+				</p>
+				<div class="modal-botoes">
+					<button class="btn-perigo" disabled={ocupado} onclick={acaoSair}>
+						{ocupado ? 'Saindo...' : 'Sim, Sair'}
+					</button>
+					<button class="btn-cancelar" disabled={ocupado} onclick={() => (confirmandoSair = false)}>
+						Cancelar
+					</button>
+				</div>
+			</div>
+		</div>
+	{/if}
+
+	{#if membroParaExpulsar}
+		<div class="modal-backdrop" in:entrarBloco>
+			<div class="modal-box">
+				<h4>Expulsar Membro</h4>
+				<p>Deseja expulsar o membro ID: {membroParaExpulsar.user_id}?</p>
+				<div class="modal-botoes">
+					<button class="btn-perigo" disabled={ocupado} onclick={acaoExpulsar}>
+						{ocupado ? 'Expulsando...' : 'Expulsar'}
+					</button>
+					<button class="btn-cancelar" disabled={ocupado} onclick={() => (membroParaExpulsar = null)}>
+						Cancelar
+					</button>
+				</div>
+			</div>
+		</div>
+	{/if}
 </div>
 
 <style>
-	.gestao { flex: 1; display: flex; flex-direction: column; padding: 12px; min-height: 0; overflow-x: hidden; }
+	.gestao { flex: 1; display: flex; flex-direction: column; padding: 12px; min-height: 0; overflow-x: hidden; position: relative; }
 	.erro { color: var(--gules); font-size: 11px; margin-bottom: 8px; text-align: center; }
 	.lista { flex: 1; overflow-y: auto; overflow-x: hidden; display: flex; flex-direction: column; gap: 6px; padding-bottom: 12px; }
 	.membro { display: flex; align-items: center; justify-content: space-between; padding: 10px; background: var(--sable-2); border: 1px solid var(--borda); border-radius: 4px; width: 100%; }
@@ -142,4 +187,67 @@
 	.rodape-gestao { padding-top: 12px; border-top: 1px solid var(--borda); }
 	.btn-sair { width: 100%; padding: 10px; background: rgba(255, 0, 0, 0.1); border: 1px solid var(--gules); color: #ff4d4d; font-size: 11px; font-weight: bold; text-transform: uppercase; border-radius: 4px; cursor: pointer; transition: background 0.2s; }
 	.btn-sair:hover { background: rgba(255, 0, 0, 0.2); }
+
+	.modal-backdrop {
+		position: absolute;
+		inset: 0;
+		background: rgba(0, 0, 0, 0.85);
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		padding: 16px;
+		z-index: 200;
+	}
+
+	.modal-box {
+		background: var(--sable-2);
+		border: 1px solid var(--borda);
+		border-radius: 6px;
+		padding: 16px;
+		width: 100%;
+		text-align: center;
+		box-shadow: 0 4px 20px rgba(0,0,0,0.8);
+	}
+
+	.modal-box h4 {
+		margin: 0 0 8px;
+		color: var(--or);
+		font-family: var(--display);
+		font-size: 15px;
+	}
+
+	.modal-box p {
+		font-size: 12px;
+		color: var(--argent);
+		margin: 0 0 16px;
+		line-height: 1.4;
+	}
+
+	.modal-botoes {
+		display: flex;
+		gap: 8px;
+	}
+
+	.btn-perigo {
+		flex: 1;
+		background: var(--gules);
+		color: #fff;
+		border: none;
+		padding: 8px;
+		font-weight: bold;
+		border-radius: 4px;
+		cursor: pointer;
+		font-size: 11px;
+	}
+
+	.btn-cancelar {
+		flex: 1;
+		background: var(--sable);
+		color: var(--argent-fraco);
+		border: 1px solid var(--borda);
+		padding: 8px;
+		border-radius: 4px;
+		cursor: pointer;
+		font-size: 11px;
+	}
 </style>

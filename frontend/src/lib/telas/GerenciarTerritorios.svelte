@@ -70,8 +70,10 @@
 		}
 	}
 
+	let excluindoId = $state<number | null>(null);
+
 	async function remove(id: number) {
-		if (!confirm('Excluir este território?')) return;
+		excluindoId = null;
 		try {
 			await excluirTerritorio(id);
 			await load();
@@ -158,8 +160,13 @@
 							<small>+{t.prestige_per_day} PPD · Pos: {t.map_x}, {t.map_y}</small>
 						</div>
 						<div class="btns">
-							<button class="icon-btn" onclick={() => edit(t)} title="Editar">✏️</button>
-							<button class="icon-btn ruim" onclick={() => remove(t.id)} title="Excluir">🗑️</button>
+							{#if excluindoId === t.id}
+								<button class="icon-btn ruim" onclick={() => remove(t.id)}>Sim</button>
+								<button class="icon-btn" onclick={() => (excluindoId = null)}>Não</button>
+							{:else}
+								<button class="icon-btn" onclick={() => edit(t)} title="Editar">✏️</button>
+								<button class="icon-btn ruim" onclick={() => (excluindoId = t.id)} title="Excluir">🗑️</button>
+							{/if}
 						</div>
 					</li>
 				{/each}

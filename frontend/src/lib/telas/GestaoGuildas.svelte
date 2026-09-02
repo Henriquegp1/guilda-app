@@ -58,14 +58,15 @@
 
 	async function confirmarAcao() {
 		if (!guildaAlvo || !acaoAlvo) return;
+		erro = '';
 
 		if (acaoAlvo !== 'reativar' && !motivoInput.trim()) {
-			alert('O motivo é obrigatório.');
+			erro = 'O motivo é obrigatório.';
 			return;
 		}
 
 		if (acaoAlvo === 'transferir' && !novoLiderId.trim()) {
-			alert('O ID do novo líder é obrigatório.');
+			erro = 'O ID do novo líder é obrigatório.';
 			return;
 		}
 
@@ -80,7 +81,7 @@
 			else if (acaoAlvo === 'transferir') await transferirLiderancaMod(id, novoLiderId, motivoInput);
 			await carregar();
 		} catch (e) {
-			alert(e instanceof ErroApi ? e.message : 'Erro na operação.');
+			erro = e instanceof ErroApi ? e.message : 'Erro na operação.';
 		} finally {
 			ocupado = null;
 		}

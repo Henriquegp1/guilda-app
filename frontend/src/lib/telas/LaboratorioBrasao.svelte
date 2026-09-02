@@ -94,9 +94,12 @@
 		salvarFavoritos();
 	}
 
+	let feedback = $state('');
+
 	function copiarJson(b: Partial<EmblemLayers>) {
 		navigator.clipboard.writeText(JSON.stringify(b, null, 2));
-		alert('JSON copiado!');
+		feedback = 'JSON copiado!';
+		setTimeout(() => { feedback = ''; }, 3000);
 	}
 </script>
 

@@ -22,10 +22,13 @@
 		}
 	}
 
+	let mensagem = $state('');
+
 	function copiar() {
 		if (novoSegredo) {
 			navigator.clipboard.writeText(novoSegredo);
-			alert('Copiado para a área de transferência!');
+			mensagem = 'Segredo copiado!';
+			setTimeout(() => { mensagem = ''; }, 3000);
 		}
 	}
 </script>

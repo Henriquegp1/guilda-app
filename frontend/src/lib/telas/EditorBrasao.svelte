@@ -92,7 +92,7 @@
 
 	function selecionar(asset: Asset) {
 		if (asset.tier === 'paid' && !posses.has(asset.id)) {
-			if (confirm(`Comprar por ${asset.price_bits} Bits?`)) comprar(asset);
+			comprar(asset);
 			return;
 		}
 		rascunho[asset.layer] = (rascunho[asset.layer] as string) === asset.id ? '' : asset.id;

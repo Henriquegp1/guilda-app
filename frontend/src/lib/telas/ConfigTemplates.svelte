@@ -65,13 +65,16 @@
 		}
 	}
 
+	let mensagem = $state('');
+
 	async function testar(type: string) {
 		ocupado = type + '-test';
+		mensagem = '';
 		try {
 			await testarEventoAnuncio(type);
-			alert('Teste disparado! Verifique seu chat em instantes.');
+			mensagem = 'Teste disparado! Verifique seu chat.';
 		} catch (e) {
-			alert(e instanceof ErroApi ? e.message : 'Erro ao disparar teste.');
+			mensagem = e instanceof ErroApi ? e.message : 'Erro ao disparar teste.';
 		} finally {
 			ocupado = null;
 		}
