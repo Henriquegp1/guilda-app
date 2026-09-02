@@ -34,8 +34,29 @@
 
 	onMount(load);
 
+	function validarDistancia() {
+		const x = Number(form.map_x) || 0;
+		const y = Number(form.map_y) || 0;
+		for (const t of territories) {
+			if (editingId && t.id === editingId) continue;
+			const dx = t.map_x - x;
+			const dy = t.map_y - y;
+			const dist = Math.sqrt(dx * dx + dy * dy);
+			if (dist < 100) {
+				return `Muito próximo de "${t.name}" (distância mínima de 100px exigida).`;
+			}
+		}
+		return null;
+	}
+
 	async function save() {
 		error = '';
+		const avisoDistancia = validarDistancia();
+		if (avisoDistancia) {
+			error = avisoDistancia;
+			return;
+		}
+
 		try {
 			if (editingId) {
 				await atualizarTerritorio(editingId, form);

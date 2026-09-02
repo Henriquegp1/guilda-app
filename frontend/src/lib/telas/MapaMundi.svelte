@@ -79,30 +79,32 @@
 						onclick={() => (selectedId = t.id)}
 						transform="translate({t.map_x}, {t.map_y})"
 					>
-						<!-- Hit Area Invisível para Mobile (Touch Target) -->
-						<circle r="60" fill="transparent" />
+						<g class="ponto-corpo">
+							<!-- Hit Area Invisível para Touch/Mouse -->
+							<circle r="60" fill="transparent" />
 
-						<!-- Aura de Proteção -->
-						{#if protegido}
-							<circle r="40" fill="none" stroke="var(--vert)" stroke-width="2" stroke-dasharray="4 4" opacity="0.6">
-								<animateTransform attributeName="transform" type="rotate" from="0" to="360" dur="10s" repeatCount="indefinite" />
-							</circle>
-						{/if}
+							<!-- Aura de Proteção -->
+							{#if protegido}
+								<circle r="45" fill="none" stroke="var(--vert)" stroke-width="3" stroke-dasharray="6 6" opacity="0.8">
+									<animateTransform attributeName="transform" type="rotate" from="0" to="360" dur="10s" repeatCount="indefinite" />
+								</circle>
+							{/if}
 
-						<!-- Ícone de Disputa (Espadas) -->
-						{#if emDisputa}
-							<text y="-25" text-anchor="middle" font-size="20">⚔️</text>
-						{/if}
+							<!-- Ícone de Disputa (Espadas) -->
+							{#if emDisputa}
+								<text y="-35" text-anchor="middle" font-size="28">⚔️</text>
+							{/if}
 
-						<!-- Base do ponto -->
-						<circle r="15" fill={t.owner_guild_id ? 'var(--or)' : 'var(--argent-fraco)'} opacity="0.8" />
+							<!-- Base do ponto -->
+							<circle class="circulo-ponto" r="28" fill={t.owner_guild_id ? 'var(--or)' : 'var(--argent-fraco)'} opacity="0.9" />
 
-						<!-- Símbolo do Dono -->
-						{#if t.owner_tag}
-							<text y="5" text-anchor="middle" class="tag-mapa">{t.owner_tag}</text>
-						{/if}
+							<!-- Símbolo do Dono -->
+							{#if t.owner_tag}
+								<text y="7" text-anchor="middle" class="tag-mapa">{t.owner_tag}</text>
+							{/if}
 
-						<text y="35" text-anchor="middle" class="nome-mapa">{t.name}</text>
+							<text y="60" text-anchor="middle" class="nome-mapa">{t.name}</text>
+						</g>
 					</g>
 				{/each}
 			</svg>
@@ -183,40 +185,47 @@
 	.mapa-svg {
 		width: 100%;
 		height: 100%;
-		cursor: grab;
 	}
 
 	.ponto {
 		cursor: pointer;
-		transition: transform 0.2s;
 	}
 
-	.ponto:hover {
-		transform: scale(1.1) translate(var(--tw-translate-x), var(--tw-translate-y));
+	.ponto-corpo {
+		transition: transform 0.2s ease-out;
+		transform-origin: 0px 0px;
+	}
+
+	.ponto:hover .ponto-corpo {
+		transform: scale(1.18);
 	}
 
 	.tag-mapa {
 		fill: var(--sable);
-		font-size: 10px;
+		font-size: 16px;
 		font-weight: bold;
 		font-family: var(--display);
+		pointer-events: none;
 	}
 
 	.nome-mapa {
 		fill: var(--argent);
-		font-size: 14px;
+		font-size: 24px;
+		font-weight: bold;
 		font-family: var(--display);
-		text-shadow: 0 2px 4px #000;
+		text-shadow: 0 2px 6px #000;
+		pointer-events: none;
 	}
 
-	.selecionado circle {
+	.selecionado .circulo-ponto {
 		stroke: var(--or);
-		stroke-width: 4px;
+		stroke-width: 5px;
+		filter: drop-shadow(0 0 8px var(--or));
 	}
 
-	.ponto.disputa circle {
+	.ponto.disputa .circulo-ponto {
 		stroke: var(--gules);
-		stroke-width: 2px;
+		stroke-width: 3px;
 	}
 
 	.detalhes {

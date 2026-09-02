@@ -737,6 +737,25 @@ export default async function wars (app) {
 
   // ------------------------------------------------------------- territórios
 
+const MIN_TERRITORY_DIST = 100 // Distância mínima para não sobrepor territórios no mapa
+
+async function assertMinDistance (c, channelId, x, y, excludeId = null) {
+  const { rows } = await c.query(
+    `SELECT id, name, map_x, map_y FROM territory
+      WHERE channel_id = $1 AND ($2::bigint IS NULL OR id <> $2)`,
+    [channelId, excludeId])
+
+  for (const t of rows) {
+    const dx = t.map_x - x
+    const dy = t.map_y - y
+    const dist = Math.sqrt(dx * dx + dy * dy)
+    if (dist < MIN_TERRITORY_DIST) {
+      throw conflict('TERRITORY_TOO_CLOSE',
+        `Muito próximo do território "${t.name}" (distância mínima de ${MIN_TERRITORY_DIST}px exigida)`)
+    }
+  }
+}
+
   app.get('/territories', async (req) => {
     const { rows } = await query(
       `SELECT t.*, h.guild_id AS owner_guild_id, h.acquired_at, h.protected_until,
@@ -759,6 +778,7 @@ export default async function wars (app) {
       throw conflict('TERRITORY_LIMIT_REACHED', `máximo de ${CHANNEL_TERRITORY_CAP} por canal`)
     }
     const t = territoryInput(req.body)
+    await assertMinDistance(c, cid, t.map_x, t.map_y)
     const { rows: [row] } = await c.query(
       `INSERT INTO territory (channel_id, slug, name, map_x, map_y, art_key, prestige_per_day)
        VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
@@ -775,6 +795,9 @@ export default async function wars (app) {
       'SELECT * FROM territory WHERE id = $1 AND channel_id = $2', [num(req.params.id), cid])
     if (!current) throw notFound('TERRITORY_NOT_FOUND', 'território não encontrado')
     const t = territoryInput({ ...current, ...req.body })
+    if (req.body?.map_x !== undefined || req.body?.map_y !== undefined) {
+      await assertMinDistance(c, cid, t.map_x, t.map_y, current.id)
+    }
     const { rows: [row] } = await c.query(
       `UPDATE territory SET slug = $2, name = $3, map_x = $4, map_y = $5, art_key = $6,
               prestige_per_day = $7, enabled = $8
