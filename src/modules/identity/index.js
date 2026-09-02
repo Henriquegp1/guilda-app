@@ -667,7 +667,23 @@ export default async function identity (app) {
     const limit = Math.min(Number(req.query.limit ?? 25), 100)
 
     const items = []
-    if (type !== 'emblem') {
+    if (!type || type === 'nickname') {
+      const { rows } = await query(
+        `SELECT p.user_id, p.nickname, p.created_at
+           FROM user_profile p
+          WHERE p.channel_id = $1 AND p.status = 'pending_review'
+          ORDER BY p.created_at LIMIT $2`, [channelId, limit])
+      items.push(...rows.map(r => ({
+        request_id: `nickname-${r.user_id}`,
+        type: 'nickname',
+        guild_name: 'Personagem',
+        requested_by: r.user_id,
+        old_value: 'Nenhum',
+        new_value: r.nickname,
+        created_at: r.created_at
+      })))
+    }
+    if (type !== 'emblem' && type !== 'nickname') {
       const { rows } = await query(
         `SELECT h.id, h.guild_id, h.field, h.old_value, h.new_value, h.requested_by, h.created_at, g.name AS guild_name
            FROM guild_identity_history h JOIN guild g ON g.id = h.guild_id
@@ -683,7 +699,7 @@ export default async function identity (app) {
         created_at: r.created_at
       })))
     }
-    if (type !== 'name' && type !== 'tag') {
+    if (type !== 'name' && type !== 'tag' && type !== 'nickname') {
       const { rows } = await query(
         `SELECT e.id, e.guild_id, e.slot_index, e.layers, e.render_url, e.created_by, e.created_at,
                 e.custom_local_path, g.name AS guild_name
@@ -706,7 +722,22 @@ export default async function identity (app) {
   app.post('/mod/identity/:requestId/approve', async (req) => tx(async (c) => {
     requireModerator(req)
     const channelId = req.auth.channelId
-    const [kind, rawId] = String(req.params.requestId).split('-')
+    const parts = String(req.params.requestId).split('-')
+    const kind = parts[0]
+    const rawId = parts.slice(1).join('-')
+
+    if (kind === 'nickname') {
+      const targetUserId = String(rawId)
+      await c.query(
+        `UPDATE user_profile SET status = 'approved'
+          WHERE channel_id = $1 AND user_id = $2 AND status = 'pending_review'`,
+        [channelId, targetUserId])
+      await audit(c, {
+        channelId, actorUserId: req.auth.userId, actorRole: req.auth.role, action: 'nickname.approved', target: `user:${targetUserId}`,
+      })
+      return { state: 'approved' }
+    }
+
     const id = Number(rawId)
 
     if (kind === 'emblem') {
@@ -768,7 +799,22 @@ export default async function identity (app) {
   app.post('/mod/identity/:requestId/reject', async (req) => tx(async (c) => {
     requireModerator(req)
     const channelId = req.auth.channelId
-    const [kind, rawId] = String(req.params.requestId).split('-')
+    const parts = String(req.params.requestId).split('-')
+    const kind = parts[0]
+    const rawId = parts.slice(1).join('-')
+
+    if (kind === 'nickname') {
+      const targetUserId = String(rawId)
+      await c.query(
+        `UPDATE user_profile SET status = 'rejected'
+          WHERE channel_id = $1 AND user_id = $2 AND status = 'pending_review'`,
+        [channelId, targetUserId])
+      await audit(c, {
+        channelId, actorUserId: req.auth.userId, actorRole: req.auth.role, action: 'nickname.rejected', target: `user:${targetUserId}`,
+      })
+      return { state: 'rejected', credit_issued_bits: 0 }
+    }
+
     const id = Number(rawId)
 
     if (kind === 'emblem') {

@@ -34,8 +34,7 @@
 			if (acao === 'aprovar') {
 				await aprovarIdentidade(req.request_id);
 			} else {
-				const motivo = motivos[req.request_id]?.trim();
-				if (!motivo) throw new Error('Motivo obrigatório para rejeição.');
+				const motivo = motivos[req.request_id]?.trim() || 'Nome de personagem inadequado.';
 				await rejeitarIdentidade(req.request_id, motivo);
 			}
 			await carregar();
@@ -56,7 +55,8 @@
 			name: 'Troca de Nome',
 			tag: 'Troca de TAG',
 			emblem: 'Novo Brasão',
-			emblem_custom: 'Brasão Customizado (PNG)'
+			emblem_custom: 'Brasão Customizado (PNG)',
+			nickname: 'Nome de Personagem'
 		};
 		return map[tipo] || tipo;
 	};
@@ -227,6 +227,7 @@
 	.tipo-tag.tag { background: #103b3b; color: #00bcd4; }
 	.tipo-tag.emblem_custom { background: #3b103b; color: #e91e63; }
 	.tipo-tag.emblem { background: #103b10; color: #4caf50; }
+	.tipo-tag.nickname { background: #3b2010; color: #ff9800; }
 
 	.data {
 		font-size: 10px;
