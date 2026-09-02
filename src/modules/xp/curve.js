@@ -32,12 +32,12 @@ export const xpToNext = (xp) => {
 }
 
 /** Vagas por faixa de nível (§6). guild.member_limit é derivado, nunca editado à mão. */
-const LIMITS = [[1, 10], [5, 12], [10, 15], [15, 17], [20, 20], [25, 22],
-  [30, 25], [35, 28], [40, 32], [45, 36], [50, 40]]
+const LIMITS = [[1, 3], [5, 6], [10, 10], [15, 14], [20, 18], [25, 22],
+  [30, 26], [35, 30], [40, 34], [45, 38], [50, 40]]
 
 export function memberLimitForLevel (n) {
   const level = clamp(n)
-  let limit = 10
+  let limit = 3
   for (const [from, vagas] of LIMITS) if (level >= from) limit = vagas
   return limit
 }

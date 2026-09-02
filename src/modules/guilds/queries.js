@@ -6,7 +6,7 @@ export const SETTINGS_DEFAULTS = {
   creation_bits_cost: 500,
   creation_sku: 'guild_creation',
   name_denylist: [],
-  default_member_limit: 10,
+  default_member_limit: 3,
   panel_url: null,
 }
 

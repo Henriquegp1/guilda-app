@@ -39,8 +39,8 @@ describe('curva de níveis (§5)', () => {
   test('22.500 é Nv.10 e 22.499 é Nv.9 (critério de aceite)', () => {
     assert.equal(levelForXp(22_500), 10)
     assert.equal(levelForXp(22_499), 9)
-    assert.equal(memberLimitForLevel(levelForXp(22_500)), 15)
-    assert.equal(memberLimitForLevel(levelForXp(22_499)), 12)
+    assert.equal(memberLimitForLevel(levelForXp(22_500)), 10)
+    assert.equal(memberLimitForLevel(levelForXp(22_499)), 6)
   })
 
   test('Nv.50 é teto: 700.000 XP continua Nv.50 com 40 vagas', () => {
@@ -62,7 +62,7 @@ describe('curva de níveis (§5)', () => {
 })
 
 describe('vagas por nível (§6)', () => {
-  const VAGAS = { 1: 10, 4: 10, 5: 12, 9: 12, 10: 15, 14: 15, 15: 17, 20: 20, 25: 22, 30: 25, 35: 28, 40: 32, 45: 36, 50: 40 }
+  const VAGAS = { 1: 3, 4: 3, 5: 6, 9: 6, 10: 10, 14: 10, 15: 14, 20: 18, 25: 22, 30: 26, 35: 30, 40: 34, 45: 38, 50: 40 }
 
   test('cada faixa da tabela', () => {
     for (const [nivel, vagas] of Object.entries(VAGAS)) {
@@ -70,8 +70,8 @@ describe('vagas por nível (§6)', () => {
     }
   })
 
-  test('10 na fase 01 → 40 no Nv.50, sempre crescente', () => {
-    assert.equal(memberLimitForLevel(1), 10)
+  test('3 na fase 01 → 40 no Nv.50, sempre crescente', () => {
+    assert.equal(memberLimitForLevel(1), 3)
     assert.equal(memberLimitForLevel(MAX_LEVEL), 40)
     for (let n = 2; n <= MAX_LEVEL; n++) {
       assert.ok(memberLimitForLevel(n) >= memberLimitForLevel(n - 1))
@@ -79,7 +79,7 @@ describe('vagas por nível (§6)', () => {
   })
 
   test('nível fora da faixa é clampado, nunca extrapola as vagas', () => {
-    assert.equal(memberLimitForLevel(0), 10)
+    assert.equal(memberLimitForLevel(0), 3)
     assert.equal(memberLimitForLevel(99), 40)
   })
 })
@@ -346,7 +346,7 @@ describe('ledger e agregados (Postgres)', { skip: !process.env.DATABASE_URL }, (
     await recompute()
     const g = await guild()
     assert.equal(g.level, 10)
-    assert.equal(g.member_limit, 15)
+    assert.equal(g.member_limit, 10)
     const eventos = await levelUps()
     assert.equal(eventos.length, 1)
     assert.deepEqual(eventos[0], { from: 1, to: 10, unlocks: unlocksBetween(1, 10) })
@@ -361,7 +361,7 @@ describe('ledger e agregados (Postgres)', { skip: !process.env.DATABASE_URL }, (
     await recompute()
     const g = await guild()
     assert.equal(g.level, 9)
-    assert.equal(g.member_limit, 12)
+    assert.equal(g.member_limit, 6)
     assert.equal((await levelUps()).length, 1)   // queda não emite (R16)
     const { rowCount } = await db.query(
       "SELECT 1 FROM guild_unlock WHERE guild_id = $1 AND unlock_key = 'frame_bronze'", [guildId])
@@ -369,17 +369,19 @@ describe('ledger e agregados (Postgres)', { skip: !process.env.DATABASE_URL }, (
   })
 
   test('R10: limite abaixo da lotação põe a guilda em overflow, sem expulsar ninguém', async () => {
-    await db.query('UPDATE guild SET member_count = 13 WHERE id = $1', [guildId])
+    await db.query('UPDATE guild SET member_count = 11 WHERE id = $1', [guildId])
     await recompute()
     assert.equal((await guild()).status, 'overflow')
     const { rows: [m] } = await db.query(
       'SELECT count(*)::int AS n FROM guild_member WHERE guild_id = $1', [guildId])
     assert.equal(m.n, 2)   // ninguém saiu
 
-    await setXp(22_500)    // volta ao Nv.10: 13 membros cabem em 15
+    await setXp(22_500)    // volta ao Nv.10: 11 membros NÃO cabem em 10
+    await recompute()
+    assert.equal((await guild()).status, 'overflow')
+    await db.query('UPDATE guild SET member_count = 2 WHERE id = $1', [guildId])
     await recompute()
     assert.equal((await guild()).status, 'active')
-    await db.query('UPDATE guild SET member_count = 2 WHERE id = $1', [guildId])
   })
 
   test('R17: snapshot do dia é imutável', async () => {

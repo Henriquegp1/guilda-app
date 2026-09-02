@@ -2,7 +2,7 @@
 -- ciclo de pagamento em Bits e ciclo de revisão da moderação.
 --
 -- Não repete o que o core já tem: guild_name_uk / guild_tag_uk (unicidade por canal),
--- a FK de guild_member, member_limit DEFAULT 10 e audit_log_channel_ix.
+-- a FK de guild_member, member_limit DEFAULT 3 e audit_log_channel_ix.
 
 ALTER TABLE guild
   ADD COLUMN creator_user_id     TEXT        NOT NULL,
