@@ -32,7 +32,7 @@ CREATE TABLE guild (
   level           INT          NOT NULL DEFAULT 1,
   xp              BIGINT       NOT NULL DEFAULT 0,
   prestige        INT          NOT NULL DEFAULT 0,
-  member_limit    INT          NOT NULL DEFAULT 3,    -- derivado do nível (fase 03, R10)
+  member_limit    INT          NOT NULL DEFAULT 2,    -- derivado do nível (fase 03, R10)
   created_at      TIMESTAMPTZ  NOT NULL DEFAULT now()
 );
 

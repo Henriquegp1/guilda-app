@@ -95,4 +95,4 @@ CREATE TABLE guild_unlock (
 ALTER TABLE guild
   ADD CONSTRAINT guild_level_range CHECK (level BETWEEN 1 AND 50),
   ADD CONSTRAINT guild_xp_nonneg   CHECK (xp >= 0),
-  ADD CONSTRAINT guild_limit_max   CHECK (member_limit <= 40);
+  ADD CONSTRAINT guild_limit_max   CHECK (member_limit <= 15);
