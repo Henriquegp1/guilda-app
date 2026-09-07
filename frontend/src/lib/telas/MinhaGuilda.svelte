@@ -63,15 +63,23 @@
 		return () => ctx.revert();
 	});
 
+	// XP acumulado necessário para o nível N: 250 * (N - 1) * N
+	const xpForLevel = (n: number) => 250 * (Math.max(1, n) - 1) * Math.max(1, n);
+
+	const xpInicioNivel = $derived(prog ? xpForLevel(prog.level) : 0);
+	const xpFimNivel = $derived(prog && prog.xp_next_level ? prog.xp_next_level : xpInicioNivel);
+	const xpNecessarioNoNivel = $derived(xpFimNivel - xpInicioNivel);
+	const xpGanhoNoNivel = $derived(prog ? Math.max(0, prog.xp - xpInicioNivel) : 0);
+
 	const fracao = $derived(
-		prog && prog.xp_do_nivel > 0 ? Math.min(1, prog.xp_no_nivel / prog.xp_do_nivel) : 0
+		xpNecessarioNoNivel > 0 ? Math.min(1, xpGanhoNoNivel / xpNecessarioNoNivel) : 1
 	);
 
 	const cNorm = $derived(String(cargo || '').toLowerCase());
 	const podeGerenciar = $derived(['lider', 'sub-lider', 'leader', 'officer'].includes(cNorm));
 	const podeEditar = $derived(['lider', 'sub-lider', 'comandante', 'leader', 'officer', 'veteran'].includes(cNorm));
 	const eLider = $derived(cNorm === 'lider' || cNorm === 'leader');
-	const falta = $derived(prog ? Math.max(0, prog.xp_do_nivel - prog.xp_no_nivel) : null);
+	const falta = $derived(prog ? prog.xp_to_next : null);
 	const lotada = $derived(guilda.member_count >= guilda.member_limit);
 
 	async function deixar() {

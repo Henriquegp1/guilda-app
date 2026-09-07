@@ -130,10 +130,12 @@ export type Convite = {
 export type Progressao = {
 	level: number;
 	xp: number;
-	xp_no_nivel: number;
-	xp_do_nivel: number;
+	xp_next_level: number | null;
+	xp_to_next: number;
 	member_limit: number;
-	unlocks?: { level: number; label: string }[];
+	member_count: number;
+	status: string;
+	unlocks?: string[];
 };
 
 export type WarFormat = 'skirmish' | 'campaign' | 'special';

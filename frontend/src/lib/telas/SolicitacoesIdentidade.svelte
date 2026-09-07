@@ -93,7 +93,7 @@
 							</div>
 
 							<div class="comparativo">
-								{#if req.type === 'name' || req.type === 'tag'}
+								{#if req.type === 'name' || req.type === 'tag' || req.type === 'nickname'}
 									<div class="valor-mod">
 										<div class="lado">
 											<small>ATUAL</small>
