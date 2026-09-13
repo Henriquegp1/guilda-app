@@ -3,7 +3,7 @@ import { writeFile, mkdir } from 'node:fs/promises'
 import { join } from 'node:path'
 import { query, tx } from '../../core/db.js'
 import { emit, audit } from '../../core/events.js'
-import { badRequest, conflict, forbidden, notFound, onUnique } from '../../core/errors.js'
+import { AppError, badRequest, conflict, forbidden, notFound, onUnique } from '../../core/errors.js'
 import { requireModerator } from '../../core/auth.js'
 import {
   ASSETS, BY_ID, CATALOG_VERSION, LAYERS, PAID_EFFECTS, BANNED_EMBLEM,
