@@ -8,6 +8,8 @@
 		reativarGuilda,
 		banirGuilda,
 		transferirLiderancaMod,
+		membrosModeracao,
+		apagarGuilda,
 		ErroApi,
 		type Guilda
 	} from '$lib/api';
@@ -21,13 +23,16 @@
 	let busca = $state('');
 	let erro = $state('');
 	let ocupado = $state<number | null>(null);
+	let membrosAbertos = $state<Set<number>>(new Set());
+	let membrosPorGuilda = $state<Record<number, { user_id: string; role: string; nickname: string; joined_at: string }[]>>({});
 
 	// Controle do Modal
 	let modalAberto = $state(false);
 	let guildaAlvo = $state<Guilda | null>(null);
-	let acaoAlvo = $state<'suspender' | 'reativar' | 'banir' | 'transferir' | null>(null);
+	let acaoAlvo = $state<'suspender' | 'reativar' | 'banir' | 'transferir' | 'apagar' | null>(null);
 	let motivoInput = $state('');
 	let novoLiderId = $state('');
+	let confirmacaoTag = $state('');
 
 	async function carregar() {
 		try {
@@ -53,15 +58,37 @@
 		acaoAlvo = acao;
 		motivoInput = '';
 		novoLiderId = '';
+		confirmacaoTag = '';
 		modalAberto = true;
+	}
+
+	async function alternarMembros(g: Guilda) {
+		if (membrosAbertos.has(g.id)) {
+			membrosAbertos.delete(g.id);
+			membrosAbertos = new Set(membrosAbertos);
+			return;
+		}
+		try {
+			if (!membrosPorGuilda[g.id]) {
+				const res = await membrosModeracao(g.id);
+				membrosPorGuilda = { ...membrosPorGuilda, [g.id]: res.members };
+			}
+			membrosAbertos = new Set([...membrosAbertos, g.id]);
+		} catch (e) {
+			erro = e instanceof ErroApi ? e.message : 'Erro ao carregar membros.';
+		}
 	}
 
 	async function confirmarAcao() {
 		if (!guildaAlvo || !acaoAlvo) return;
 		erro = '';
 
-		if (acaoAlvo !== 'reativar' && !motivoInput.trim()) {
+		if (acaoAlvo !== 'reativar' && acaoAlvo !== 'apagar' && !motivoInput.trim()) {
 			erro = 'O motivo é obrigatório.';
+			return;
+		}
+		if (acaoAlvo === 'apagar' && confirmacaoTag.trim().toUpperCase() !== guildaAlvo.tag.toUpperCase()) {
+			erro = 'Digite a TAG da guilda para confirmar.';
 			return;
 		}
 
@@ -79,6 +106,7 @@
 			else if (acaoAlvo === 'reativar') await reativarGuilda(id);
 			else if (acaoAlvo === 'banir') await banirGuilda(id, motivoInput);
 			else if (acaoAlvo === 'transferir') await transferirLiderancaMod(id, novoLiderId, motivoInput);
+			else if (acaoAlvo === 'apagar') await apagarGuilda(id);
 			await carregar();
 		} catch (e) {
 			erro = e instanceof ErroApi ? e.message : 'Erro na operação.';
@@ -131,6 +159,7 @@
 						<td>{g.level}</td>
 						<td><small class="num">{g.leader_user_id}</small></td>
 						<td class="btns">
+							<button class="btn-members" onclick={() => alternarMembros(g)}>{membrosAbertos.has(g.id) ? 'Ocultar' : 'Membros'}</button>
 							{#if g.status === 'active' || g.status === 'overflow'}
 								<button class="btn-suspend" onclick={() => abrirModal(g, 'suspender')}>Pausar</button>
 							{/if}
@@ -141,9 +170,25 @@
 							{#if role === 'broadcaster'}
 								<button class="btn-ban" onclick={() => abrirModal(g, 'banir')}>Banir</button>
 								<button class="btn-transfer" onclick={() => abrirModal(g, 'transferir')}>Líder</button>
+								<button class="btn-delete" onclick={() => abrirModal(g, 'apagar')}>Apagar</button>
 							{/if}
 						</td>
 					</tr>
+					{#if membrosAbertos.has(g.id)}
+						<tr class="linha-membros">
+							<td colspan="5">
+								{#if membrosPorGuilda[g.id]?.length}
+									<ul>
+										{#each membrosPorGuilda[g.id] as membro}
+											<li><strong>{membro.nickname}</strong> <span>{membro.user_id} · {membro.role}</span></li>
+										{/each}
+									</ul>
+								{:else}
+									<span class="sem-membros">Nenhum membro.</span>
+								{/if}
+							</td>
+						</tr>
+					{/if}
 				{/each}
 			</tbody>
 		</table>
@@ -163,6 +208,12 @@
 >
 	{#if acaoAlvo === 'reativar'}
 		<p>Deseja reativar a guilda <b>{guildaAlvo?.name}</b>? Ela voltará a aparecer nas listagens públicas.</p>
+	{:else if acaoAlvo === 'apagar'}
+		<p class="perigo">Esta ação apagará a guilda e os dados relacionados. O canal e os usuários serão preservados.</p>
+		<div class="field">
+			<label for="confirmacao-tag">Digite a TAG {guildaAlvo?.tag} para confirmar</label>
+			<input id="confirmacao-tag" type="text" bind:value={confirmacaoTag} autocomplete="off" />
+		</div>
 	{:else}
 		<div class="form-modal">
 			{#if acaoAlvo === 'transferir'}
@@ -231,6 +282,7 @@
 
 	button:hover { border-color: var(--argent); color: var(--argent); }
 	.btn-ban:hover { border-color: var(--gules); color: var(--gules); }
+	.btn-delete:hover { border-color: var(--gules); color: var(--gules); }
 	.btn-reactivate:hover { border-color: var(--vert); color: var(--vert); }
 
 	.ocupado { opacity: 0.3; pointer-events: none; }
@@ -250,6 +302,11 @@
 	}
 	.field textarea { height: 80px; resize: none; }
 	.aviso-modal { font-size: 11px; color: var(--argent-fraco); font-style: italic; margin-top: 8px; }
+	.perigo { color: var(--gules); }
+	.linha-membros td { background: var(--sable-3); padding: 8px 16px; }
+	.linha-membros ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 5px; }
+	.linha-membros li { color: var(--argent); font-size: 12px; }
+	.linha-membros li span, .sem-membros { color: var(--argent-fraco); }
 
 	.vazio { text-align: center; padding: 60px; color: var(--argent-fraco); border: 1px dashed var(--borda); margin-top: 20px; }
 </style>

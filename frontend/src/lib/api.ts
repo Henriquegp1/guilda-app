@@ -448,6 +448,11 @@ export const filaModeracao = (status: string = 'pending', cursor?: string) => {
 		`/mod/guilds?${params.toString()}`
 	);
 };
+export const membrosModeracao = (id: number) =>
+	get<{ members: { user_id: string; role: string; nickname: string; joined_at: string }[] }>(
+		`/mod/guilds/${id}/members`
+	);
+export const apagarGuilda = (id: number) => chamar<void>(`/mod/guilds/${id}`, { metodo: 'DELETE' });
 export const filaIdentidade = () => get<{ items: IdentityRequest[] }>('/mod/identity/queue');
 export const aprovarIdentidade = (id: string) => post<unknown>(`/mod/identity/${id}/approve`);
 export const rejeitarIdentidade = (id: string, reason: string) =>

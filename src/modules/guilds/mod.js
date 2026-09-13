@@ -1,4 +1,4 @@
-import { requireModerator } from '../../core/auth.js'
+import { requireBroadcaster, requireModerator } from '../../core/auth.js'
 import { pool, query, tx } from '../../core/db.js'
 import { audit, emit } from '../../core/events.js'
 import { AppError, badRequest, onUnique } from '../../core/errors.js'
@@ -76,6 +76,42 @@ export default async function modRoutes (app) {
       total: count.total,
       next_cursor: rows.length === limit ? rows[rows.length - 1].id : null,
     }
+  })
+
+  app.get('/mod/guilds/:id/members', async (req) => withGuild(req, async (c, _channel, guild) => {
+    const { rows } = await c.query(
+      `SELECT m.user_id, m.role, m.joined_at,
+              COALESCE(p.nickname, m.user_id) AS nickname
+         FROM guild_member m
+         LEFT JOIN user_profile p
+           ON p.channel_id = m.channel_id
+          AND p.user_id = m.user_id
+          AND p.status = 'approved'
+        WHERE m.guild_id = $1
+        ORDER BY m.joined_at, m.user_id`,
+      [guild.id])
+    return { members: rows }
+  }))
+
+  app.delete('/mod/guilds/:id', async (req, reply) => {
+    requireBroadcaster(req)
+    return withGuild(req, async (c, channel, guild, auth) => {
+      const { rows: members } = await c.query(
+        'SELECT user_id, role FROM guild_member WHERE guild_id = $1 ORDER BY joined_at, user_id',
+        [guild.id])
+
+      await audit(c, {
+        channelId: channel.id,
+        actorUserId: auth.userId,
+        actorRole: auth.role,
+        action: 'guild.deleted',
+        target: `guild:${guild.id}`,
+        before: { status: guild.status, name: guild.name, tag: guild.tag, members },
+        after: null,
+      })
+      await c.query('DELETE FROM guild WHERE id = $1 AND channel_id = $2', [guild.id, channel.id])
+      reply.code(204)
+    })
   })
 
   app.post('/mod/guilds/:id/approve', async (req) => withGuild(req, (c, channel, g, auth) => {
