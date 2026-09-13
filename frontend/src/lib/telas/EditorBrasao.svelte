@@ -10,7 +10,8 @@
 		type Guilda,
 		comprarAsset,
 		salvarEmblema,
-		salvarImagemCustomizada
+		salvarImagemCustomizada,
+		ErroApi
 	} from '$lib/api';
 	import { onMount } from 'svelte';
 	import Creditos from '$lib/ui/Creditos.svelte';
@@ -105,7 +106,7 @@
 			await carregarDados();
 			rascunho[asset.layer] = asset.id;
 		} catch (e) {
-			erro = 'Falha na compra';
+			erro = e instanceof ErroApi ? e.message : e instanceof Error ? e.message : 'Falha na compra';
 		} finally {
 			ocupado = false;
 		}
