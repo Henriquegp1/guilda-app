@@ -35,7 +35,7 @@ export const isMod = (req) =>
 
 const PUBLIC_FIELDS = [
   'id', 'name', 'tag', 'description', 'motto', 'join_mode',
-  'color_primary', 'color_secondary', 'emblem_preset', 'status',
+  'color_primary', 'color_secondary', 'emblem_preset', 'custom_emblem_url', 'status',
   'leader_user_id', 'level', 'xp', 'prestige', 'member_limit', 'created_at',
 ]
 const PRIVATE_FIELDS = [
