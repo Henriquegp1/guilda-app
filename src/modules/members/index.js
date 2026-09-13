@@ -55,23 +55,29 @@ export default async function members (app) {
   })
 
   app.post('/me/profile', async (req) => tx(async (c) => {
-    const cid = await channelPk(c, req.auth)
-    const userId = requireUser(req.auth)
-    const nick = String(req.body?.nickname ?? '').trim()
+    try {
+      const cid = await channelPk(c, req.auth)
+      const userId = requireUser(req.auth)
+      const nick = String(req.body?.nickname ?? '').trim()
 
-    if (!/^[A-Za-z0-9_ ]{2,20}$/.test(nick)) {
-      throw badRequest('INVALID_NICKNAME', 'Nome de personagem deve ter entre 2 e 20 caracteres')
+      if (!/^[A-Za-z0-9_ ]{2,20}$/.test(nick)) {
+        throw badRequest('INVALID_NICKNAME', 'Nome de personagem deve ter entre 2 e 20 caracteres')
+      }
+
+      // Ao salvar ou atualizar, o status volta para 'pending_review'
+      await c.query(
+        `INSERT INTO user_profile (channel_id, user_id, nickname, status)
+         VALUES ($1, $2, $3, 'pending_review')
+         ON CONFLICT (channel_id, user_id) DO UPDATE SET nickname = EXCLUDED.nickname, status = 'pending_review'`,
+        [cid, userId, nick]
+      )
+
+      return { nickname: nick, status: 'pending_review' }
+    } catch (err) {
+      if (err instanceof AppError) throw err
+      req.log.error(err, 'Error in POST /me/profile')
+      throw new AppError(500, 'PROFILE_SAVE_FAILED', err.message || 'Falha ao salvar perfil')
     }
-
-    // Ao salvar ou atualizar, o status volta para 'pending_review'
-    await c.query(
-      `INSERT INTO user_profile (channel_id, user_id, nickname, status)
-       VALUES ($1, $2, $3, 'pending_review')
-       ON CONFLICT (channel_id, user_id) DO UPDATE SET nickname = EXCLUDED.nickname, status = 'pending_review'`,
-      [cid, userId, nick]
-    )
-
-    return { nickname: nick, status: 'pending_review' }
   }))
 
   // ---------------------------------------------------------------- listagem
