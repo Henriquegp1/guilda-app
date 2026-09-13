@@ -319,7 +319,7 @@ export const meusConvites = () => get<{ invites: Convite[] }>('/me/invites');
 export const aceitarConvite = (code: string) => post<unknown>(`/invites/${code}/accept`);
 
 // ---- identidade e brasão
-export const fetchCatalog = () => get<Catalog>('/emblem/catalog');
+export const fetchCatalog = () => get<Catalog>('/emblem/catalog', { requerAuth: false });
 export const carregarEmblema = (gid: number) =>
 	get<{ active: Emblem | null; slots: Emblem[] }>(`/guilds/${gid}/emblem`);
 export const carregarPosses = (gid: number) =>
