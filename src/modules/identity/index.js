@@ -177,6 +177,23 @@ async function issueCredit (c, { channelId, guildId, bits, reason, purchaseId = 
 
 // ---------------------------------------------------------------- brasão
 
+/** Sincroniza a tabela guild com o brasão ativo atual para cache de listagem. */
+async function syncGuildEmblem (c, guildId) {
+  const { rows: [active] } = await c.query(
+    `SELECT layers, custom_local_path FROM guild_emblem
+      WHERE guild_id = $1 AND is_active = true`, [guildId])
+
+  if (active) {
+    const customUrl = active.custom_local_path
+      ? `${process.env.BASE_URL ?? 'http://localhost:3000'}/public/custom-assets/${active.custom_local_path}`
+      : null
+
+    await c.query(
+      `UPDATE guild SET emblem_preset = $2, custom_emblem_url = $3
+        WHERE id = $1`, [guildId, JSON.stringify(active.layers), customUrl])
+  }
+}
+
 async function deniedCombo (c, ids) {
   const { rows } = await c.query(
     'SELECT asset_ids, action, reason FROM emblem_denied_combo WHERE asset_ids <@ $1::text[]', [ids])
@@ -240,6 +257,7 @@ async function publishEmblem (c, { channelId, guild, slot, layers, userId, statu
     actorUserId: userId,
     payload: { from_version: prev.rows[0]?.id ?? null, to_version: emblem.id, action: status, slot },
   })
+  if (active) await syncGuildEmblem(c, guild.id)
   return { ...emblem, layers_hash: hash }
 }
 
@@ -526,6 +544,7 @@ export default async function identity (app) {
     const from = await c.query(
       'UPDATE guild_emblem SET is_active = false WHERE guild_id = $1 AND is_active RETURNING id', [guild.id])
     await c.query('UPDATE guild_emblem SET is_active = true WHERE id = $1', [target.rows[0].id])
+    await syncGuildEmblem(c, guild.id)
     await emit(c, {
       channelId,
       guildId: guild.id,
@@ -754,6 +773,7 @@ export default async function identity (app) {
         `UPDATE guild_emblem SET is_active = false WHERE guild_id = $1 AND is_active AND id <> $2`,
         [rows[0].guild_id, rows[0].id])
       await c.query('UPDATE guild_emblem SET is_active = true WHERE id = $1', [rows[0].id])
+      await syncGuildEmblem(c, rows[0].guild_id)
       await audit(c, {
         channelId, actorUserId: req.auth.userId, actorRole: req.auth.role, action: 'emblem.approved', target: `emblem:${rows[0].id}`,
       })
@@ -794,6 +814,7 @@ export default async function identity (app) {
       if (emblem) {
         await c.query("UPDATE guild_emblem SET is_active = false WHERE guild_id = $1 AND is_active = true", [r.guild_id])
         await c.query("UPDATE guild_emblem SET status = 'published', is_active = true WHERE id = $1", [emblem.id])
+        await syncGuildEmblem(c, r.guild_id)
       }
     }
 
@@ -1004,5 +1025,6 @@ export async function createDefaultEmblem (client, { channelId, guildId, userId 
                                status, render_url, is_active, created_by)
      VALUES ($1, $2, 1, $3, $4, 'published', $5, true, $6) RETURNING id`,
     [channelId, guildId, layers, CATALOG_VERSION, renderUrl(emblemHash(layers)), userId])
+  await syncGuildEmblem(client, guildId)
   return rows[0].id
 }
