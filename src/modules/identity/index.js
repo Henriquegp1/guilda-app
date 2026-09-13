@@ -474,33 +474,38 @@ export default async function identity (app) {
     if (!Number.isInteger(slot) || slot < 1 || slot > MAX_SLOTS) throw badRequest('SLOT_NOT_OWNED', 'slot inexistente')
 
     return tx(async (c) => {
-      const { channelId, guild, userId } = await scope(c, req, { roles: ['lider', 'sub-lider'], eligible: true })
-      const ents = await entitlements(c, guild.id)
-      if (slot > 1 && !ents.slots.has(`slot:${slot}`)) throw forbidden('SLOT_NOT_OWNED', `slot ${slot} não comprado`)
+      try {
+        const { channelId, guild, userId } = await scope(c, req, { roles: ['lider', 'sub-lider'], eligible: true })
+        const ents = await entitlements(c, guild.id)
+        if (slot > 1 && !ents.slots.has(`slot:${slot}`)) throw forbidden('SLOT_NOT_OWNED', `slot ${slot} não comprado`)
 
-      const last = await c.query('SELECT max(created_at) AS at FROM guild_emblem WHERE guild_id = $1', [guild.id])
-      if (last.rows[0].at && Date.now() - new Date(last.rows[0].at) < EMBLEM_EDIT_COOLDOWN_S * 1000) {
-        throw conflict('RATE_LIMITED', `aguarde ${EMBLEM_EDIT_COOLDOWN_S}s entre edições de brasão`)
-      }
+        const last = await c.query('SELECT max(created_at) AS at FROM guild_emblem WHERE guild_id = $1', [guild.id])
+        if (last.rows[0].at && Date.now() - new Date(last.rows[0].at) < EMBLEM_EDIT_COOLDOWN_S * 1000) {
+          throw conflict('RATE_LIMITED', `aguarde ${EMBLEM_EDIT_COOLDOWN_S}s entre edições de brasão`)
+        }
 
-      const layers = normalizeLayers(req.body?.layers)
-      const violations = validateEmblem(layers, { level: guild.level, entitlements: ents.assets })
-      if (violations.length) {
-        // o primeiro código de violação vira o erro HTTP; a lista completa vai na mensagem.
-        const code = violations.find(v => v.code !== 'MISSING_LAYER' && v.code !== 'UNKNOWN_ASSET')?.code ?? 'INVALID_LAYERS'
-        throw badRequest(code, JSON.stringify(violations))
-      }
+        const layers = normalizeLayers(req.body?.layers)
+        const violations = validateEmblem(layers, { level: guild.level, entitlements: ents.assets })
+        if (violations.length) {
+          const code = violations.find(v => v.code !== 'MISSING_LAYER' && v.code !== 'UNKNOWN_ASSET')?.code ?? 'INVALID_LAYERS'
+          throw badRequest(code, JSON.stringify(violations))
+        }
 
-      const combo = await deniedCombo(c, LAYERS.map(l => layers[l]))
-      if (combo?.action === 'block') throw forbidden('EMBLEM_COMBO_BLOCKED', combo.reason)
+        const combo = await deniedCombo(c, LAYERS.map(l => layers[l]))
+        if (combo?.action === 'block') throw forbidden('EMBLEM_COMBO_BLOCKED', combo.reason)
 
-      const emblem = await publishEmblem(c, {
-        channelId, guild, slot, layers, userId,
-        status: combo ? 'pending_review' : 'published',
-      })
-      return {
-        emblem_id: emblem.id, status: emblem.status, render_url: emblem.render_url,
-        layers_hash: emblem.layers_hash,
+        const emblem = await publishEmblem(c, {
+          channelId, guild, slot, layers, userId,
+          status: combo ? 'pending_review' : 'published',
+        })
+        return {
+          emblem_id: emblem.id, status: emblem.status, render_url: emblem.render_url,
+          layers_hash: emblem.layers_hash,
+        }
+      } catch (err) {
+        if (err instanceof AppError) throw err
+        console.error('[PUT /emblem/slots Error]:', err)
+        throw new AppError(500, 'EMBLEM_SAVE_FAILED', err.message || 'Falha ao salvar brasão')
       }
     })
   })
