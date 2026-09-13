@@ -28,7 +28,7 @@ export function cors (app) {
       // A resposta muda conforme a origem; sem isto um proxy serve a errada.
       vary: 'Origin',
       'access-control-allow-headers': 'authorization, content-type, x-actor-user-id',
-      'access-control-allow-methods': 'GET, POST, PATCH, DELETE, OPTIONS',
+      'access-control-allow-methods': 'GET, POST, PUT, PATCH, DELETE, OPTIONS',
       'access-control-max-age': '86400',
     })
 
