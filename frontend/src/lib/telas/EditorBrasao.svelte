@@ -199,7 +199,7 @@
 					class:selecionado={rascunho[abaAtiva] === asset.id}
 					class:bloqueado
 					class:pago={asset.tier === 'paid' && !posses.has(asset.id)}
-					onclick={() => !bloqueado && selecionar(asset)}
+					onclick={() => (!bloqueado || asset.tier === 'paid') && selecionar(asset)}
 				>
 					<div class="visual">
 						{#if abaAtiva === 'palette'}
