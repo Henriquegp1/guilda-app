@@ -1,17 +1,67 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { membros, alterarCargo, sair, expulsar, salvarSettingsGuilda, ErroApi, type Guilda, type Membro, type Cargo } from '$lib/api';
+	import {
+		membros, alterarCargo, sair, expulsar, salvarSettingsGuilda,
+		obterPerfil, salvarPerfil, ErroApi, type Guilda, type Membro, type Cargo
+	} from '$lib/api';
 	import { entrarBloco } from '$lib/motion';
-	import { onAuth } from '$lib/twitch';
+	import { onAuth, pedirIdentidade, viewerStore } from '$lib/twitch';
+	import Brasao from '$lib/ui/Brasao.svelte';
 
 	let { guilda, cargoAtor, aoSair, aoAtualizar }: { guilda: Guilda; cargoAtor: Cargo; aoSair: () => void; aoAtualizar: () => void } = $props();
 
 	let lista = $state<Membro[]>([]);
 	let meuId = $state('');
+	let meuNick = $state<string | null>(null);
+	let meuNickStatus = $state<string | null>(null);
+	let temUserId = $state(false);
+
 	let ocupado = $state(false);
 	let erro = $state('');
 	let modoEntrada = $state(guilda.join_mode ?? 'approval');
 	let alterandoModo = $state(false);
+
+	// Estados para modais
+	let confirmandoSair = $state(false);
+	let membroParaExpulsar = $state<Membro | null>(null);
+	let editandoMeuPerfil = $state(false);
+	let novoNomeInput = $state('');
+	let salvandoPerfil = $state(false);
+
+	onMount(() => {
+		const unsubViewer = viewerStore.subscribe(v => {
+			meuId = v.userId || '';
+			temUserId = !!v.userId && !v.userId.startsWith('U');
+		});
+		carregar();
+		carregarMeuPerfil();
+		return () => unsubViewer();
+	});
+
+	async function carregarMeuPerfil() {
+		try {
+			const res = await obterPerfil();
+			meuNick = res.nickname;
+			meuNickStatus = res.status;
+			novoNomeInput = meuNick || '';
+		} catch (e) {}
+	}
+
+	async function salvarMeuPerfil() {
+		if (!novoNomeInput.trim()) return;
+		salvandoPerfil = true;
+		try {
+			const res = await salvarPerfil(novoNomeInput.trim());
+			meuNick = res.nickname;
+			meuNickStatus = res.status;
+			editandoMeuPerfil = false;
+			await carregar(); // Atualiza a lista para mostrar o nome novo
+		} catch (e: any) {
+			erro = e.message || 'Erro ao salvar perfil.';
+		} finally {
+			salvandoPerfil = false;
+		}
+	}
 
 	async function mudarModoEntrada(novoModo: 'open' | 'approval' | 'closed') {
 		alterandoModo = true;
@@ -28,19 +78,7 @@
 		}
 	}
 
-	// Estados para modais de confirmação internos (Sem usar window.confirm/alert que a Twitch bloqueia)
-	let confirmandoSair = $state(false);
-	let membroParaExpulsar = $state<Membro | null>(null);
-
 	const CARGOS: Cargo[] = ['lider', 'sub-lider', 'comandante', 'vassalo'];
-
-	onMount(() => {
-		onAuth((auth) => {
-			meuId = auth.userId;
-			console.log('[Gestao] Logado como:', meuId);
-		});
-		carregar();
-	});
 
 	async function carregar() {
 		try {
@@ -108,6 +146,27 @@
 </script>
 
 <div class="gestao" in:entrarBloco>
+	<!-- Perfil do Jogador RPG -->
+	<div class="meu-perfil-rpg">
+		<div class="header-perfil">
+			<span>⚔️ Meu Personagem</span>
+			{#if meuNickStatus === 'pending_review'}
+				<span class="status-tag pendente">Em Análise</span>
+			{:else if meuNickStatus === 'approved'}
+				<span class="status-tag aprovado">Aprovado</span>
+			{:else if meuNickStatus === 'rejected'}
+				<span class="status-tag rejeitado">Rejeitado</span>
+			{/if}
+		</div>
+
+		<div class="corpo-perfil">
+			<span class="nick-exibicao">{meuNick || 'Sem Nome de Personagem'}</span>
+			<button class="btn-editar-perfil" onclick={() => (editandoMeuPerfil = true)}>
+				{meuNick ? 'Alterar' : 'Criar Personagem'}
+			</button>
+		</div>
+	</div>
+
 	{#if ['lider', 'sub-lider'].includes(cargoAtor)}
 		<div class="secao-modo">
 			<label for="select-modo">Modo de Entrada no Clã</label>
@@ -199,10 +258,51 @@
 			</div>
 		</div>
 	{/if}
+
+	{#if editandoMeuPerfil}
+		<div class="modal-backdrop" role="dialog" aria-modal="true" in:entrarBloco>
+			<div class="modal-box">
+				<Brasao tamanho={48} />
+				<h4>Nome do Personagem</h4>
+				<p>Escolha como você quer ser chamado nas listas de membros.</p>
+
+				{#if !temUserId}
+					<p class="nota gules">⚠️ Autorize a identidade para o clã salvar seu nome.</p>
+					<button class="btn-perigo" onclick={pedirIdentidade}>Autorizar Twitch</button>
+				{:else}
+					<input
+						type="text"
+						class="input-nick"
+						bind:value={novoNomeInput}
+						placeholder="Ex: Sir_Lancelot"
+						maxlength={20}
+					/>
+					<div class="modal-botoes">
+						<button class="btn-perigo" disabled={salvandoPerfil || !novoNomeInput.trim()} onclick={salvarMeuPerfil}>
+							{salvandoPerfil ? 'Salvando...' : 'Salvar Nome'}
+						</button>
+						<button class="btn-cancelar" onclick={() => (editandoMeuPerfil = false)}>Fechar</button>
+					</div>
+				{/if}
+			</div>
+		</div>
+	{/if}
 </div>
 
 <style>
 	.gestao { flex: 1; display: flex; flex-direction: column; padding: 12px; min-height: 0; overflow-x: hidden; position: relative; }
+
+	.meu-perfil-rpg { background: var(--sable-2); border: 1px solid var(--borda); border-radius: 4px; padding: 12px; margin-bottom: 12px; display: flex; flex-direction: column; gap: 8px; }
+	.header-perfil { display: flex; justify-content: space-between; align-items: center; font-size: 10px; font-weight: bold; color: var(--or); text-transform: uppercase; letter-spacing: 0.05em; }
+	.status-tag { padding: 2px 6px; border-radius: 2px; font-size: 8px; color: white; }
+	.status-tag.pendente { background: #3b3b10; color: #ffeb3b; }
+	.status-tag.aprovado { background: #103b10; color: #4caf50; }
+	.status-tag.rejeitado { background: var(--gules); }
+
+	.corpo-perfil { display: flex; justify-content: space-between; align-items: center; }
+	.nick-exibicao { font-size: 14px; font-family: var(--display); color: var(--argent); font-weight: bold; }
+	.btn-editar-perfil { background: none; border: 1px solid var(--borda); color: var(--or); font-size: 10px; padding: 4px 10px; min-height: auto; border-radius: 2px; }
+
 	.secao-modo { display: flex; flex-direction: column; gap: 4px; margin-bottom: 10px; padding: 10px; background: var(--sable-2); border: 1px solid var(--borda); border-radius: 4px; }
 	.secao-modo label { font-size: 10px; text-transform: uppercase; color: var(--or); font-weight: bold; letter-spacing: 0.05em; }
 	.secao-modo select { background: var(--sable); color: var(--argent); border: 1px solid var(--borda); font-size: 10px; padding: 6px; border-radius: 2px; width: 100%; outline: none; }
@@ -286,5 +386,17 @@
 		border-radius: 4px;
 		cursor: pointer;
 		font-size: 11px;
+	}
+
+	.input-nick {
+		width: 100%;
+		padding: 10px;
+		background: var(--sable);
+		border: 1px solid var(--borda);
+		color: var(--argent);
+		font-family: inherit;
+		text-align: center;
+		margin-bottom: 16px;
+		border-radius: 4px;
 	}
 </style>

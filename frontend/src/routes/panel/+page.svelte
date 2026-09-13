@@ -21,29 +21,9 @@
 	let erro = $state('');
 	let aba = $state('minha');
 
-	let nickname = $state<string | null>(null);
-	let precisaCriarNome = $state(false);
-	let novoNome = $state('');
-	let salvandoNome = $state(false);
-	let erroNome = $state('');
-	let temUserId = $state(false);
-
 	async function carregar() {
 		try {
-			const [gRes, perfRes] = await Promise.all([
-				minhaGuilda(),
-				obterPerfil().catch(() => ({ nickname: null }))
-			]);
-			guilda = gRes;
-			nickname = perfRes.nickname;
-
-			// Se não tem nickname, precisamos criar
-			if (!nickname) {
-				precisaCriarNome = true;
-			} else {
-				precisaCriarNome = false;
-			}
-
+			guilda = await minhaGuilda();
 			estado = 'pronto';
 			if (!guilda && (aba === 'minha' || aba === 'criar')) aba = 'guildas';
 			if (guilda && (aba === 'guildas' || aba === 'criar')) aba = 'minha';
@@ -55,12 +35,7 @@
 
 	onMount(() => {
 		iniciar();
-		const unsub = viewerStore.subscribe(v => {
-			temUserId = v.role === 'broadcaster' || (!!v.userId && !v.userId.startsWith('U'));
-			console.log('[Painel] Estado de Identidade:', { role: v.role, userId: v.userId, temUserId });
-		});
-		const unsubAuth = onAuth(carregar);
-		return () => { unsub(); unsubAuth(); };
+		return onAuth(carregar);
 	});
 
 	async function salvarPersonagem() {
@@ -131,38 +106,6 @@
 				{/if}
 			</div>
 		{/key}
-	{/if}
-
-	{#if precisaCriarNome}
-		<div class="modal-personagem" role="dialog" aria-modal="true" aria-labelledby="titulo-personagem" in:entrarBloco>
-			<div class="box-personagem">
-				<Brasao tamanho={64} />
-				<h2 id="titulo-personagem">Crie seu Personagem</h2>
-				<p>Escolha o nome pelo qual você será conhecido no canal e entre as guildas.</p>
-
-				{#if !temUserId}
-					<p class="aviso-identidade">
-						⚠️ Você está anônimo. Para que o clã lembre do seu nome, autorize o compartilhamento de identidade.
-					</p>
-					<button class="btn-twitch" onclick={pedirIdentidade}>
-						Autorizar Identidade
-					</button>
-				{:else}
-					<input
-						type="text"
-						placeholder="Ex: Sir_Lancelot"
-						bind:value={novoNome}
-						maxlength={20}
-						disabled={salvandoNome}
-						aria-required="true"
-					/>
-					{#if erroNome}<p class="erro-p" role="alert">{erroNome}</p>{/if}
-					<button class="btn-salvar-p" disabled={salvandoNome || !novoNome.trim()} onclick={salvarPersonagem}>
-						{salvandoNome ? 'Salvando...' : 'Confirmar Personagem'}
-					</button>
-				{/if}
-			</div>
-		</div>
 	{/if}
 </Estandarte>
 
@@ -290,4 +233,22 @@
 		text-transform: uppercase;
 		font-size: 12px;
 	}
+
+	.aviso-flutuante {
+		position: absolute;
+		bottom: 10px;
+		left: 10px;
+		right: 10px;
+		background: var(--sable-2);
+		border: 1px solid var(--or);
+		padding: 8px 12px;
+		border-radius: 4px;
+		font-size: 11px;
+		color: var(--argent);
+		text-align: center;
+		z-index: 1000;
+		box-shadow: 0 2px 10px rgba(0,0,0,0.5);
+	}
+
+	.aviso-flutuante b { color: var(--or); }
 </style>

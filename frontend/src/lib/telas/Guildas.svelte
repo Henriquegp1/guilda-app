@@ -8,6 +8,7 @@
 	let estado = $state<'carregando' | 'pronto' | 'vazio' | 'erro'>('carregando');
 	let guildas = $state<Guilda[]>([]);
 	let convites = $state<Convite[]>([]);
+	let busca = $state('');
 	let erro = $state('');
 	let entrando = $state<number | null>(null);
 	let aviso = $state('');
@@ -28,6 +29,13 @@
 			estado = 'erro';
 		}
 	}
+
+	const guildasFiltradas = $derived(
+		guildas.filter(g =>
+			g.name.toLowerCase().includes(busca.toLowerCase().trim()) ||
+			g.tag.toLowerCase().includes(busca.toLowerCase().trim())
+		)
+	);
 
 	async function tentarEntrar(g: Guilda) {
 		entrando = g.id;
@@ -67,57 +75,69 @@
 	<Estado estado="carregando" />
 {:else if estado === 'erro'}
 	<Estado estado="erro" mensagem={erro} acao="Tentar de novo" aoAgir={carregar} />
-{:else if estado === 'vazio'}
-	<Estado estado="vazio" mensagem="Nenhuma guilda aprovada neste canal ainda. A sua pode ser a primeira." />
 {:else}
+	<div class="busca-container">
+		<input
+			type="text"
+			placeholder="🔍 Pesquisar guilda ou TAG..."
+			bind:value={busca}
+		/>
+	</div>
+
 	<div class="rolagem">
 	{#if aviso}
 		<p class="aviso" role="alert">{aviso}</p>
 	{/if}
 
-	{#if convites.length}
-		<h2>Convites</h2>
+	{#if estado === 'vazio' && !busca}
+		<p class="vazio-msg">Nenhuma guilda aprovada neste canal ainda. A sua pode ser a primeira.</p>
+	{:else}
+		{#if convites.length && !busca}
+			<h2>Convites</h2>
+			<ul>
+				{#each convites as c (c.invite_id)}
+					<li>
+						<span class="nome">
+							<b>{c.guild.name}</b>
+							<small>[{c.guild.tag}]</small>
+						</span>
+						<button onclick={() => aceitar(c)}>Aceitar</button>
+					</li>
+				{/each}
+			</ul>
+		{/if}
+
+		<h2>Guildas do canal</h2>
 		<ul>
-			{#each convites as c (c.invite_id)}
+			{#each guildasFiltradas as g (g.id)}
+				{@const modo = g.join_mode ?? 'approval'}
 				<li>
 					<span class="nome">
-						<b>{c.guild.name}</b>
-						<small>[{c.guild.tag}]</small>
+						<b>{g.name}</b>
+						<small>[{g.tag}] · Nv.{g.level} · {g.member_count}/{g.member_limit}</small>
 					</span>
-					<button onclick={() => aceitar(c)}>Aceitar</button>
+					<button
+						disabled={cheia(g) || modo === 'closed' || entrando === g.id}
+						onclick={() => tentarEntrar(g)}
+					>
+						{#if cheia(g)}
+							Cheia
+						{:else if entrando === g.id}
+							...
+						{:else if modo === 'closed'}
+							Fechada
+						{:else if modo === 'approval'}
+							Pedir Entrada
+						{:else}
+							Entrar
+						{/if}
+					</button>
 				</li>
+			{:else}
+				<p class="vazio-busca">Nenhuma guilda encontrada para "{busca}"</p>
 			{/each}
 		</ul>
 	{/if}
-
-	<h2>Guildas do canal</h2>
-	<ul>
-		{#each guildas as g (g.id)}
-			{@const modo = g.join_mode ?? 'approval'}
-			<li>
-				<span class="nome">
-					<b>{g.name}</b>
-					<small>[{g.tag}] · Nv.{g.level} · {g.member_count}/{g.member_limit}</small>
-				</span>
-				<button
-					disabled={cheia(g) || modo === 'closed' || entrando === g.id}
-					onclick={() => tentarEntrar(g)}
-				>
-					{#if cheia(g)}
-						Cheia
-					{:else if entrando === g.id}
-						...
-					{:else if modo === 'closed'}
-						Fechada
-					{:else if modo === 'approval'}
-						Pedir Entrada
-					{:else}
-						Entrar
-					{/if}
-				</button>
-			</li>
-		{/each}
-	</ul>
 	</div>
 {/if}
 
@@ -131,6 +151,42 @@
 		padding-bottom: 6px;
 		/* Diz "tem mais abaixo" em vez de parecer corte. */
 		mask-image: linear-gradient(180deg, #000 calc(100% - 20px), transparent);
+	}
+
+	.busca-container {
+		margin-bottom: 12px;
+	}
+
+	.busca-container input {
+		width: 100%;
+		padding: 10px 14px;
+		background: var(--sable-2);
+		border: 1px solid var(--borda);
+		border-radius: 4px;
+		color: var(--argent);
+		font-size: 13px;
+		outline: none;
+		transition: border-color 0.2s;
+	}
+
+	.busca-container input:focus {
+		border-color: var(--or);
+	}
+
+	.vazio-busca {
+		padding: 30px 10px;
+		text-align: center;
+		color: var(--argent-fraco);
+		font-size: 12px;
+		font-style: italic;
+	}
+
+	.vazio-msg {
+		padding: 40px 20px;
+		text-align: center;
+		color: var(--argent-fraco);
+		font-size: 13px;
+		line-height: 1.5;
 	}
 
 	h2 {
