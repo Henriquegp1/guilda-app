@@ -471,6 +471,40 @@ export default async function seasons (app) {
       return { season_id: 0, position: null, prestige: 0, delta_position: null, live: false }
     }
 
+    app.get('/guilds/:gid/weekly-progress', async (req) => {
+      const cid = req.auth.channelId
+      const guild = await getGuild({ query }, cid, req.params.gid)
+      const { key, start, end } = weekRange()
+      const { rows: [progress] } = await query(
+        `SELECT count(DISTINCT e.actor_user_id)::int AS members,
+                count(DISTINCT (e.created_at AT TIME ZONE 'UTC')::date)::int AS days
+           FROM guild_event e
+           JOIN guild_member gm
+             ON gm.channel_id = e.channel_id
+            AND gm.guild_id = $1
+            AND gm.user_id = e.actor_user_id
+          WHERE e.channel_id = $2
+            AND e.type = ANY($3)
+            AND e.actor_user_id IS NOT NULL
+            AND e.created_at >= $4
+            AND e.created_at < $5`,
+        [guild.id, cid, ACTIVITY_TYPES, start, end])
+
+      const members = Number(progress?.members ?? 0)
+      const days = Number(progress?.days ?? 0)
+      return {
+        week: key,
+        objective: WEEKLY_OBJECTIVE.code,
+        description: WEEKLY_OBJECTIVE.description,
+        members,
+        days,
+        target_members: WEEKLY_OBJECTIVE.min_members,
+        target_days: WEEKLY_OBJECTIVE.min_days,
+        completed: weeklyObjectiveMet({ members, days }),
+        points: WEEKLY_OBJECTIVE.points,
+      }
+    })
+
     const season = req.query.season_id
       ? await getSeason({ query }, cid, req.query.season_id).catch(() => null)
       : await currentSeason({ query }, cid)

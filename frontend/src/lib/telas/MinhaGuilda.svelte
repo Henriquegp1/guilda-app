@@ -6,12 +6,13 @@
 	import {
 		progressao,
 		posicaoDa,
+		progressoSemanal,
 		sair,
 		listarTerritorios,
 		carregarConquistas,
 		ErroApi
 	} from '$lib/api';
-	import type { Guilda, Cargo, Progressao, Territory, Achievement } from '$lib/api';
+	import type { Guilda, Cargo, Progressao, ProgressoSemanal, Territory, Achievement } from '$lib/api';
 	import { gsap, dur, entrarBloco } from '$lib/motion';
 
 	let {
@@ -22,6 +23,7 @@
 	}: { guilda: Guilda; cargo: Cargo; aoSair: () => void; aoAtualizar: () => void } = $props();
 
 	let prog = $state<Progressao | null>(null);
+	let semanal = $state<ProgressoSemanal | null>(null);
 	let posicao = $state<number | null>(null);
 	let terrs = $state<Territory[]>([]);
 	let medalhas = $state<Achievement[]>([]);
@@ -38,6 +40,9 @@
 			.catch(() => {});
 		posicaoDa(guilda.id)
 			.then((r) => (posicao = r.position))
+			.catch(() => {});
+		progressoSemanal(guilda.id)
+			.then((p) => (semanal = p))
 			.catch(() => {});
 		listarTerritorios()
 			.then((res) => (terrs = res.items.filter((t) => t.owner_guild_id === guilda.id)))
@@ -81,6 +86,10 @@
 	const eLider = $derived(cNorm === 'lider' || cNorm === 'leader');
 	const falta = $derived(prog ? prog.xp_to_next : null);
 	const lotada = $derived(guilda.member_count >= guilda.member_limit);
+	const proximoDesbloqueio = $derived.by(() => {
+		const niveis = [3, 5, 8, 10, 12, 15, 18, 20, 25, 30, 35, 40, 45, 50];
+		return niveis.find((nivel) => nivel > guilda.level) ?? null;
+	});
 
 	async function deixar() {
 		aviso = '';
@@ -157,6 +166,24 @@
 				{/if}
 			</p>
 		</div>
+	{/if}
+
+	{#if semanal}
+		<section class="progresso-semanal" aria-label="Progresso semanal">
+			<div class="semana-topo">
+				<strong>Meta da semana</strong>
+				<span class:concluida={semanal.completed}>{semanal.completed ? 'Concluída' : `+${semanal.points} Poder`}</span>
+			</div>
+			<p>{semanal.description}</p>
+			<div class="metas">
+				<span class:atingida={semanal.members >= semanal.target_members}>{semanal.members}/{semanal.target_members} membros</span>
+				<span class:atingida={semanal.days >= semanal.target_days}>{semanal.days}/{semanal.target_days} dias</span>
+			</div>
+		</section>
+	{/if}
+
+	{#if proximoDesbloqueio}
+		<p class="proximo-desbloqueio">Próximo desbloqueio: <b>Nível {proximoDesbloqueio}</b></p>
 	{/if}
 
 	<dl class="quadro">
@@ -338,6 +365,26 @@
 		font-size: 10px;
 		color: var(--argent-fraco);
 	}
+
+	.progresso-semanal {
+		margin-top: 14px;
+		padding: 10px;
+		border: 1px solid var(--borda);
+		background: var(--sable-2);
+	}
+
+	.semana-topo, .metas {
+		display: flex;
+		justify-content: space-between;
+		gap: 8px;
+	}
+
+	.semana-topo strong { color: var(--or); font-size: 12px; }
+	.semana-topo span, .metas span { color: var(--argent-fraco); font-size: 10px; }
+	.semana-topo span.concluida, .metas span.atingida { color: var(--vert); }
+	.progresso-semanal p { margin: 7px 0; color: var(--argent-fraco); font-size: 11px; }
+	.proximo-desbloqueio { margin: 10px 0 0; color: var(--argent-fraco); font-size: 11px; }
+	.proximo-desbloqueio b { color: var(--or); }
 
 	.nota {
 		margin: 12px 0 0;

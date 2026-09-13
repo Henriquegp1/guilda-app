@@ -385,6 +385,18 @@ export const posicaoDa = (gid: number) =>
 		delta_position: number | null;
 		live: boolean;
 	}>(`/guilds/${gid}/rank`);
+export type ProgressoSemanal = {
+	week: string;
+	objective: string;
+	description: string;
+	members: number;
+	days: number;
+	target_members: number;
+	target_days: number;
+	completed: boolean;
+	points: number;
+};
+export const progressoSemanal = (gid: number) => get<ProgressoSemanal>(`/guilds/${gid}/weekly-progress`);
 export const carregarConquistas = (gid: number) =>
 	get<{ unlocked: Achievement[]; progress: AchievementProgress[] }>(`/guilds/${gid}/achievements`);
 
