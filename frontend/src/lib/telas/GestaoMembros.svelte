@@ -161,9 +161,9 @@
 	</div>
 
 	{#if confirmandoSair}
-		<div class="modal-backdrop" in:entrarBloco>
+		<div class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="titulo-sair" in:entrarBloco>
 			<div class="modal-box">
-				<h4>Confirmar Saída</h4>
+				<h4 id="titulo-sair">Confirmar Saída</h4>
 				<p>
 					{#if cargoAtor === 'lider'}
 						Você é o líder. Ao sair, a liderança passará automaticamente para o sub-líder.
@@ -184,9 +184,9 @@
 	{/if}
 
 	{#if membroParaExpulsar}
-		<div class="modal-backdrop" in:entrarBloco>
+		<div class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="titulo-expulsar" in:entrarBloco>
 			<div class="modal-box">
-				<h4>Expulsar Membro</h4>
+				<h4 id="titulo-expulsar">Expulsar Membro</h4>
 				<p>Deseja expulsar o membro ID: {membroParaExpulsar.user_id}?</p>
 				<div class="modal-botoes">
 					<button class="btn-perigo" disabled={ocupado} onclick={acaoExpulsar}>

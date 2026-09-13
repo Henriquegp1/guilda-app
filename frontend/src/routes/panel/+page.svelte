@@ -118,10 +118,10 @@
 	{/if}
 
 	{#if precisaCriarNome}
-		<div class="modal-personagem" in:entrarBloco>
+		<div class="modal-personagem" role="dialog" aria-modal="true" aria-labelledby="titulo-personagem" in:entrarBloco>
 			<div class="box-personagem">
 				<Brasao tamanho={64} />
-				<h2>Crie seu Personagem</h2>
+				<h2 id="titulo-personagem">Crie seu Personagem</h2>
 				<p>Escolha o nome pelo qual você será conhecido no canal e entre as guildas.</p>
 				<input
 					type="text"
@@ -129,8 +129,9 @@
 					bind:value={novoNome}
 					maxlength={20}
 					disabled={salvandoNome}
+					aria-required="true"
 				/>
-				{#if erroNome}<p class="erro-p">{erroNome}</p>{/if}
+				{#if erroNome}<p class="erro-p" role="alert">{erroNome}</p>{/if}
 				<button class="btn-salvar-p" disabled={salvandoNome || !novoNome.trim()} onclick={salvarPersonagem}>
 					{salvandoNome ? 'Salvando...' : 'Confirmar Personagem'}
 				</button>

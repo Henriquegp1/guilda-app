@@ -6,11 +6,14 @@
 	}: { abas: { id: string; rotulo: string }[]; atual: string } = $props();
 </script>
 
-<nav aria-label="Seções do painel">
+<nav role="tablist" aria-label="Seções do painel">
 	{#each abas as aba (aba.id)}
 		<button
+			role="tab"
+			id="tab-{aba.id}"
+			aria-selected={atual === aba.id}
+			aria-controls="panel-{aba.id}"
 			class:ativa={atual === aba.id}
-			aria-current={atual === aba.id ? 'page' : undefined}
 			onclick={() => (atual = aba.id)}
 		>
 			{aba.rotulo}

@@ -1,15 +1,37 @@
 # Subir a extensão e o EBS
 
-Duas metades independentes: o **EBS** roda na sua VPS, a **extensão** é um zip
+Duas metades independentes: o **EBS** roda no **Render.com** (ou sua VPS), a **extensão** é um zip
 hospedado pela Twitch. A ordem importa — o EBS precisa estar no ar com HTTPS
 antes de a extensão conseguir falar com ele.
 
 ---
 
-## Parte 1 — EBS na VPS
+## Parte 1 — EBS no Render.com (Recomendado)
 
-Requisitos: uma VPS com Docker, e um domínio (ou subdomínio) apontando para o IP
-dela. `guilds.seucanal.com` serve.
+O backend real do projeto está configurado para o **Render.com**, usando Docker.
+
+### 1. Banco de Dados
+Crie um **PostgreSQL** gerenciado no Render. Copie a `External Database URL`.
+
+### 2. Variáveis de Ambiente
+No painel do Render, configure as seguintes variáveis:
+
+| Variável            | Valor / Origem                                                     |
+| ------------------- | ------------------------------------------------------------------ |
+| `DATABASE_URL`      | A URL do passo 1                                                   |
+| `TWITCH_EXT_SECRET` | Developer Console → sua extensão → **Settings → Secret Keys**      |
+| `ANNOUNCE_ENC_KEY`  | Chave de 32 hex. Gere com: `node -e "console.log(require('crypto').randomBytes(16).toString('hex'))"` |
+| `BASE_URL`          | A URL do seu serviço no Render (ex: `https://seu-ebs.onrender.com`) |
+
+### 3. Deploy
+Aponte o Render para o seu repositório GitHub. O `Dockerfile` na raiz cuidará de:
+1. Instalar dependências.
+2. Rodar as migrações automaticamente (`src/core/migrate.js`).
+3. Iniciar o servidor Fastify na porta 3000.
+
+---
+
+## Parte 1.5 — EBS na VPS (Alternativa)
 
 ### 1. DNS antes de tudo
 

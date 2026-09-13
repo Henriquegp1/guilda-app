@@ -30,6 +30,7 @@ describe('iniciar', () => {
 	it('faz fallback para broadcaster quando a Twitch não entregou uma role válida em localhost', () => {
 		const originalWindow = (globalThis as any).window;
 		(globalThis as any).window = {
+			location: { hostname: 'localhost' },
 			Twitch: {
 				ext: {
 					viewer: { role: null },

@@ -44,10 +44,26 @@ audit_log      (id, channel_id, actor_user_id, action, target, before jsonb,
 ```
 
 `guild.status`: `awaiting | pending | active | overflow | suspended | banned | purged`.
-`guild_member.role`: `leader | officer | veteran | member | recruit`.
+`guild_member.role`: `lider | sub-lider | comandante | vassalo`.
 
 `overflow` = guilda ativa acima do limite de vagas depois que uma queda de nível
 reduziu `member_limit` (fase 03, R10). Ninguém é expulso; ela só não admite entradas.
+
+## Perfil e Identidade de RPG
+
+Diferente do login da Twitch, o viewer cria um **Nome de Personagem** (nickname)
+ao entrar no canal pela primeira vez. Este nome passa por moderação e é a base da
+exibição nas listas de clãs.
+
+## Segurança e CSP (Fase F0)
+
+Este projeto implementa a **Fase F0 (Fundação Técnica)** para conformidade com a
+Content Security Policy (CSP) da Twitch:
+1. **Script Externalization**: Scripts inline gerados pelo SvelteKit são
+   automaticamente extraídos para arquivos `.js` físicos (ex: `boot.js`) durante o
+   build pelo script `scripts/csp-externalize.js`.
+2. **Sanity Check**: O `zip.js` remove subdiretórios com underlines (`_app`) que são
+   bloqueados pelo CDN da Twitch, movendo-os para `app_ext`.
 
 ## Ciclo de vida de nome e TAG
 

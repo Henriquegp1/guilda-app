@@ -37,10 +37,14 @@ const MENSAGENS: Record<string, string> = {
 export const mensagemDe = (code: string, cru?: string) =>
 	MENSAGENS[code] ?? cru ?? 'Algo deu errado. Tente de novo.';
 
-type Opcoes = { metodo?: string; corpo?: unknown; sinal?: AbortSignal };
+type Opcoes = { metodo?: string; corpo?: unknown; sinal?: AbortSignal; requerAuth?: boolean };
 
-export async function chamar<T>(rota: string, { metodo = 'GET', corpo, sinal }: Opcoes = {}) {
+export async function chamar<T>(rota: string, { metodo = 'GET', corpo, sinal, requerAuth = true }: Opcoes = {}) {
 	const token = tokenAtual();
+
+	if (requerAuth && !token) {
+		throw new ErroApi('UNAUTHORIZED', 401, mensagemDe('UNAUTHORIZED'));
+	}
 
 	let res: Response;
 	try {

@@ -281,7 +281,7 @@ describe('ledger e agregados (Postgres)', { skip: !process.env.DATABASE_URL }, (
        VALUES ($1, 'Xp Testers', 'XPT', 'active', $2, $2, 2, 'paid', 500, $3) RETURNING id`,
       [channelId, U.sub, `tx-xp-${sufixo}`])
     guildId = g.id
-    for (const [user, role] of [[U.sub, 'leader'], [U.bits, 'member']]) {
+    for (const [user, role] of [[U.sub, 'lider'], [U.bits, 'vassalo']]) {
       await db.query(
         'INSERT INTO guild_member (guild_id, user_id, channel_id, role) VALUES ($1, $2, $3, $4)',
         [guildId, user, channelId, role])

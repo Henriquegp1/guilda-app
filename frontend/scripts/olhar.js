@@ -123,6 +123,7 @@ const CENAS = [
 		titulo: 'Painel de Moderação',
 		nota: 'O que o streamer/mod vê na live',
 		rota: '/live/',
+		viewport: { width: 900, height: 650 },
 		corpoFila: {
 			items: [
 				{
@@ -141,6 +142,7 @@ const CENAS = [
 		titulo: 'Configuração do Canal',
 		nota: 'Instalação e ajustes do bot',
 		rota: '/config/',
+		viewport: { width: 900, height: 650 },
 		corpoConfig: {
 			enabled: true,
 			webhook_url: 'https://bot.foyth.tv/guildas',
@@ -153,6 +155,7 @@ const CENAS = [
 		titulo: 'Overlay de Guerra',
 		nota: 'Placar ao vivo sobre o vídeo',
 		rota: '/overlay/',
+		viewport: { width: 1280, height: 720 },
 		corpoGuerras: {
 			items: [
 				{
@@ -304,6 +307,7 @@ const CENAS = [
 		titulo: 'Gerenciar Territórios',
 		nota: 'Painel do streamer para criar o mundo',
 		rota: '/config/',
+		viewport: { width: 900, height: 650 },
 		corpoTerritorios: {
 			items: [
 				{ id: 1, name: 'Floresta Sombria', map_x: 200, map_y: 300, prestige_per_day: 15, enabled: true }
@@ -371,7 +375,11 @@ const browser = await chromium.launch();
 await mkdir(SAIDA, { recursive: true });
 
 for (const cena of CENAS) {
-	const context = await browser.newContext({ viewport: { width: 318, height: 496 } });
+	// Cada tipo de view da Twitch tem um tamanho real diferente: painel do viewer
+	// é sempre 318px, mas dashboard (config/moderação) abre largo, e overlay
+	// acompanha o player. Sem isso, tudo era espremido em 318x496 e quebrava
+	// layouts que na Twitch de verdade têm espaço de sobra.
+	const context = await browser.newContext({ viewport: cena.viewport ?? { width: 318, height: 496 } });
 	const page = await context.newPage();
 	await page.emulateMedia({ reducedMotion: 'reduce' });
 
@@ -466,7 +474,14 @@ for (const cena of CENAS) {
 				return rota.fulfill({
 					status: 200,
 					contentType: 'application/json',
-					body: JSON.stringify(cena.corpoGuerras ?? { items: [] })
+					body: JSON.stringify({ wars: cena.corpoGuerras?.items ?? [] })
+				});
+			}
+			if (url.includes('/me/profile')) {
+				return rota.fulfill({
+					status: 200,
+					contentType: 'application/json',
+					body: JSON.stringify({ nickname: cena.semPersonagem ? null : 'Testador' })
 				});
 			}
 			if (url.includes('/ranking')) {
@@ -555,7 +570,7 @@ for (const cena of CENAS) {
 // Folha de contato: um PNG com tudo, que é o que se olha para comparar.
 const cartoes = CENAS.map(
 	(c) => `<figure>
-    <img src="${c.nome}.png" width="318" height="496" alt="${c.titulo}">
+    <img src="${c.nome}.png" style="max-width:${c.viewport?.width ?? 318}px" alt="${c.titulo}">
     <figcaption><b>${c.titulo}</b><span>${c.nota}</span></figcaption>
   </figure>`
 ).join('');

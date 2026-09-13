@@ -616,7 +616,7 @@ describe('guerra e território (Postgres)', { skip: !process.env.DATABASE_URL },
     const w = await newWar(guilds.c, guilds.a, { status: 'active' })
     const user = `wp-${sufixo}`
     await db.query(
-      `INSERT INTO guild_member (guild_id, user_id, channel_id, role) VALUES ($1, $2, $3, 'member')`,
+      `INSERT INTO guild_member (guild_id, user_id, channel_id, role) VALUES ($1, $2, $3, 'vassalo')`,
       [guilds.c, user, channelId])
     await db.query(
       'INSERT INTO war_roster (war_id, guild_id, user_id, added_by) VALUES ($1, $2, $3, $3)',

@@ -36,7 +36,7 @@ export function iniciar() {
 		viewerStore.set({ role, isLoaded: true, token, userId });
 	};
 
-	if (!t) {
+	if (!t || (typeof window !== 'undefined' && window.location?.hostname === 'localhost' && !t.viewer?.role)) {
 		definir('broadcaster', 'dev-token', 'dev-user-id');
 		return;
 	}
