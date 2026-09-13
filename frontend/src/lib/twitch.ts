@@ -115,6 +115,16 @@ export function gastarBits(sku: string): Promise<string> {
 	});
 }
 
+/**
+ * Abre o prompt da Twitch para o usuário compartilhar a identidade.
+ */
+export function pedirIdentidade() {
+	const t = (window as any).Twitch?.ext;
+	if (t?.actions?.requestIdShare) {
+		t.actions.requestIdShare();
+	}
+}
+
 export function ouvirBroadcast<T>(fn: (m: T) => void): () => void {
 	const t = (window as any).Twitch?.ext;
 	if (!t) return () => {};

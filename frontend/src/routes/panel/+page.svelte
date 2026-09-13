@@ -10,7 +10,7 @@
 	import Criar from '$lib/telas/Criar.svelte';
 	import PainelGuerra from '$lib/telas/PainelGuerra.svelte';
 	import MapaMundi from '$lib/telas/MapaMundi.svelte';
-	import { iniciar, onAuth } from '$lib/twitch';
+	import { iniciar, onAuth, pedirIdentidade, viewerStore } from '$lib/twitch';
 	import { entrarBloco } from '$lib/motion';
 	import { minhaGuilda, obterPerfil, salvarPerfil, ErroApi, type Guilda, type Cargo } from '$lib/api';
 
@@ -26,6 +26,7 @@
 	let novoNome = $state('');
 	let salvandoNome = $state(false);
 	let erroNome = $state('');
+	let temUserId = $state(false);
 
 	async function carregar() {
 		try {
@@ -35,9 +36,14 @@
 			]);
 			guilda = gRes;
 			nickname = perfRes.nickname;
+
+			// Se não tem nickname, precisamos criar
 			if (!nickname) {
 				precisaCriarNome = true;
+			} else {
+				precisaCriarNome = false;
 			}
+
 			estado = 'pronto';
 			if (!guilda && (aba === 'minha' || aba === 'criar')) aba = 'guildas';
 			if (guilda && (aba === 'guildas' || aba === 'criar')) aba = 'minha';
@@ -46,6 +52,15 @@
 			estado = 'erro';
 		}
 	}
+
+	onMount(() => {
+		iniciar();
+		const unsub = viewerStore.subscribe(v => {
+			temUserId = !!v.userId && !v.userId.startsWith('U');
+		});
+		const unsubAuth = onAuth(carregar);
+		return () => { unsub(); unsubAuth(); };
+	});
 
 	async function salvarPersonagem() {
 		if (!novoNome.trim()) {
@@ -123,18 +138,28 @@
 				<Brasao tamanho={64} />
 				<h2 id="titulo-personagem">Crie seu Personagem</h2>
 				<p>Escolha o nome pelo qual você será conhecido no canal e entre as guildas.</p>
-				<input
-					type="text"
-					placeholder="Ex: Sir_Lancelot"
-					bind:value={novoNome}
-					maxlength={20}
-					disabled={salvandoNome}
-					aria-required="true"
-				/>
-				{#if erroNome}<p class="erro-p" role="alert">{erroNome}</p>{/if}
-				<button class="btn-salvar-p" disabled={salvandoNome || !novoNome.trim()} onclick={salvarPersonagem}>
-					{salvandoNome ? 'Salvando...' : 'Confirmar Personagem'}
-				</button>
+
+				{#if !temUserId}
+					<p class="aviso-identidade">
+						⚠️ Você está anônimo. Para que o clã lembre do seu nome, autorize o compartilhamento de identidade.
+					</p>
+					<button class="btn-twitch" onclick={pedirIdentidade}>
+						Autorizar Identidade
+					</button>
+				{:else}
+					<input
+						type="text"
+						placeholder="Ex: Sir_Lancelot"
+						bind:value={novoNome}
+						maxlength={20}
+						disabled={salvandoNome}
+						aria-required="true"
+					/>
+					{#if erroNome}<p class="erro-p" role="alert">{erroNome}</p>{/if}
+					<button class="btn-salvar-p" disabled={salvandoNome || !novoNome.trim()} onclick={salvarPersonagem}>
+						{salvandoNome ? 'Salvando...' : 'Confirmar Personagem'}
+					</button>
+				{/if}
 			</div>
 		</div>
 	{/if}
@@ -210,6 +235,28 @@
 		color: var(--argent-fraco);
 		margin: 0;
 		line-height: 1.4;
+	}
+
+	.aviso-identidade {
+		background: rgba(200, 160, 46, 0.1);
+		border: 1px solid var(--or);
+		padding: 10px;
+		border-radius: 4px;
+		color: var(--or) !important;
+		margin: 8px 0 !important;
+	}
+
+	.btn-twitch {
+		width: 100%;
+		padding: 12px;
+		background: #9146ff;
+		color: white;
+		font-weight: bold;
+		border: none;
+		border-radius: 4px;
+		cursor: pointer;
+		text-transform: uppercase;
+		font-size: 12px;
 	}
 
 	.box-personagem input {

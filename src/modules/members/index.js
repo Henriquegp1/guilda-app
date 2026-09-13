@@ -1,4 +1,4 @@
-import { tx } from '../../core/db.js'
+import { query, tx } from '../../core/db.js'
 import { emit, audit } from '../../core/events.js'
 import { AppError, badRequest, conflict, forbidden, notFound, onUnique } from '../../core/errors.js'
 import { requireModerator } from '../../core/auth.js'
@@ -35,29 +35,37 @@ export default async function members (app) {
   // ---------------------------------------------------------------- perfil do personagem
   app.get('/me/profile', async (req) => {
     const cid = req.auth.channelId
-    if (!req.auth.userId) return { nickname: null }
-    // Read simples: fora de tx() para não complicar rollback
+    if (!req.auth.userId) return { nickname: null, status: null }
+
     const { rows } = await query(
-      'SELECT nickname FROM user_profile WHERE channel_id = $1 AND user_id = $2',
+      'SELECT nickname, status FROM user_profile WHERE channel_id = $1 AND user_id = $2',
       [cid, req.auth.userId]
     ).catch(() => ({ rows: [] }))
-    return { nickname: rows[0]?.nickname ?? null }
+
+    return {
+      nickname: rows[0]?.nickname ?? null,
+      status: rows[0]?.status ?? null
+    }
   })
 
   app.post('/me/profile', async (req) => tx(async (c) => {
     const cid = await channelPk(c, req.auth)
     const userId = requireUser(req.auth)
     const nick = String(req.body?.nickname ?? '').trim()
+
     if (!/^[A-Za-z0-9_ ]{2,20}$/.test(nick)) {
-      throw badRequest('INVALID_NICKNAME', 'Nome de personagem deve ter entre 2 e 20 caracteres (apenas letras, números e espaços)')
+      throw badRequest('INVALID_NICKNAME', 'Nome de personagem deve ter entre 2 e 20 caracteres')
     }
+
+    // Ao salvar ou atualizar, o status volta para 'pending_review'
     await c.query(
-      `INSERT INTO user_profile (channel_id, user_id, nickname)
-       VALUES ($1, $2, $3)
-       ON CONFLICT (channel_id, user_id) DO UPDATE SET nickname = EXCLUDED.nickname`,
+      `INSERT INTO user_profile (channel_id, user_id, nickname, status)
+       VALUES ($1, $2, $3, 'pending_review')
+       ON CONFLICT (channel_id, user_id) DO UPDATE SET nickname = EXCLUDED.nickname, status = 'pending_review'`,
       [cid, userId, nick]
     )
-    return { nickname: nick }
+
+    return { nickname: nick, status: 'pending_review' }
   }))
 
   // ---------------------------------------------------------------- listagem
