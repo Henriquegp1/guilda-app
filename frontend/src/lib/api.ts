@@ -76,10 +76,11 @@ export async function chamar<T>(rota: string, { metodo = 'GET', corpo, sinal, re
 	return json as T;
 }
 
-export const get = <T>(rota: string, sinal?: AbortSignal) => chamar<T>(rota, { sinal });
-export const post = <T>(rota: string, corpo?: unknown) => chamar<T>(rota, { metodo: 'POST', corpo });
-export const patch = <T>(rota: string, corpo?: unknown) =>
-	chamar<T>(rota, { metodo: 'PATCH', corpo });
+export const get = <T>(rota: string, opcoes: Opcoes = {}) => chamar<T>(rota, opcoes);
+export const post = <T>(rota: string, corpo?: unknown, opcoes: Opcoes = {}) =>
+	chamar<T>(rota, { metodo: 'POST', corpo, ...opcoes });
+export const patch = <T>(rota: string, corpo?: unknown, opcoes: Opcoes = {}) =>
+	chamar<T>(rota, { metodo: 'PATCH', corpo, ...opcoes });
 
 // ------------------------------------------------------------------- domínio
 

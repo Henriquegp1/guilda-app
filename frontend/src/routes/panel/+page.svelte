@@ -56,7 +56,8 @@
 	onMount(() => {
 		iniciar();
 		const unsub = viewerStore.subscribe(v => {
-			temUserId = !!v.userId && !v.userId.startsWith('U');
+			temUserId = v.role === 'broadcaster' || (!!v.userId && !v.userId.startsWith('U'));
+			console.log('[Painel] Estado de Identidade:', { role: v.role, userId: v.userId, temUserId });
 		});
 		const unsubAuth = onAuth(carregar);
 		return () => { unsub(); unsubAuth(); };

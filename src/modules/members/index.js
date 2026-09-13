@@ -34,17 +34,23 @@ const page = (q) => Math.min(Math.max(Number(q.limit) || 25, 1), 100)
 export default async function members (app) {
   // ---------------------------------------------------------------- perfil do personagem
   app.get('/me/profile', async (req) => {
-    const cid = req.auth.channelId
-    if (!req.auth.userId) return { nickname: null, status: null }
+    try {
+      const cid = req.auth.channelId
+      const uid = req.auth.userId
+      if (!uid) return { nickname: null, status: null }
 
-    const { rows } = await query(
-      'SELECT nickname, status FROM user_profile WHERE channel_id = $1 AND user_id = $2',
-      [cid, req.auth.userId]
-    ).catch(() => ({ rows: [] }))
+      const { rows } = await query(
+        'SELECT nickname, status FROM user_profile WHERE channel_id = $1 AND user_id = $2',
+        [cid, uid]
+      )
 
-    return {
-      nickname: rows[0]?.nickname ?? null,
-      status: rows[0]?.status ?? null
+      return {
+        nickname: rows[0]?.nickname ?? null,
+        status: rows[0]?.status ?? null
+      }
+    } catch (err) {
+      req.log.error(err, 'Error in GET /me/profile')
+      return { nickname: null, status: null }
     }
   })
 
