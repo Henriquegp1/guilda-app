@@ -194,15 +194,54 @@
 
 	<path d={escudoPath} fill="black" opacity="0.3" transform="translate(0, 3)" />
 
+	<!-- Progression Frames (Estilo Ranqueado) -->
 	{#if progressionFrame && FRAME_COLORS[progressionFrame]}
-		<path
-			d={escudoPath}
-			fill="none"
-			stroke={FRAME_COLORS[progressionFrame]}
-			stroke-width="10"
-			stroke-linejoin="round"
-			opacity="0.9"
-		/>
+		{@const cor = FRAME_COLORS[progressionFrame]}
+		<g class="progression-frame" style:color={cor}>
+			<!-- Brilho de fundo para frames altos -->
+			{#if ['frame_platinum', 'frame_diamond', 'frame_legendary'].includes(progressionFrame)}
+				<path d={escudoPath} fill="currentColor" opacity="0.1" filter="url(#fx--glow)" />
+			{/if}
+
+			<!-- Moldura Base Reforçada -->
+			<path
+				d={escudoPath}
+				fill="none"
+				stroke="currentColor"
+				stroke-width="6"
+				stroke-linejoin="round"
+			/>
+
+			<!-- Ornamentos Superiores (Cristas) -->
+			<g transform="translate(48, 10)">
+				{#if progressionFrame === 'frame_bronze'}
+					<path d="M-20 0 L0 -15 L20 0 L0 -5 Z" fill="currentColor" />
+				{:else if progressionFrame === 'frame_silver'}
+					<path d="M-25 0 L-10 -20 L0 -10 L10 -20 L25 0 L0 -5 Z" fill="currentColor" />
+				{:else if progressionFrame === 'frame_gold'}
+					<path d="M-30 5 L-35 -15 L-10 -10 L0 -25 L10 -10 L35 -15 L30 5 Z" fill="currentColor" stroke="black" stroke-width="1" />
+				{:else if progressionFrame === 'frame_platinum'}
+					<path d="M-40 10 L-45 -10 L-20 -5 L0 -30 L20 -5 L45 -10 L40 10 Z" fill="currentColor" stroke="black" stroke-width="1" />
+				{:else if progressionFrame === 'frame_diamond'}
+					<path d="M-45 15 L-50 -5 L-25 0 L0 -35 L25 0 L50 -5 L45 15 Z" fill="currentColor" stroke="white" stroke-width="1" />
+				{:else if progressionFrame === 'frame_legendary'}
+					<g filter="url(#fx--glow)">
+						<path d="M-50 20 L-55 0 L-30 5 L0 -40 L30 5 L55 0 L50 20 Z" fill="currentColor" stroke="black" stroke-width="1" />
+						<circle cy="-40" r="4" fill="white">
+							<animate attributeName="opacity" values="0.5;1;0.5" dur="2s" repeatCount="indefinite" />
+						</circle>
+					</g>
+				{/if}
+			</g>
+
+			<!-- Detalhes Laterais para Níveis Altos -->
+			{#if ['frame_gold', 'frame_platinum', 'frame_diamond', 'frame_legendary'].includes(progressionFrame)}
+				<g opacity="0.8">
+					<path d="M5 40 L-5 50 L5 60" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" />
+					<path d="M91 40 L101 50 L91 60" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" />
+				</g>
+			{/if}
+		</g>
 	{/if}
 
 	<path d={escudoPath} fill="var(--cor-pri)" />

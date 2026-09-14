@@ -30,6 +30,17 @@
 		{ id: 'frame_legendary', label: 'Lendário (Nv.50)' }
 	];
 
+	let formatoSelecionado = $state('shape.heater');
+	const formatos = [
+		{ id: 'shape.heater', label: 'Clássico' },
+		{ id: 'shape.round', label: 'Redondo' },
+		{ id: 'shape.square', label: 'Quadrado' },
+		{ id: 'shape.pointed', label: 'Pontudo' },
+		{ id: 'shape.kite', label: 'Pipa' },
+		{ id: 'shape.lozenge', label: 'Losango' },
+		{ id: 'shape.banner', label: 'Estandarte' }
+	];
+
 	onMount(async () => {
 		try {
 			await catalog.load();
@@ -61,14 +72,24 @@
 	</header>
 
 	<section class="galeria-frames">
-		<h2>Galeria de Molduras (Nível)</h2>
+		<header class="header-galeria">
+			<h2>Galeria de Molduras (Nível)</h2>
+			<div class="seletor-formato">
+				<span>Trocar Formato:</span>
+				<select bind:value={formatoSelecionado}>
+					{#each formatos as f}
+						<option value={f.id}>{f.label}</option>
+					{/each}
+				</select>
+			</div>
+		</header>
 		<div class="grid-frames">
 			{#each frames as f}
 				<div class="item-frame">
 					<Brasao
 						tag="TEST"
 						tamanho={100}
-						layers={JSON.parse(guildaMock.emblem_preset)}
+						layers={{...JSON.parse(guildaMock.emblem_preset), shape: formatoSelecionado}}
 						progressionFrame={f.id}
 					/>
 					<span>{f.label}</span>
@@ -102,7 +123,31 @@
 		padding-bottom: 1rem;
 	}
 	h1 { color: #d4af37; margin: 0; }
-	h2 { color: #c8a02e; font-size: 1.2rem; margin-bottom: 1.5rem; text-transform: uppercase; letter-spacing: 0.1em; }
+	h2 { color: #c8a02e; font-size: 1.2rem; margin: 0; text-transform: uppercase; letter-spacing: 0.1em; }
+
+	.header-galeria {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		margin-bottom: 1.5rem;
+	}
+
+	.seletor-formato {
+		display: flex;
+		align-items: center;
+		gap: 1rem;
+		font-size: 0.9rem;
+		color: #9a93a8;
+	}
+
+	.seletor-formato select {
+		background: #16121c;
+		color: #d4af37;
+		border: 1px solid #322942;
+		padding: 0.4rem;
+		border-radius: 4px;
+		outline: none;
+	}
 	p { color: #888; font-size: 0.9rem; }
 
 	.grid-frames {
