@@ -262,7 +262,13 @@
 {:else}
 	<div class="conteudo" in:entrarBloco>
 		<header>
-			<Banner url={guilda.banner_url} nivel={guilda.level} unlocks={prog?.unlocks || []} />
+			<Banner
+				url={guilda.banner_url}
+				nivel={guilda.level}
+				unlocks={prog?.unlocks || []}
+				corPri={guilda.color_primary}
+				corSec={guilda.color_secondary}
+			/>
 			<div class="header-brasao-pos">
 				<Brasao
 					tag={guilda.tag}
