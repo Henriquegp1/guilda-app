@@ -6,6 +6,9 @@ ALTER TABLE guild_emblem
   ADD COLUMN custom_asset_hash   TEXT,
   ADD COLUMN custom_local_path   TEXT;
 
+ALTER TABLE guild
+  ADD COLUMN IF NOT EXISTS banner_url TEXT;
+
 -- Regra de integridade: ou tem camadas (catálogo) ou tem imagem customizada.
 -- 'v' é o campo de versão das camadas; se não existe, deve ser custom.
 ALTER TABLE guild_emblem

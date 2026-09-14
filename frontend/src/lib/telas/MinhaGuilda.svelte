@@ -1,5 +1,6 @@
 <script lang="ts">
 	import Brasao from '$lib/ui/Brasao.svelte';
+	import Banner from '$lib/ui/Banner.svelte';
 	import Estado from '$lib/ui/Estado.svelte';
 	import EditorBrasao from './EditorBrasao.svelte';
 	import GestaoMembros from './GestaoMembros.svelte';
@@ -31,6 +32,7 @@
 	let resumo = $state<ResumoSemanal | null>(null);
 	let missoesSemana = $state<MissaoSemanal[]>([]);
 	let missoesDia = $state<MissaoDiaria[]>([]);
+	let missoesAbertas = $state(false);
 	let posicao = $state<number | null>(null);
 	let terrs = $state<Territory[]>([]);
 	let medalhas = $state<Achievement[]>([]);
@@ -150,15 +152,82 @@
 		xpNecessarioNoNivel > 0 ? Math.min(1, xpGanhoNoNivel / xpNecessarioNoNivel) : 1
 	);
 
+	const UNLOCK_LABELS: Record<string, string> = {
+		emblem_base: 'Emblema Base',
+		color_default: 'Cores Iniciais',
+		description_140: 'Descrição (140 carac.)',
+		description_280: 'Descrição Expandida',
+		palette_6: 'Paleta de 6 Cores',
+		motto: 'Lema da Guilda',
+		frame_bronze: 'Moldura de Bronze',
+		color_special: 'Cores Especiais',
+		banner_custom: 'Banner Personalizado',
+		xp_history: 'Histórico de XP',
+		frame_silver: 'Moldura de Prata',
+		member_badge: 'Insígnia de Membro',
+		palette_12: 'Paleta de 12 Cores',
+		banner_animated: 'Banner Animado',
+		frame_gold: 'Moldura de Ouro',
+		banner_frame: 'Moldura do Banner',
+		guild_emote: 'Emote da Guilda',
+		frame_platinum: 'Moldura de Platina',
+		color_gradient: 'Cores em Gradiente',
+		banner_glow: 'Brilho no Banner',
+		frame_diamond: 'Moldura de Diamante',
+		frame_legendary: 'Moldura Lendária',
+		color_lv50: 'Cores de Nível Máximo',
+		banner_signed: 'Banner Assinado'
+	};
+
+	const progressionFrame = $derived.by(() => {
+		if (!prog) return undefined;
+		const frames = [
+			'frame_legendary',
+			'frame_diamond',
+			'frame_platinum',
+			'frame_gold',
+			'frame_silver',
+			'frame_bronze'
+		];
+		return frames.find((f) => prog!.unlocks.includes(f));
+	});
+
 	const cNorm = $derived(String(cargo || '').toLowerCase());
 	const podeGerenciar = $derived(['lider', 'sub-lider', 'leader', 'officer'].includes(cNorm));
 	const podeEditar = $derived(['lider', 'sub-lider', 'comandante', 'leader', 'officer', 'veteran'].includes(cNorm));
 	const eLider = $derived(cNorm === 'lider' || cNorm === 'leader');
 	const falta = $derived(prog ? prog.xp_to_next : null);
 	const lotada = $derived(guilda.member_count >= guilda.member_limit);
+
+	// Marcos de nível sincronizados com curve.js
+	const MARCOS = {
+		3: ['description_280'],
+		5: ['palette_6'],
+		8: ['motto'],
+		10: ['frame_bronze', 'color_special', 'banner_custom'],
+		12: ['xp_history'],
+		15: ['frame_silver'],
+		18: ['member_badge'],
+		20: ['palette_12', 'banner_animated'],
+		25: ['frame_gold'],
+		30: ['banner_frame', 'guild_emote'],
+		35: ['frame_platinum'],
+		40: ['color_gradient', 'banner_glow'],
+		45: ['frame_diamond'],
+		50: ['frame_legendary', 'color_lv50', 'banner_signed']
+	};
+
 	const proximoDesbloqueio = $derived.by(() => {
-		const niveis = [3, 5, 8, 10, 12, 15, 18, 20, 25, 30, 35, 40, 45, 50];
-		return niveis.find((nivel) => nivel > guilda.level) ?? null;
+		if (!prog) return null;
+		const niveis = Object.keys(MARCOS)
+			.map(Number)
+			.sort((a, b) => a - b);
+		const nivelAlvo = niveis.find((n) => n > prog!.level);
+		if (!nivelAlvo) return null;
+
+		const chaves = (MARCOS as any)[nivelAlvo] || [];
+		const nomes = chaves.map((k: string) => UNLOCK_LABELS[k]).filter(Boolean);
+		return { level: nivelAlvo, label: nomes.join(', ') };
 	});
 
 	async function deixar() {
@@ -193,12 +262,16 @@
 {:else}
 	<div class="conteudo" in:entrarBloco>
 		<header>
-			<Brasao
-				tag={guilda.tag}
-				tamanho={78}
-				layers={guilda.emblem_preset ? JSON.parse(guilda.emblem_preset) : undefined}
-				customUrl={guilda.custom_emblem_url}
-			/>
+			<Banner url={guilda.banner_url} nivel={guilda.level} unlocks={prog?.unlocks || []} />
+			<div class="header-brasao-pos">
+				<Brasao
+					tag={guilda.tag}
+					tamanho={82}
+					layers={guilda.emblem_preset ? JSON.parse(guilda.emblem_preset) : undefined}
+					customUrl={guilda.custom_emblem_url}
+					{progressionFrame}
+				/>
+			</div>
 			<h1>{guilda.name}</h1>
 		<p class="linhagem">
 			<span class="num">Nível {guilda.level}</span>
@@ -284,47 +357,73 @@
 		</div>
 	{/if}
 
-	{#if missoesDia.length > 0}
-		<section class="missoes" aria-label="Missões diárias">
-			<strong>Missões de hoje</strong>
-			{#each missoesDia as m}
-				<div class="missao-linha" class:completa={m.completed}>
-					<span>{m.completed ? '✅' : '⬜'} {m.label}</span>
-					<span class="num">{m.progress}/{m.target}</span>
-				</div>
-			{/each}
-		</section>
-	{:else if erroMissoesDia}
-		<div class="bloco-erro">
-			<Estado estado="erro" mensagem={erroMissoesDia} acao="Tentar de novo" aoAgir={carregarMissoesDia} />
-		</div>
-	{/if}
+	{#if missoesDia.length > 0 || missoesSemana.length > 0 || erroMissoesDia || erroMissoesSemana}
+		<div class="missoes-wrapper">
+			<button class="missoes-toggle" onclick={() => (missoesAbertas = !missoesAbertas)}>
+				<span>🎯 Missões</span>
+				<span class="chevron" class:aberto={missoesAbertas}>▸</span>
+			</button>
 
-	{#if missoesSemana.length > 0}
-		<section class="missoes" aria-label="Missões da semana">
-			<strong>Missões da semana</strong>
-			{#each missoesSemana as m}
-				{#if 'progress_members' in m}
-					<div class="missao-linha" class:completa={m.completed}>
-						<span>{m.completed ? '✅' : '⬜'} {m.label}</span>
-						<span class="num">{m.progress_members}/{m.target} membros · {m.progress_days}/{m.target} dias</span>
-					</div>
-				{:else}
-					<div class="missao-linha" class:completa={m.completed}>
-						<span>{m.completed ? '✅' : '⬜'} {m.label}</span>
-						<span class="num">{m.progress}/{m.target}</span>
+			{#if missoesAbertas}
+				{#if missoesDia.length > 0}
+					<section class="missoes" aria-label="Missões diárias">
+						<strong>Missões de hoje</strong>
+						{#each missoesDia as m}
+							<div class="missao-linha" class:completa={m.completed}>
+								<span>{m.completed ? '✅' : '⬜'} {m.label}</span>
+								<span class="num">{m.progress}/{m.target}</span>
+							</div>
+						{/each}
+					</section>
+				{:else if erroMissoesDia}
+					<div class="bloco-erro">
+						<Estado estado="erro" mensagem={erroMissoesDia} acao="Tentar de novo" aoAgir={carregarMissoesDia} />
 					</div>
 				{/if}
-			{/each}
-		</section>
-	{:else if erroMissoesSemana}
-		<div class="bloco-erro">
-			<Estado estado="erro" mensagem={erroMissoesSemana} acao="Tentar de novo" aoAgir={carregarMissoesSemana} />
+
+				{#if missoesSemana.length > 0}
+					<section class="missoes" aria-label="Missões da semana">
+						<strong>Missões da semana</strong>
+						{#each missoesSemana as m}
+							{#if 'progress_members' in m}
+								<div class="missao-linha" class:completa={m.completed}>
+									<span>{m.completed ? '✅' : '⬜'} {m.label}</span>
+									<span class="num">{m.progress_members}/{m.target} membros · {m.progress_days}/{m.target} dias</span>
+								</div>
+							{:else}
+								<div class="missao-linha" class:completa={m.completed}>
+									<span>{m.completed ? '✅' : '⬜'} {m.label}</span>
+									<span class="num">{m.progress}/{m.target}</span>
+								</div>
+							{/if}
+						{/each}
+					</section>
+				{:else if erroMissoesSemana}
+					<div class="bloco-erro">
+						<Estado estado="erro" mensagem={erroMissoesSemana} acao="Tentar de novo" aoAgir={carregarMissoesSemana} />
+					</div>
+				{/if}
+			{/if}
 		</div>
 	{/if}
 
 	{#if proximoDesbloqueio}
-		<p class="proximo-desbloqueio">Próximo desbloqueio: <b>Nível {proximoDesbloqueio}</b></p>
+		<p class="proximo-desbloqueio">
+			Próximo desbloqueio: <b>Nível {proximoDesbloqueio.level} — {proximoDesbloqueio.label}</b>
+		</p>
+	{/if}
+
+	{#if prog && prog.unlocks.length > 0}
+		<div class="beneficios-resumo">
+			<strong>Benefícios Desbloqueados</strong>
+			<div class="lista-tags">
+				{#each prog.unlocks as key}
+					{#if UNLOCK_LABELS[key]}
+						<span class="tag-beneficio">✓ {UNLOCK_LABELS[key]}</span>
+					{/if}
+				{/each}
+			</div>
+		</div>
 	{/if}
 
 	<dl class="quadro">
@@ -399,8 +498,15 @@
 		flex-direction: column;
 		align-items: center;
 		gap: 8px;
-		padding: 2px 0 12px;
+		padding: 0 0 12px;
 		border-bottom: 1px solid var(--borda);
+		position: relative;
+	}
+
+	.header-brasao-pos {
+		margin-top: -50px;
+		z-index: 10;
+		filter: drop-shadow(0 4px 8px rgba(0,0,0,0.5));
 	}
 
 	h1 {
@@ -572,8 +678,65 @@
 	.missao-linha.completa { color: var(--vert); }
 	.missao-linha .num { color: var(--argent-fraco); font-size: 10px; }
 	.missao-linha.completa .num { color: var(--vert); }
+
+	.missoes-wrapper { margin-top: 10px; }
+
+	.missoes-toggle {
+		width: 100%;
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		background: var(--sable-2);
+		border: 1px solid var(--borda);
+		color: var(--or);
+		font-size: 12px;
+		padding: 8px 10px;
+		cursor: pointer;
+	}
+
+	.missoes-toggle .chevron {
+		transition: transform 0.15s ease;
+		font-size: 10px;
+	}
+
+	.missoes-toggle .chevron.aberto { transform: rotate(90deg); }
+
+	.missoes-wrapper .missoes {
+		margin-top: 6px;
+		border-top: none;
+	}
 	.proximo-desbloqueio { margin: 10px 0 0; color: var(--argent-fraco); font-size: 11px; }
 	.proximo-desbloqueio b { color: var(--or); }
+
+	.beneficios-resumo {
+		margin-top: 14px;
+		padding: 10px;
+		border: 1px solid var(--borda);
+		background: var(--sable-2);
+	}
+
+	.beneficios-resumo strong {
+		color: var(--or);
+		font-size: 12px;
+		display: block;
+		margin-bottom: 8px;
+	}
+
+	.lista-tags {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 4px;
+	}
+
+	.tag-beneficio {
+		font-size: 9px;
+		text-transform: uppercase;
+		color: var(--vert);
+		background: rgba(63, 125, 92, 0.1);
+		padding: 2px 6px;
+		border-radius: 2px;
+		border: 1px solid rgba(63, 125, 92, 0.3);
+	}
 
 	.nota {
 		margin: 12px 0 0;

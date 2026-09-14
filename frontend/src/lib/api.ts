@@ -99,6 +99,7 @@ export type Guilda = {
 	motto?: string | null;
 	emblem_preset?: string | null;
 	custom_emblem_url?: string | null;
+	banner_url?: string | null;
 	reject_reason?: string | null;
 };
 
@@ -140,7 +141,7 @@ export type Progressao = {
 	member_limit: number;
 	member_count: number;
 	status: string;
-	unlocks?: string[];
+	unlocks: string[];
 };
 
 export type WarFormat = 'skirmish' | 'campaign' | 'special';

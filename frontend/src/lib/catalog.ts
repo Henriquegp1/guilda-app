@@ -7,8 +7,12 @@ function createCatalogStore() {
 
 	return {
 		subscribe,
-		async load() {
+		async load(mockData?: Catalog) {
 			if (loading) return;
+			if (mockData) {
+				set(mockData);
+				return;
+			}
 			loading = true;
 			try {
 				const data = await fetchCatalog();

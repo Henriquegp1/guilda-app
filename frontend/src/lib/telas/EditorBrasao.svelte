@@ -30,9 +30,10 @@
 		effect: 'effect.none'
 	};
 
-	let abaAtiva = $state<'shape' | 'background' | 'palette' | 'border' | 'symbol' | 'effect' | 'name' | 'tag' | 'custom'>('shape');
+	let abaAtiva = $state<'shape' | 'background' | 'palette' | 'border' | 'symbol' | 'effect' | 'name' | 'tag' | 'custom' | 'banner'>('shape');
 	let rascunho = $state<EmblemLayers>({ ...PADRAO });
 	let customUrlInput = $state('');
+	let bannerUrlInput = $state('');
 	let posses = $state<Set<string>>(new Set());
 	let nivelGuilda = $state(0);
 	let ocupado = $state(false);
@@ -73,6 +74,9 @@
 			if (abaAtiva === 'custom') {
 				if (!customUrlInput) throw new Error('URL necessária');
 				await salvarImagemCustomizada(guilda.id, 1, customUrlInput);
+			} else if (abaAtiva === 'banner') {
+				if (!bannerUrlInput) throw new Error('URL necessária');
+				await salvarSettingsGuilda(guilda.id, { banner_url: bannerUrlInput });
 			} else {
 				await salvarEmblema(guilda.id, 1, rascunho);
 			}
@@ -92,6 +96,7 @@
 		{ id: 'symbol', rotulo: 'Símbolo' },
 		{ id: 'effect', rotulo: 'Efeito' },
 		{ id: 'custom', rotulo: 'Custom' },
+		{ id: 'banner', rotulo: 'Banner' },
 		{ id: 'name', rotulo: 'Nome' },
 		{ id: 'tag', rotulo: 'TAG' }
 	];
@@ -207,6 +212,20 @@
 					<p class="instrucao">Cole a URL de um PNG transparente.</p>
 					<input type="url" placeholder="https://..." bind:value={customUrlInput} />
 					<button class="btn-preview" onclick={() => (customUrlInput = customUrlInput.trim())}>Simular Preview</button>
+				</div>
+			{:else if abaAtiva === 'banner'}
+				<div class="secao-custom">
+					<p class="instrucao">
+						Fundo personalizado do clã (Requer Nv. 10).
+						{#if nivelGuilda < 10}<span class="gules">🔒 Bloqueado</span>{/if}
+					</p>
+					<input
+						type="url"
+						placeholder="https://..."
+						bind:value={bannerUrlInput}
+						disabled={nivelGuilda < 10}
+					/>
+					<small>Tamanho ideal: 400x120px. GIFs permitidos no Nv. 20.</small>
 				</div>
 			{:else}
 				{#each assetsFiltrados as asset}

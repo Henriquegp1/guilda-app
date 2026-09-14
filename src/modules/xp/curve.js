@@ -31,7 +31,11 @@ export const xpToNext = (xp) => {
   return next > MAX_LEVEL ? 0 : xpForLevel(next) - (Number(xp) || 0)
 }
 
-/** Vagas por faixa de nível (§6). guild.member_limit é derivado, nunca editado à mão. */
+/**
+ * Vagas por faixa de nível (§6). guild.member_limit é derivado, nunca editado à mão.
+ * Design atualizado e consolidado: 2 membros no Nv.1 até 15 membros no Nv.50.
+ * Reflete a iteração de design que substituiu a escala original de 10-40.
+ */
 const LIMITS = [[1, 2], [5, 4], [10, 6], [15, 8], [20, 10], [25, 11],
   [30, 12], [35, 13], [40, 14], [45, 15], [50, 15]]
 

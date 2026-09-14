@@ -8,8 +8,15 @@
 		tag = '',
 		tamanho = 96,
 		layers,
-		customUrl
-	}: { tag?: string; tamanho?: number; layers?: Partial<EmblemLayers>; customUrl?: string | null } = $props();
+		customUrl,
+		progressionFrame
+	}: {
+		tag?: string;
+		tamanho?: number;
+		layers?: Partial<EmblemLayers>;
+		customUrl?: string | null;
+		progressionFrame?: string;
+	} = $props();
 
 	// Fallbacks padrão do catálogo (devem bater com o Back-end)
 	const FALLBACKS: Record<string, string> = {
@@ -79,6 +86,15 @@
 	const borderId = $derived(getLayer('border'));
 	const borderStyle = $derived(BORDER_STROKES[borderId] ?? null);
 
+	const FRAME_COLORS: Record<string, string> = {
+		frame_bronze: '#8C593B',
+		frame_silver: '#A6A6A6',
+		frame_gold: '#D4AF37',
+		frame_platinum: '#E5E4E2',
+		frame_diamond: '#B9F2FF',
+		frame_legendary: 'url(#grad-legendary)'
+	};
+
 	$effect(() => {
 		if (tag) console.log('[Guilda] Renderizando brasão para', tag, 'com base:', base);
 	});
@@ -86,9 +102,9 @@
 
 <svg
 	class="brasao"
-	viewBox="0 0 96 104"
+	viewBox="-6 -6 108 116"
 	width={tamanho}
-	height={tamanho * (104 / 96)}
+	height={tamanho * (116 / 108)}
 	role="img"
 	class:vago={!tag && !layers}
 	aria-label={tag ? `Brasão da guilda ${tag}` : 'Escudo heráldico'}
@@ -105,6 +121,13 @@
 			<stop offset="0%" stop-color="#BF953F" />
 			<stop offset="50%" stop-color="#FCF6BA" />
 			<stop offset="100%" stop-color="#AA771C" />
+		</linearGradient>
+
+		<linearGradient id="grad-legendary" x1="0%" y1="0%" x2="100%" y2="100%">
+			<stop offset="0%" stop-color="#FFD700" />
+			<stop offset="50%" stop-color="#FFFFFF" />
+			<stop offset="100%" stop-color="#FFD700" />
+			<animate attributeName="x1" values="0%;100%;0%" dur="3s" repeatCount="indefinite" />
 		</linearGradient>
 
 		<linearGradient id="brilho-vidro" x1="0%" y1="0%" x2="0%" y2="100%">
@@ -170,6 +193,18 @@
 	</defs>
 
 	<path d={escudoPath} fill="black" opacity="0.3" transform="translate(0, 3)" />
+
+	{#if progressionFrame && FRAME_COLORS[progressionFrame]}
+		<path
+			d={escudoPath}
+			fill="none"
+			stroke={FRAME_COLORS[progressionFrame]}
+			stroke-width="10"
+			stroke-linejoin="round"
+			opacity="0.9"
+		/>
+	{/if}
+
 	<path d={escudoPath} fill="var(--cor-pri)" />
 
 	<g clip-path="url(#clip-escudo)">
