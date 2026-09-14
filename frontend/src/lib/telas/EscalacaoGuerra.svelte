@@ -14,9 +14,12 @@
 	let selecionados = $state<Set<string>>(new Set());
 	let ocupado = $state(false);
 	let erro = $state('');
+	let erroCarregar = $state('');
+	let carregando = $state(true);
 
-	onMount(async () => {
-		selecionados = new Set(currentRoster.map(r => r.user_id));
+	async function carregarElegibilidade() {
+		erroCarregar = '';
+		carregando = true;
 		try {
 			const res = await memberEligibility(guildaId);
 			membros = res.items;
@@ -29,9 +32,15 @@
 					.forEach(m => selecionados.add(m.user_id));
 			}
 		} catch (e) {
-			console.error(e);
-			erro = 'Falha ao carregar elegibilidade.';
+			erroCarregar = 'Falha ao carregar elegibilidade dos membros.';
+		} finally {
+			carregando = false;
 		}
+	}
+
+	onMount(() => {
+		selecionados = new Set(currentRoster.map(r => r.user_id));
+		carregarElegibilidade();
 	});
 
 	function alternar(uid: string, eligible: boolean) {
@@ -74,24 +83,33 @@
 	</p>
 
 	<ul class="lista-membros">
-		{#each membros as m}
-			<button
-				type="button"
-				class="membro-btn-escalacao"
-				class:selecionado={selecionados.has(m.user_id)}
-				class:inativo={!m.is_eligible}
-				onclick={() => alternar(m.user_id, m.is_eligible)}
-			>
-				<div class="check">{selecionados.has(m.user_id) ? '✓' : ''}</div>
-				<div class="info">
-					<b>{m.user_id}</b>
-					<small>{m.role} · {m.events} eventos</small>
-				</div>
-				{#if !m.is_eligible}
-					<span class="tag-erro">Inativo</span>
-				{/if}
-			</button>
-		{/each}
+		{#if carregando}
+			<li class="estado-lista">Carregando elegibilidade...</li>
+		{:else if erroCarregar}
+			<li class="estado-lista erro-lista">
+				{erroCarregar}
+				<button class="link-retry" onclick={carregarElegibilidade}>Tentar de novo</button>
+			</li>
+		{:else}
+			{#each membros as m}
+				<button
+					type="button"
+					class="membro-btn-escalacao"
+					class:selecionado={selecionados.has(m.user_id)}
+					class:inativo={!m.is_eligible}
+					onclick={() => alternar(m.user_id, m.is_eligible)}
+				>
+					<div class="check">{selecionados.has(m.user_id) ? '✓' : ''}</div>
+					<div class="info">
+						<b>{m.user_id}</b>
+						<small>{m.role} · {m.events} eventos</small>
+					</div>
+					{#if !m.is_eligible}
+						<span class="tag-erro">Inativo</span>
+					{/if}
+				</button>
+			{/each}
+		{/if}
 	</ul>
 
 	{#if erro}<p class="erro">{erro}</p>{/if}
@@ -170,6 +188,32 @@
 	.info small { font-size: 10px; color: var(--argent-fraco); }
 
 	.tag-erro { font-size: 9px; color: var(--gules); text-transform: uppercase; border: 1px solid var(--gules); padding: 1px 4px; }
+
+	.estado-lista {
+		text-align: center;
+		padding: 20px;
+		font-size: 12px;
+		color: var(--argent-fraco);
+		list-style: none;
+	}
+
+	.erro-lista {
+		color: var(--gules);
+		display: flex;
+		flex-direction: column;
+		gap: 6px;
+		align-items: center;
+	}
+
+	.link-retry {
+		background: none;
+		border: none;
+		padding: 0;
+		color: var(--or);
+		font-size: 11px;
+		text-decoration: underline;
+		cursor: pointer;
+	}
 
 	.erro { color: var(--gules); font-size: 12px; margin: 0; }
 

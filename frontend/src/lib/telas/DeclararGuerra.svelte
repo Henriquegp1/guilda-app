@@ -10,9 +10,11 @@
 	let territóriosDisponíveis = $state<Territory[]>([]);
 	let ocupado = $state(false);
 	let erro = $state('');
+	let erroTerritorios = $state('');
 
 	async function carregarTerritorios() {
 		if (formato !== 'special' || tagInimiga.length < 2) return;
+		erroTerritorios = '';
 		try {
 			const res = await listarTerritorios();
 			// Apenas territórios da guilda alvo que NÃO estão protegidos
@@ -21,7 +23,8 @@
 				(!t.protected_until || +new Date(t.protected_until) < Date.now())
 			);
 		} catch (e) {
-			console.error(e);
+			territóriosDisponíveis = [];
+			erroTerritorios = 'Não foi possível verificar os territórios dessa guilda. Isso não significa que ela não tenha nenhum.';
 		}
 	}
 
@@ -94,6 +97,11 @@
 						<option value={t.id}>{t.name} (+{t.prestige_per_day} PPD)</option>
 					{/each}
 				</select>
+			{:else if erroTerritorios}
+				<p class="aviso-stake erro-checagem">
+					{erroTerritorios}
+					<button class="link-retry" onclick={carregarTerritorios}>Tentar de novo</button>
+				</p>
 			{:else}
 				<p class="aviso-stake">Nenhum território atacável encontrado para esta TAG.</p>
 			{/if}
@@ -160,6 +168,23 @@
 		font-size: 11px;
 		color: var(--gules);
 		margin: 0;
+	}
+
+	.erro-checagem {
+		display: flex;
+		flex-direction: column;
+		gap: 4px;
+		align-items: flex-start;
+	}
+
+	.link-retry {
+		background: none;
+		border: none;
+		padding: 0;
+		color: var(--or);
+		font-size: 11px;
+		text-decoration: underline;
+		cursor: pointer;
 	}
 
 	.erro { color: var(--gules); font-size: 12px; margin: 0; }

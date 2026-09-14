@@ -8,6 +8,11 @@
 	let valor = $state('');
 	let ocupado = $state(false);
 	let erro = $state('');
+	// Se os Bits já foram cobrados nesta tentativa mas o registro da troca
+	// falhou, guardamos o recibo pra reenviar SÓ o registro — nunca cobrar
+	// Bits de novo pela mesma solicitação por causa de uma falha de rede.
+	let ultimoRecibo = $state<string | null>(null);
+	let pagamentoNaoConfirmado = $state(false);
 
 	// Sincroniza valor inicial
 	$effect(() => {
@@ -20,6 +25,13 @@
 
 	const rotulo = $derived(tipo === 'name' ? 'Nome da Guilda' : 'TAG');
 	const preco = $derived(tipo === 'name' ? 500 : 300);
+
+	async function enviarRegistro(receipt: string) {
+		await post(`/guilds/${guilda.id}/identity/${tipo}`, {
+			value: valor,
+			transaction_receipt: receipt
+		});
+	}
 
 	async function solicitar() {
 		if (!regex.test(valor)) {
@@ -35,13 +47,39 @@
 		erro = '';
 		try {
 			const receipt = await gastarBits(`guild.${tipo === 'name' ? 'rename' : 'tag'}`);
-			await post(`/guilds/${guilda.id}/identity/${tipo}`, {
-				value: valor,
-				transaction_receipt: receipt
-			});
+			ultimoRecibo = receipt;
+			await enviarRegistro(receipt);
+			pagamentoNaoConfirmado = false;
 			aoSucesso();
 		} catch (e) {
-			erro = e instanceof Error ? e.message : 'Falha na solicitação';
+			if (ultimoRecibo) {
+				// Os Bits já foram debitados nesta tentativa — só o registro
+				// falhou. NÃO deixar o usuário pagar de novo por engano.
+				pagamentoNaoConfirmado = true;
+				erro =
+					(e instanceof Error ? e.message + ' ' : '') +
+					'Seus Bits já foram cobrados. Não pague de novo — toque em "Tentar registrar de novo".';
+			} else {
+				erro = e instanceof Error ? e.message : 'Falha na solicitação';
+			}
+		} finally {
+			ocupado = false;
+		}
+	}
+
+	async function tentarRegistrarNovamente() {
+		if (!ultimoRecibo) return;
+		ocupado = true;
+		erro = '';
+		try {
+			await enviarRegistro(ultimoRecibo);
+			pagamentoNaoConfirmado = false;
+			aoSucesso();
+		} catch (e) {
+			pagamentoNaoConfirmado = true;
+			erro =
+				(e instanceof Error ? e.message + ' ' : '') +
+				'Ainda não conseguimos registrar. Seus Bits continuam já pagos — pode tentar de novo sem pagar outra vez.';
 		} finally {
 			ocupado = false;
 		}
@@ -66,11 +104,21 @@
 		{/if}
 	</div>
 
-	{#if erro}<p class="erro">{erro}</p>{/if}
+	{#if erro}<p class="erro" class:aviso-pagamento={pagamentoNaoConfirmado}>{erro}</p>{/if}
 
 	<div class="acoes">
-		<button class="confirmar" disabled={ocupado || !valor} onclick={solicitar}>
-			{ocupado ? 'Processando...' : `Pagar ${preco} Bits e Solicitar`}
+		<button
+			class="confirmar"
+			disabled={ocupado || (!valor && !pagamentoNaoConfirmado)}
+			onclick={pagamentoNaoConfirmado ? tentarRegistrarNovamente : solicitar}
+		>
+			{#if ocupado}
+				Processando...
+			{:else if pagamentoNaoConfirmado}
+				Tentar registrar de novo (sem novo pagamento)
+			{:else}
+				Pagar {preco} Bits e Solicitar
+			{/if}
 		</button>
 	</div>
 </div>
@@ -122,6 +170,10 @@
 		color: var(--gules);
 		font-size: 12px;
 		margin: 8px 0 0;
+	}
+
+	.erro.aviso-pagamento {
+		color: var(--or);
 	}
 
 	.acoes {

@@ -9,14 +9,17 @@
 	let selecionada = $state<number | null>(null);
 	let podio = $state<{ position: number; tag: string; name: string; prestige_final: number }[]>([]);
 	let loading = $state(true);
+	let erroCarregar = $state('');
+	let erroPodio = $state('');
 
 	async function carregar() {
+		erroCarregar = '';
 		try {
 			const res = await listarTemporadas();
 			temporadas = res.items.filter((s) => s.status === 'closed' || s.status === 'archived');
 			if (temporadas.length > 0) verPodio(temporadas[0].id);
 		} catch (e) {
-			console.error(e);
+			erroCarregar = 'Não foi possível carregar o histórico de temporadas.';
 		} finally {
 			loading = false;
 		}
@@ -24,11 +27,13 @@
 
 	async function verPodio(id: number) {
 		selecionada = id;
+		erroPodio = '';
 		try {
 			const res = await buscarPodio(id);
 			podio = res.awards;
 		} catch (e) {
-			console.error(e);
+			podio = [];
+			erroPodio = 'Não foi possível carregar o pódio desta temporada.';
 		}
 	}
 
@@ -43,6 +48,11 @@
 
 	{#if loading}
 		<p class="centro">Consultando pergaminhos...</p>
+	{:else if erroCarregar}
+		<div class="centro erro-bloco">
+			<p>{erroCarregar}</p>
+			<button class="tentar-novo" onclick={carregar}>Tentar de novo</button>
+		</div>
 	{:else if temporadas.length === 0}
 		<p class="centro">Nenhuma temporada encerrada ainda.</p>
 	{:else}
@@ -67,6 +77,11 @@
 							<span class="pontos num">{a.prestige_final.toLocaleString('pt-BR')} <small>Poder</small></span>
 						</div>
 					{/each}
+				</div>
+			{:else if erroPodio}
+				<div class="centro erro-bloco">
+					<p>{erroPodio}</p>
+					<button class="tentar-novo" onclick={() => selecionada && verPodio(selecionada)}>Tentar de novo</button>
 				</div>
 			{:else}
 				<p class="centro">Apuração não concluída ou nenhum pódio registrado.</p>
@@ -151,4 +166,23 @@
 	.pontos small { display: block; font-size: 9px; text-transform: uppercase; color: var(--argent-fraco); }
 
 	.centro { padding: 40px; text-align: center; color: var(--argent-fraco); font-size: 12px; }
+
+	.erro-bloco {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		gap: 12px;
+		color: var(--gules);
+	}
+
+	.tentar-novo {
+		background: none;
+		border: 1px solid var(--or);
+		color: var(--or);
+		padding: 6px 16px;
+		font-size: 11px;
+		text-transform: uppercase;
+		border-radius: 2px;
+		cursor: pointer;
+	}
 </style>

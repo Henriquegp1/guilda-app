@@ -23,6 +23,11 @@
 	let passo = $state<'form' | 'pagando' | 'confirmando' | 'pendente'>('form');
 	let erro = $state('');
 	let rascunhoId = $state<number | null>(null);
+	// Se os Bits já foram cobrados nesta tentativa mas a confirmação falhou,
+	// guardamos o recibo pra poder reenviar SÓ a confirmação — nunca cobrar
+	// Bits de novo pela mesma guilda por causa de uma falha de rede.
+	let ultimoRecibo = $state<string | null>(null);
+	let pagamentoNaoConfirmado = $state(false);
 
 	$effect(() => {
 		temBits = bitsHabilitado();
@@ -83,10 +88,12 @@
 			// Se o loopback estiver ativo, enviamos o recibo fake direto para o nosso servidor
 			// ignorando a interface de pagamento da Twitch.
 			const recibo = loopback ? 'receipt-fake-123' : await gastarBits(sku);
+			ultimoRecibo = recibo;
 
 			passo = 'confirmando';
 			await confirmarPagamento(g.id, recibo);
 			passo = 'pendente';
+			pagamentoNaoConfirmado = false;
 			aoCriar();
 		} catch (e) {
 			if (e instanceof Error && e.message === 'BITS_CANCELADO') {
@@ -96,7 +103,34 @@
 				passo = 'form';
 				return;
 			}
-			erro = e instanceof ErroApi ? e.message : 'Não foi possível criar a guilda.';
+			if (ultimoRecibo) {
+				// Os Bits já foram debitados nesta tentativa — só a confirmação
+				// falhou. NÃO deixar o usuário pagar de novo por engano.
+				pagamentoNaoConfirmado = true;
+				erro =
+					(e instanceof ErroApi ? e.message + ' ' : '') +
+					'Seus Bits já foram cobrados. Não pague de novo — toque em "Tentar confirmar de novo".';
+			} else {
+				erro = e instanceof ErroApi ? e.message : 'Não foi possível criar a guilda.';
+			}
+			passo = 'form';
+		}
+	}
+
+	async function tentarConfirmarNovamente() {
+		if (!rascunhoId || !ultimoRecibo) return;
+		erro = '';
+		passo = 'confirmando';
+		try {
+			await confirmarPagamento(rascunhoId, ultimoRecibo);
+			passo = 'pendente';
+			pagamentoNaoConfirmado = false;
+			aoCriar();
+		} catch (e) {
+			pagamentoNaoConfirmado = true;
+			erro =
+				(e instanceof ErroApi ? e.message + ' ' : '') +
+				'Ainda não conseguimos confirmar. Seus Bits continuam já pagos — pode tentar de novo sem pagar outra vez.';
 			passo = 'form';
 		}
 	}
@@ -118,11 +152,11 @@
 	<form
 		onsubmit={(e) => {
 			e.preventDefault();
-			criar();
+			pagamentoNaoConfirmado ? tentarConfirmarNovamente() : criar();
 		}}
 	>
 		{#if erro}
-			<p class="erro" role="alert">{erro}</p>
+			<p class="erro" class:aviso-pagamento={pagamentoNaoConfirmado} role="alert">{erro}</p>
 		{/if}
 
 		<label>
@@ -160,9 +194,11 @@
 			</p>
 		{/if}
 
-		<button class="twitch" type="submit" disabled={!podeEnviar}>
+		<button class="twitch" type="submit" disabled={!podeEnviar && !pagamentoNaoConfirmado}>
 			{#if passo === 'pagando'}
 				Aguardando pagamento
+			{:else if pagamentoNaoConfirmado}
+				Tentar confirmar de novo (sem novo pagamento)
 			{:else if custo}
 				Criar por {custo} Bits
 			{:else}
@@ -263,6 +299,11 @@
 		padding-left: 10px;
 		border-left: 2px solid var(--gules);
 		font-size: 12px;
+	}
+
+	.erro.aviso-pagamento {
+		border-left-color: var(--or);
+		color: var(--argent);
 	}
 
 	.fim {

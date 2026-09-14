@@ -14,12 +14,14 @@
 	let territories = $state<Territory[]>([]);
 	let loading = $state(true);
 	let error = $state('');
+	let erroLista = $state('');
 	let editingId = $state<number | null>(null);
 
 	let bgUrlInput = $state('');
 	let bgAtual = $state<string | null>(null);
 	let salvandoBg = $state(false);
 	let msgBg = $state('');
+	let erroBgConfig = $state('');
 
 	let form = $state<Partial<Territory>>({
 		name: '',
@@ -30,15 +32,26 @@
 	});
 
 	async function load() {
+		erroLista = '';
+		loading = true;
 		try {
-			const [res, cfg] = await Promise.all([
+			const [res, cfgResult] = await Promise.allSettled([
 				listarTerritorios(),
-				obterMapConfig().catch(() => ({ background_url: null }))
+				obterMapConfig()
 			]);
-			territories = res.items;
-			bgAtual = cfg.background_url;
-		} catch (e) {
-			error = 'Falha ao carregar territórios.';
+
+			if (res.status === 'fulfilled') {
+				territories = res.value.items;
+			} else {
+				erroLista = 'Falha ao carregar territórios.';
+			}
+
+			if (cfgResult.status === 'fulfilled') {
+				bgAtual = cfgResult.value.background_url;
+				erroBgConfig = '';
+			} else {
+				erroBgConfig = 'Não foi possível verificar o fundo do mapa configurado (pode já existir um, mesmo não aparecendo aqui).';
+			}
 		} finally {
 			loading = false;
 		}
@@ -177,6 +190,13 @@
 			<p class="msg-bg" class:sucesso={msgBg.includes('sucesso') || msgBg.includes('removida')}>{msgBg}</p>
 		{/if}
 
+		{#if erroBgConfig}
+			<p class="msg-bg">
+				{erroBgConfig}
+				<button class="link-retry" onclick={load}>Tentar de novo</button>
+			</p>
+		{/if}
+
 		{#if bgAtual}
 			<div class="preview-bg">
 				<p>Fundo Atual:</p>
@@ -228,6 +248,11 @@
 
 		{#if loading}
 			<p>Carregando...</p>
+		{:else if erroLista}
+			<p class="erro">
+				{erroLista}
+				<button class="link-retry" onclick={load}>Tentar de novo</button>
+			</p>
 		{:else if territories.length === 0}
 			<p class="vazio">Nenhum território criado ainda.</p>
 		{:else}
@@ -450,6 +475,17 @@
 		color: var(--gules);
 		font-size: 12px;
 		margin-top: 12px;
+	}
+
+	.link-retry {
+		background: none;
+		border: none;
+		padding: 0;
+		margin-left: 6px;
+		color: var(--or);
+		font-size: 11px;
+		text-decoration: underline;
+		cursor: pointer;
 	}
 
 	.vazio {

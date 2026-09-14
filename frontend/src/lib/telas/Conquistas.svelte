@@ -54,7 +54,10 @@
 	{#if estado === 'carregando'}
 		<p class="centro">Carregando medalhas...</p>
 	{:else if estado === 'erro'}
-		<p class="centro erro">Falha ao carregar conquistas.</p>
+		<div class="centro erro">
+			<p>Falha ao carregar conquistas.</p>
+			<button class="tentar-novo" onclick={carregar}>Tentar de novo</button>
+		</div>
 	{:else}
 		<section class="secao">
 			<h3>Desbloqueadas <span class="num">{filtradas.length}</span></h3>
@@ -248,5 +251,16 @@
 	}
 
 	.centro { padding: 40px; text-align: center; color: var(--argent-fraco); }
-	.erro { color: var(--gules); }
+	.erro { color: var(--gules); display: flex; flex-direction: column; align-items: center; gap: 12px; }
+
+	.tentar-novo {
+		background: none;
+		border: 1px solid var(--or);
+		color: var(--or);
+		padding: 6px 16px;
+		font-size: 11px;
+		text-transform: uppercase;
+		border-radius: 2px;
+		cursor: pointer;
+	}
 </style>

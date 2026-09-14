@@ -63,13 +63,13 @@
 				<span class="status-badge ativo">Ativo</span>
 				<span class="label">Assinatura HMAC-SHA256 habilitada</span>
 			</div>
-			<button class="btn-rotacionar" onclick={() => (mostrarConfirmacao = true)}>
+			<button class="btn-rotacionar" onclick={() => { erro = ''; mostrarConfirmacao = true; }}>
 				🔄 Gerar Novo Segredo
 			</button>
 		</div>
 	{/if}
 
-	{#if erro}<p class="msg-erro">{erro}</p>{/if}
+	{#if erro && !mostrarConfirmacao}<p class="msg-erro">{erro}</p>{/if}
 
 	{#if mostrarConfirmacao}
 		<div class="modal-overlay">
@@ -79,10 +79,11 @@
 					Ao gerar um novo segredo, o atual entrará em período de expiração (24h). Você precisará
 					atualizar a configuração do seu bot com a nova chave.
 				</p>
+				{#if erro}<p class="msg-erro msg-erro-modal">{erro}</p>{/if}
 				<div class="modal-acoes">
 					<button class="btn-cancelar" onclick={() => (mostrarConfirmacao = false)}>Cancelar</button>
 					<button class="btn-confirmar" disabled={carregando} onclick={rotacionar}>
-						{carregando ? 'Gerando...' : 'Sim, Gerar Novo'}
+						{carregando ? 'Gerando...' : erro ? 'Tentar de novo' : 'Sim, Gerar Novo'}
 					</button>
 				</div>
 			</div>
@@ -197,6 +198,13 @@
 		color: var(--gules);
 		font-size: 12px;
 		margin-top: 12px;
+	}
+
+	.msg-erro-modal {
+		margin: -8px 0 16px;
+		padding: 8px;
+		background: rgba(166, 50, 50, 0.12);
+		border-radius: 2px;
 	}
 
 	.modal-overlay {

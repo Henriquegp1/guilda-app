@@ -2,7 +2,8 @@
 	import { onMount } from 'svelte';
 	import {
 		membros, alterarCargo, sair, expulsar, salvarSettingsGuilda,
-		obterPerfil, salvarPerfil, ErroApi, type Guilda, type Membro, type Cargo
+		obterPerfil, salvarPerfil, contribuicoesXp, contribuicoesXpSemana, ErroApi,
+		type Guilda, type Membro, type Cargo, type ContribuicaoMembro
 	} from '$lib/api';
 	import { entrarBloco } from '$lib/motion';
 	import { onAuth, pedirIdentidade, viewerStore } from '$lib/twitch';
@@ -11,6 +12,10 @@
 	let { guilda, cargoAtor, aoSair, aoAtualizar }: { guilda: Guilda; cargoAtor: Cargo; aoSair: () => void; aoAtualizar: () => void } = $props();
 
 	let lista = $state<Membro[]>([]);
+	let contribuicoes = $state<Map<string, ContribuicaoMembro>>(new Map());
+	let erroContribuicoes = $state('');
+	let topSemana = $state<ContribuicaoMembro[]>([]);
+	let erroTopSemana = $state('');
 	let meuId = $state('');
 	let meuNick = $state<string | null>(null);
 	let meuNickStatus = $state<string | null>(null);
@@ -34,6 +39,8 @@
 			temUserId = !!v.userId && !v.userId.startsWith('U');
 		});
 		carregar();
+		carregarContribuicoes();
+		carregarTopSemana();
 		carregarMeuPerfil();
 		return () => unsubViewer();
 	});
@@ -86,6 +93,28 @@
 			lista = res.members;
 		} catch (e) {
 			erro = 'Erro ao carregar membros.';
+		}
+	}
+
+	async function carregarContribuicoes() {
+		erroContribuicoes = '';
+		try {
+			// A rota pagina 25 por vez (máx. 50); para o tamanho atual de guilda
+			// (limite bem abaixo disso) uma página cobre todo mundo.
+			const res = await contribuicoesXp(guilda.id);
+			contribuicoes = new Map(res.items.map((c) => [c.user_id, c]));
+		} catch (e) {
+			erroContribuicoes = e instanceof ErroApi ? e.message : 'Não foi possível carregar a contribuição de XP.';
+		}
+	}
+
+	async function carregarTopSemana() {
+		erroTopSemana = '';
+		try {
+			const res = await contribuicoesXpSemana(guilda.id);
+			topSemana = res.items;
+		} catch (e) {
+			erroTopSemana = e instanceof ErroApi ? e.message : 'Não foi possível carregar o destaque da semana.';
 		}
 	}
 
@@ -184,6 +213,31 @@
 	{/if}
 
 	{#if erro}<p class="erro">{erro}</p>{/if}
+	{#if erroContribuicoes}
+		<p class="erro">
+			{erroContribuicoes}
+			<button class="link-retry" onclick={carregarContribuicoes}>Tentar de novo</button>
+		</p>
+	{/if}
+
+	{#if topSemana.length > 0}
+		<div class="top-semana">
+			<h4>🏆 Destaques da semana</h4>
+			<div class="top-lista">
+				{#each topSemana.slice(0, 3) as t, i}
+					<span class="top-item">
+						{['🥇', '🥈', '🥉'][i]} {lista.find(m => m.user_id === t.user_id)?.nickname || t.user_id}
+						<small>{t.xp_total.toLocaleString('pt-BR')} XP</small>
+					</span>
+				{/each}
+			</div>
+		</div>
+	{:else if erroTopSemana}
+		<p class="erro">
+			{erroTopSemana}
+			<button class="link-retry" onclick={carregarTopSemana}>Tentar de novo</button>
+		</p>
+	{/if}
 
 	<div class="lista">
 		{#each lista as m}
@@ -193,6 +247,12 @@
 						{m.user_id === meuId ? `🛡️ VOCÊ (${m.nickname || m.user_id})` : (m.nickname || `ID: ${m.user_id}`)}
 					</span>
 					<span class="cargo-atual">{m.role}</span>
+					{#if contribuicoes.has(m.user_id)}
+						<span class="contribuicao">
+							{contribuicoes.get(m.user_id)!.xp_total.toLocaleString('pt-BR')} XP
+							<small>(#{contribuicoes.get(m.user_id)!.rank} na guilda)</small>
+						</span>
+					{/if}
 				</div>
 
 				<div class="acoes">
@@ -308,6 +368,30 @@
 	.secao-modo select { background: var(--sable); color: var(--argent); border: 1px solid var(--borda); font-size: 10px; padding: 6px; border-radius: 2px; width: 100%; outline: none; }
 
 	.erro { color: var(--gules); font-size: 11px; margin-bottom: 8px; text-align: center; }
+
+	.top-semana {
+		background: rgba(212, 175, 55, 0.06);
+		border: 1px solid var(--or);
+		border-radius: 4px;
+		padding: 8px 10px;
+		margin-bottom: 10px;
+	}
+	.top-semana h4 { margin: 0 0 6px; font-size: 10px; text-transform: uppercase; color: var(--or); letter-spacing: 0.05em; }
+	.top-lista { display: flex; flex-direction: column; gap: 3px; }
+	.top-item { font-size: 11px; color: var(--argent); display: flex; justify-content: space-between; }
+	.top-item small { color: var(--argent-fraco); }
+
+	.link-retry {
+		background: none;
+		border: none;
+		padding: 0;
+		margin-left: 6px;
+		color: var(--or);
+		font-size: 11px;
+		text-decoration: underline;
+		cursor: pointer;
+	}
+
 	.lista { flex: 1; overflow-y: auto; overflow-x: hidden; display: flex; flex-direction: column; gap: 6px; padding-bottom: 12px; }
 	.membro { display: flex; align-items: center; justify-content: space-between; padding: 10px; background: var(--sable-2); border: 1px solid var(--borda); border-radius: 4px; width: 100%; }
 	.membro.eu { border-color: var(--or); background: rgba(212, 175, 55, 0.05); }
@@ -315,6 +399,19 @@
 	.info { display: flex; flex-direction: column; gap: 2px; }
 	.id { font-size: 10px; color: var(--argent); font-weight: bold; }
 	.cargo-atual { font-size: 9px; text-transform: uppercase; color: var(--or); opacity: 0.8; }
+	.contribuicao { font-size: 10px; color: var(--vert); margin-top: 2px; }
+	.contribuicao small { color: var(--argent-fraco); }
+
+	.link-retry {
+		background: none;
+		border: none;
+		padding: 0;
+		margin-left: 6px;
+		color: var(--or);
+		font-size: 11px;
+		text-decoration: underline;
+		cursor: pointer;
+	}
 
 	.acoes { display: flex; align-items: center; gap: 8px; }
 	select { background: var(--sable); color: var(--argent); border: 1px solid var(--borda); font-size: 10px; padding: 3px; border-radius: 2px; outline: none; }

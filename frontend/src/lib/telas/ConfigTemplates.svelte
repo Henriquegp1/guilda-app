@@ -65,16 +65,19 @@
 		}
 	}
 
-	let mensagem = $state('');
+	let mensagemPorEvento = $state<Record<string, { texto: string; tipo: 'ok' | 'erro' }>>({});
 
 	async function testar(type: string) {
 		ocupado = type + '-test';
-		mensagem = '';
+		mensagemPorEvento[type] = { texto: '', tipo: 'ok' };
 		try {
 			await testarEventoAnuncio(type);
-			mensagem = 'Teste disparado! Verifique seu chat.';
+			mensagemPorEvento[type] = { texto: 'Teste disparado! Verifique seu chat.', tipo: 'ok' };
 		} catch (e) {
-			mensagem = e instanceof ErroApi ? e.message : 'Erro ao disparar teste.';
+			mensagemPorEvento[type] = {
+				texto: e instanceof ErroApi ? e.message : 'Erro ao disparar teste.',
+				tipo: 'erro'
+			};
 		} finally {
 			ocupado = null;
 		}
@@ -162,11 +165,16 @@
 									{ocupado === ev.event_type ? 'Salvando...' : 'Salvar Mudanças'}
 								</button>
 								<button class="btn-testar" disabled={ocupado?.includes('test')} onclick={() => testar(ev.event_type)}>
-									🧪 Testar no Chat
+									{ocupado === ev.event_type + '-test' ? 'Disparando...' : '🧪 Testar no Chat'}
 								</button>
 								{#if statusMsg[ev.event_type]}
 									<span class="status {statusMsg[ev.event_type].tipo}">
 										{statusMsg[ev.event_type].texto}
+									</span>
+								{/if}
+								{#if mensagemPorEvento[ev.event_type]}
+									<span class="status {mensagemPorEvento[ev.event_type].tipo}">
+										{mensagemPorEvento[ev.event_type].texto}
 									</span>
 								{/if}
 							</div>

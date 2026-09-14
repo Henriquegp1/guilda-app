@@ -303,6 +303,13 @@ export const sair = (gid: number) => chamar<void>(`/guilds/${gid}/members/me`, {
 export const expulsar = (gid: number, uid: string) =>
 	chamar<void>(`/guilds/${gid}/members/${uid}`, { metodo: 'DELETE' });
 export const membros = (gid: number) => get<{ members: Membro[] }>(`/guilds/${gid}/members`);
+export type ContribuicaoMembro = { user_id: string; xp_total: number; rank: number };
+export const contribuicoesXp = (gid: number, cursor?: string) =>
+	get<{ items: ContribuicaoMembro[]; next_cursor: string | null }>(
+		`/guilds/${gid}/xp/contributions${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ''}`
+	);
+export const contribuicoesXpSemana = (gid: number) =>
+	get<{ week: string; items: ContribuicaoMembro[] }>(`/guilds/${gid}/xp/contributions/weekly`);
 export const alterarCargo = (gid: number, uid: string, role: Cargo) =>
 	chamar<{ user_id: string; from_role: Cargo; to_role: Cargo }>(`/guilds/${gid}/members/${uid}/role`, {
 		metodo: 'PATCH',
@@ -397,6 +404,31 @@ export type ProgressoSemanal = {
 	points: number;
 };
 export const progressoSemanal = (gid: number) => get<ProgressoSemanal>(`/guilds/${gid}/weekly-progress`);
+export type ResumoSemanal = {
+	week: string;
+	xp_gained: number;
+	prestige_gained: number;
+	wars_won: number;
+	new_members: number;
+	territories_conquered: number;
+};
+export const resumoSemanal = (gid: number) => get<ResumoSemanal>(`/guilds/${gid}/weekly-summary`);
+
+export type MissaoUniforme = { code: string; label: string; progress: number; target: number; completed: boolean };
+export type MissaoMembros = {
+	code: 'members_active';
+	label: string;
+	progress_members: number;
+	progress_days: number;
+	target: number;
+	completed: boolean;
+};
+export type MissaoSemanal = MissaoUniforme | MissaoMembros;
+export const missoesSemanal = (gid: number) =>
+	get<{ week: string; items: MissaoSemanal[] }>(`/guilds/${gid}/weekly-missions`);
+
+export type MissaoDiaria = { code: string; label: string; progress: number; target: number; completed: boolean };
+export const missoesDiarias = () => get<{ day: string; items: MissaoDiaria[] }>('/me/daily-missions');
 export const carregarConquistas = (gid: number) =>
 	get<{ unlocked: Achievement[]; progress: AchievementProgress[] }>(`/guilds/${gid}/achievements`);
 

@@ -471,40 +471,6 @@ export default async function seasons (app) {
       return { season_id: 0, position: null, prestige: 0, delta_position: null, live: false }
     }
 
-    app.get('/guilds/:gid/weekly-progress', async (req) => {
-      const cid = req.auth.channelId
-      const guild = await getGuild({ query }, cid, req.params.gid)
-      const { key, start, end } = weekRange()
-      const { rows: [progress] } = await query(
-        `SELECT count(DISTINCT e.actor_user_id)::int AS members,
-                count(DISTINCT (e.created_at AT TIME ZONE 'UTC')::date)::int AS days
-           FROM guild_event e
-           JOIN guild_member gm
-             ON gm.channel_id = e.channel_id
-            AND gm.guild_id = $1
-            AND gm.user_id = e.actor_user_id
-          WHERE e.channel_id = $2
-            AND e.type = ANY($3)
-            AND e.actor_user_id IS NOT NULL
-            AND e.created_at >= $4
-            AND e.created_at < $5`,
-        [guild.id, cid, ACTIVITY_TYPES, start, end])
-
-      const members = Number(progress?.members ?? 0)
-      const days = Number(progress?.days ?? 0)
-      return {
-        week: key,
-        objective: WEEKLY_OBJECTIVE.code,
-        description: WEEKLY_OBJECTIVE.description,
-        members,
-        days,
-        target_members: WEEKLY_OBJECTIVE.min_members,
-        target_days: WEEKLY_OBJECTIVE.min_days,
-        completed: weeklyObjectiveMet({ members, days }),
-        points: WEEKLY_OBJECTIVE.points,
-      }
-    })
-
     const season = req.query.season_id
       ? await getSeason({ query }, cid, req.query.season_id).catch(() => null)
       : await currentSeason({ query }, cid)
@@ -531,6 +497,159 @@ export default async function seasons (app) {
       prestige: live.prestige,
       delta_position: prev ? prev.position - num(live.position) : null,   // + = subiu
       live: true,
+    }
+  })
+
+  app.get('/guilds/:gid/weekly-progress', async (req) => {
+    const cid = req.auth.channelId
+    const guild = await getGuild({ query }, cid, req.params.gid)
+    const { key, start, end } = weekRange()
+    const { rows: [progress] } = await query(
+      `SELECT count(DISTINCT e.actor_user_id)::int AS members,
+              count(DISTINCT (e.created_at AT TIME ZONE 'UTC')::date)::int AS days
+         FROM guild_event e
+         JOIN guild_member gm
+           ON gm.channel_id = e.channel_id
+          AND gm.guild_id = $1
+          AND gm.user_id = e.actor_user_id
+        WHERE e.channel_id = $2
+          AND e.type = ANY($3)
+          AND e.actor_user_id IS NOT NULL
+          AND e.created_at >= $4
+          AND e.created_at < $5`,
+      [guild.id, cid, ACTIVITY_TYPES, start, end])
+
+    const members = Number(progress?.members ?? 0)
+    const days = Number(progress?.days ?? 0)
+    return {
+      week: key,
+      objective: WEEKLY_OBJECTIVE.code,
+      description: WEEKLY_OBJECTIVE.description,
+      members,
+      days,
+      target_members: WEEKLY_OBJECTIVE.min_members,
+      target_days: WEEKLY_OBJECTIVE.min_days,
+      completed: weeklyObjectiveMet({ members, days }),
+      points: WEEKLY_OBJECTIVE.points,
+    }
+  })
+
+  /**
+   * Resumo semanal completo (plano §3). Junta cinco fontes que já existem
+   * espalhadas — XP (guild_xp_entry), prestígio (prestige_ledger), guerras
+   * (war.settled_at + winner_guild_id), membros novos (guild_member.joined_at)
+   * e territórios (territory_holding.acquired_at) — numa janela só, a mesma
+   * semana de weekly-progress (weekRange).
+   */
+  app.get('/guilds/:gid/weekly-summary', async (req) => {
+    const cid = req.auth.channelId
+    const guild = await getGuild({ query }, cid, req.params.gid)
+    await requireMembership(req, guild)
+    const { key, start, end } = weekRange()
+    const season = await currentSeason({ query }, cid)
+
+    const [xp, prestige, wars, members, territories] = await Promise.all([
+      query(
+        `SELECT coalesce(sum(amount), 0)::bigint AS total FROM guild_xp_entry
+          WHERE guild_id = $1 AND created_at >= $2 AND created_at < $3`,
+        [guild.id, start, end]),
+      season
+        ? query(
+            `SELECT coalesce(sum(points), 0)::int AS total FROM prestige_ledger
+              WHERE guild_id = $1 AND season_id = $2 AND created_at >= $3 AND created_at < $4`,
+            [guild.id, season.id, start, end])
+        : Promise.resolve({ rows: [{ total: 0 }] }),
+      query(
+        `SELECT count(*)::int AS total FROM war
+          WHERE winner_guild_id = $1 AND status = 'settled'
+            AND settled_at >= $2 AND settled_at < $3`,
+        [guild.id, start, end]),
+      query(
+        `SELECT count(*)::int AS total FROM guild_member
+          WHERE guild_id = $1 AND joined_at >= $2 AND joined_at < $3`,
+        [guild.id, start, end]),
+      query(
+        `SELECT count(*)::int AS total FROM territory_holding
+          WHERE guild_id = $1 AND acquired_at >= $2 AND acquired_at < $3`,
+        [guild.id, start, end]),
+    ])
+
+    return {
+      week: key,
+      xp_gained: num(xp.rows[0]?.total),
+      prestige_gained: num(prestige.rows[0]?.total),
+      wars_won: num(wars.rows[0]?.total),
+      new_members: num(members.rows[0]?.total),
+      territories_conquered: num(territories.rows[0]?.total),
+    }
+  })
+
+  /**
+   * Missões semanais coletivas (plano §2), exemplos do próprio plano. Mesma
+   * lógica de weekly-summary: nada persistido, tudo derivado das mesmas
+   * tabelas na janela da semana corrente.
+   */
+  app.get('/guilds/:gid/weekly-missions', async (req) => {
+    const cid = req.auth.channelId
+    const guild = await getGuild({ query }, cid, req.params.gid)
+    await requireMembership(req, guild)
+    const { key, start, end } = weekRange()
+
+    const [activity, events, wars, territories] = await Promise.all([
+      query(
+        `SELECT count(DISTINCT e.actor_user_id)::int AS members,
+                count(DISTINCT (e.created_at AT TIME ZONE 'UTC')::date)::int AS days
+           FROM guild_event e
+           JOIN guild_member gm
+             ON gm.channel_id = e.channel_id AND gm.guild_id = $1 AND gm.user_id = e.actor_user_id
+          WHERE e.channel_id = $2 AND e.type = ANY($3) AND e.actor_user_id IS NOT NULL
+            AND e.created_at >= $4 AND e.created_at < $5`,
+        [guild.id, cid, ACTIVITY_TYPES, start, end]),
+      query(
+        `SELECT count(*)::int AS total
+           FROM guild_event e
+           JOIN guild_member gm
+             ON gm.channel_id = e.channel_id AND gm.guild_id = $1 AND gm.user_id = e.actor_user_id
+          WHERE e.channel_id = $2 AND e.type = 'event.participate'
+            AND e.created_at >= $3 AND e.created_at < $4`,
+        [guild.id, cid, start, end]),
+      query(
+        `SELECT count(*)::int AS total FROM war
+          WHERE winner_guild_id = $1 AND status = 'settled'
+            AND settled_at >= $2 AND settled_at < $3`,
+        [guild.id, start, end]),
+      query(
+        `SELECT count(*)::int AS total FROM territory_holding
+          WHERE guild_id = $1 AND acquired_at >= $2 AND acquired_at < $3`,
+        [guild.id, start, end]),
+    ])
+
+    const members = num(activity.rows[0]?.members)
+    const days = num(activity.rows[0]?.days)
+    const eventos = num(events.rows[0]?.total)
+    const vitorias = num(wars.rows[0]?.total)
+    const territoriosGanhos = num(territories.rows[0]?.total)
+
+    const missao = (code, label, progress, target) =>
+      ({ code, label, progress: Math.min(progress, target), target, completed: progress >= target })
+
+    return {
+      week: key,
+      items: [
+        {
+          code: 'members_active',
+          label: '3 membros ativos em 3 dias',
+          // Dois critérios independentes — não dá pra resumir num só progresso
+          // sem esconder qual dos dois ainda falta.
+          progress_members: Math.min(members, 3),
+          progress_days: Math.min(days, 3),
+          target: 3,
+          completed: members >= 3 && days >= 3,
+        },
+        missao('events_participate', 'Participar de 4 eventos', eventos, 4),
+        missao('territory_conquer', 'Conquistar 1 território', territoriosGanhos, 1),
+        missao('war_win', 'Vencer uma guerra', vitorias, 1),
+      ],
     }
   })
 

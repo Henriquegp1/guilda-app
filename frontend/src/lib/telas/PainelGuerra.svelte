@@ -14,14 +14,17 @@
 	let editandoRoster = $state(false);
 	let ocupado = $state(false);
 	let rosterAtual = $state<WarRosterItem[]>([]);
+	let erroRoster = $state('');
+	let erroResposta = $state('');
 
 	async function carregarRoster() {
 		if ($guerraStore) {
+			erroRoster = '';
 			try {
 				const res = await warDetails($guerraStore.id);
 				rosterAtual = res.roster.filter((r) => r.guild_id === guilda.id);
 			} catch (e) {
-				console.error(e);
+				erroRoster = 'Não foi possível confirmar a escalação atual.';
 			}
 		}
 	}
@@ -39,12 +42,16 @@
 
 	async function responder(id: number, acao: 'aceitar' | 'recusar') {
 		ocupado = true;
+		erroResposta = '';
 		try {
 			if (acao === 'aceitar') await aceitarGuerra(id);
 			else await recusarGuerra(id);
 			await wars.atualizar();
 		} catch (e) {
-			console.error(e);
+			erroResposta =
+				acao === 'aceitar'
+					? 'Não foi possível aceitar a guerra. A guerra continua pendente — tente de novo.'
+					: 'Não foi possível recusar a guerra. A guerra continua pendente — tente de novo.';
 		} finally {
 			ocupado = false;
 		}
@@ -138,6 +145,12 @@
 						<button class="ajuste-roster" onclick={() => (editandoRoster = true)}>
 							Escalar Time ({rosterAtual.length}/{$guerraStore.roster_size})
 						</button>
+						{#if erroRoster}
+							<p class="erro-guerra">
+								{erroRoster}
+								<button class="link-retry" onclick={carregarRoster}>Tentar de novo</button>
+							</p>
+						{/if}
 						{#if $guerraStore.status === 'pending' && $guerraStore.defender_guild_id === guilda.id}
 							<div class="botoes-pendente">
 								<button
@@ -151,6 +164,9 @@
 									onclick={() => responder($guerraStore!.id, 'recusar')}>Recusar</button
 								>
 							</div>
+							{#if erroResposta}
+								<p class="erro-guerra" role="alert">{erroResposta}</p>
+							{/if}
 						{/if}
 					{/if}
 				{:else if $guerraStore.status === 'active'}
@@ -317,6 +333,24 @@
 		padding: 6px;
 		font-size: 11px;
 		text-transform: uppercase;
+		cursor: pointer;
+	}
+
+	.erro-guerra {
+		margin: 8px 0 0;
+		font-size: 11px;
+		color: var(--gules);
+		text-align: center;
+	}
+
+	.link-retry {
+		background: none;
+		border: none;
+		padding: 0;
+		margin-left: 6px;
+		color: var(--or);
+		font-size: 11px;
+		text-decoration: underline;
 		cursor: pointer;
 	}
 </style>

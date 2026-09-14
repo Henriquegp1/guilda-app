@@ -37,15 +37,21 @@
 	let nivelGuilda = $state(0);
 	let ocupado = $state(false);
 	let erro = $state('');
+	let sucesso = $state('');
+	let erroCarregar = $state('');
 
 	async function carregarDados() {
 		if (!guilda?.id) return;
+		erroCarregar = '';
 		try {
 			const res = await carregarPosses(guilda.id);
 			posses = new Set(res.assets);
 			nivelGuilda = res.level;
 		} catch (e) {
-			console.error('Erro ao carregar posses:', e);
+			erroCarregar =
+				e instanceof ErroApi
+					? e.message
+					: 'Não foi possível confirmar seus itens e nível. Os itens pagos podem aparecer como bloqueados por engano.';
 		}
 	}
 
@@ -100,11 +106,14 @@
 
 	async function comprar(asset: Asset) {
 		ocupado = true;
+		erro = '';
+		sucesso = '';
 		try {
 			const receipt = await gastarBits(`asset.${asset.id}`);
 			await comprarAsset(guilda.id, { asset_id: asset.id, transaction_receipt: receipt });
 			await carregarDados();
 			rascunho[asset.layer] = asset.id;
+			sucesso = 'Item comprado e adicionado à guilda.';
 		} catch (e) {
 			erro = e instanceof ErroApi ? e.message : e instanceof Error ? e.message : 'Falha na compra';
 		} finally {
@@ -172,6 +181,13 @@
 		</div>
 	</div>
 
+	{#if erroCarregar}
+		<div class="aviso-carregamento" role="alert">
+			<span>{erroCarregar}</span>
+			<button onclick={carregarDados}>Tentar de novo</button>
+		</div>
+	{/if}
+
 	<div class="corpo-rolavel">
 		<nav class="abas">
 			{#each categorias as cat}
@@ -228,6 +244,7 @@
 
 		<div class="rodape">
 			{#if erro}<p class="erro">{erro}</p>{/if}
+			{#if sucesso}<p class="sucesso">{sucesso}</p>{/if}
 			<div class="salvar-container">
 				<button class="salvar" disabled={ocupado} onclick={salvar}>
 					{ocupado ? 'Salvando...' : 'Salvar'}
@@ -442,6 +459,37 @@
 		font-size: 11px;
 		margin: 0;
 		text-align: center;
+	}
+
+	.sucesso {
+		color: var(--vert);
+		font-size: 11px;
+		margin: 0;
+		text-align: center;
+	}
+
+	.aviso-carregamento {
+		flex-shrink: 0;
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 10px;
+		padding: 8px 16px;
+		background: rgba(212, 0, 0, 0.08);
+		border-bottom: 1px solid var(--borda);
+		color: var(--argent);
+		font-size: 11px;
+	}
+
+	.aviso-carregamento button {
+		flex-shrink: 0;
+		background: none;
+		border: 1px solid var(--gules);
+		color: var(--argent);
+		font-size: 10px;
+		padding: 4px 8px;
+		border-radius: 3px;
+		cursor: pointer;
 	}
 
 	.creditos-footer {

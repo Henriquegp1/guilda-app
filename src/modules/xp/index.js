@@ -7,6 +7,7 @@ import {
   xpForLevel, xpToNext,
 } from './curve.js'
 import { DAILY_CAP, REVERSAL, RULES, earn, publicTable } from './rules.js'
+import { weekRange } from '../seasons/prestige.js'
 
 /**
  * Fase 03 — Progressão. Este módulo é quase todo CONSUMIDOR: lê `guild_event`,
@@ -44,7 +45,7 @@ function requireUser (auth) {
  * O UPSERT existe pelo lado do lock: ele trava a linha do par (canal, usuário) e
  * serializa dois eventos concorrentes do mesmo membro no mesmo dia.
  */
-async function usageOf (client, channelId, userId, day, type) {
+export async function usageOf (client, channelId, userId, day, type) {
   const { rows: [d] } = await client.query(
     `INSERT INTO member_xp_daily (channel_id, user_id, day) VALUES ($1, $2, $3)
      ON CONFLICT (channel_id, user_id, day)
@@ -284,6 +285,37 @@ export default async function xp (app) {
     }
   })
 
+  /**
+   * "Quem mais ajudou a guilda na semana" (plano §2). Diferente da contribuição
+   * total (guild_member_xp, um cache incremental), a janela semanal precisa
+   * somar o ledger bruto (guild_xp_entry) — não existe um agregado incremental
+   * por semana, então isso é sempre um scan da semana corrente, nunca do
+   * histórico inteiro.
+   */
+  app.get('/guilds/:gid/xp/contributions/weekly', async (req) => {
+    const cid = req.auth.channelId
+    const guild = await getGuild({ query }, cid, req.params.gid)
+    await requireMembership(req, guild)
+
+    const limit = Math.min(Math.max(Number(req.query.limit) || 10, 1), 50)
+    const { key, start, end } = weekRange()
+    const { rows } = await query(
+      `SELECT user_id, sum(amount)::bigint AS xp_total,
+              row_number() OVER (ORDER BY sum(amount) DESC, user_id) AS rank
+         FROM guild_xp_entry
+        WHERE guild_id = $1 AND channel_id = $2 AND user_id IS NOT NULL
+          AND created_at >= $3 AND created_at < $4
+        GROUP BY user_id
+       HAVING sum(amount) > 0
+        ORDER BY xp_total DESC, user_id LIMIT $5`,
+      [guild.id, cid, start, end, limit])
+
+    return {
+      week: key,
+      items: rows.map(r => ({ user_id: r.user_id, xp_total: num(r.xp_total), rank: num(r.rank) })),
+    }
+  })
+
   // Aba de histórico: desbloqueio de Nv.12 (§6, R11).
   app.get('/guilds/:gid/xp/history', async (req) => {
     const guild = await getGuild({ query }, req.auth.channelId, req.params.gid)
@@ -312,6 +344,34 @@ export default async function xp (app) {
       cap: DAILY_CAP,
       ticks_today: d?.watch_ticks ?? 0,
       eligible_at: eligibleAt,
+    }
+  })
+
+  /**
+   * Missões diárias simples (plano §2), calculadas em cima do que já existe em
+   * member_xp_daily/guild_xp_entry via usageOf — sem tabela nova, sem estado de
+   * missão persistido. O alvo de cada missão é uma fração do teto da própria
+   * fonte em rules.js: pedir o teto inteiro (18 watch.tick, por ex.) tornaria a
+   * missão indistinguível de "jogar o dia todo", o que o plano pede pra evitar.
+   */
+  const DAILY_MISSIONS = [
+    { code: 'watch.tick', label: 'Assista à live', target: 5 },
+    { code: 'chat.message', label: 'Converse no chat', target: 5 },
+    { code: 'event.participate', label: 'Participe de um evento', target: 1 },
+  ]
+
+  app.get('/me/daily-missions', async (req) => {
+    const cid = req.auth.channelId
+    const userId = requireUser(req.auth)
+    const day = utcDay()
+    const { bySource } = await usageOf({ query }, cid, userId, day)
+
+    return {
+      day,
+      items: DAILY_MISSIONS.map(m => {
+        const progress = Math.min(m.target, bySource[m.code]?.count ?? 0)
+        return { code: m.code, label: m.label, progress, target: m.target, completed: progress >= m.target }
+      }),
     }
   })
 

@@ -7,11 +7,13 @@
 	let territories = $state<Territory[]>([]);
 	let mapBgUrl = $state<string | null>(null);
 	let loading = $state(true);
+	let erroCarregar = $state('');
 	let selectedId = $state<number | null>(null);
 	let ocupado = $state(false);
 	let mensagem = $state('');
 
 	async function load() {
+		erroCarregar = '';
 		try {
 			const [res, cfg] = await Promise.all([
 				listarTerritorios(),
@@ -20,7 +22,7 @@
 			territories = res.items.filter((t) => t.enabled);
 			mapBgUrl = cfg.background_url;
 		} catch (e) {
-			console.error('Erro ao carregar mapa:', e);
+			erroCarregar = 'Não foi possível carregar os territórios do mapa.';
 		} finally {
 			loading = false;
 		}
@@ -57,6 +59,11 @@
 <div class="mapa-container">
 	{#if loading}
 		<p class="centro">Carregando Mapa...</p>
+	{:else if erroCarregar}
+		<div class="centro erro-mapa">
+			<p>{erroCarregar}</p>
+			<button class="tentar-novo" onclick={load}>Tentar de novo</button>
+		</div>
 	{:else}
 		<div class="viewport">
 			<svg viewBox="0 0 1000 1000" class="mapa-svg">
@@ -309,5 +316,30 @@
 		padding: 40px;
 		text-align: center;
 		color: var(--argent-fraco);
+	}
+
+	.erro-mapa {
+		flex: 1;
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		justify-content: center;
+		gap: 12px;
+	}
+
+	.erro-mapa p {
+		color: var(--gules);
+		margin: 0;
+	}
+
+	.tentar-novo {
+		background: none;
+		border: 1px solid var(--or);
+		color: var(--or);
+		padding: 6px 16px;
+		font-size: 11px;
+		text-transform: uppercase;
+		border-radius: 2px;
+		cursor: pointer;
 	}
 </style>
