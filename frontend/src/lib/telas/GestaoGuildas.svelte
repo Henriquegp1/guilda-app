@@ -8,6 +8,9 @@
 		reativarGuilda,
 		banirGuilda,
 		transferirLiderancaMod,
+		editarGuildaMod,
+		ajustarXpMod,
+		ajustarPrestigioMod,
 		membrosModeracao,
 		apagarGuilda,
 		ErroApi,
@@ -29,10 +32,13 @@
 	// Controle do Modal
 	let modalAberto = $state(false);
 	let guildaAlvo = $state<Guilda | null>(null);
-	let acaoAlvo = $state<'suspender' | 'reativar' | 'banir' | 'transferir' | 'apagar' | null>(null);
+	let acaoAlvo = $state<'suspender' | 'reativar' | 'banir' | 'transferir' | 'apagar' | 'editar' | 'xp' | 'prestigio' | null>(null);
 	let motivoInput = $state('');
 	let novoLiderId = $state('');
 	let confirmacaoTag = $state('');
+	let editNomeInput = $state('');
+	let editDescInput = $state('');
+	let ajusteQtdInput = $state('');
 
 	async function carregar() {
 		try {
@@ -59,6 +65,9 @@
 		motivoInput = '';
 		novoLiderId = '';
 		confirmacaoTag = '';
+		editNomeInput = g.name;
+		editDescInput = g.description ?? '';
+		ajusteQtdInput = '';
 		modalAberto = true;
 	}
 
@@ -83,7 +92,7 @@
 		if (!guildaAlvo || !acaoAlvo) return;
 		erro = '';
 
-		if (acaoAlvo !== 'reativar' && acaoAlvo !== 'apagar' && !motivoInput.trim()) {
+		if (!['reativar', 'apagar', 'editar'].includes(acaoAlvo) && !motivoInput.trim()) {
 			erro = 'O motivo é obrigatório.';
 			return;
 		}
@@ -97,6 +106,25 @@
 			return;
 		}
 
+		let quantidade = 0;
+		if (acaoAlvo === 'xp' || acaoAlvo === 'prestigio') {
+			quantidade = Math.trunc(Number(ajusteQtdInput));
+			if (!Number.isFinite(quantidade) || quantidade === 0) {
+				erro = 'Informe uma quantidade inteira diferente de zero (pode ser negativa).';
+				return;
+			}
+		}
+
+		let camposEditados: { name?: string; description?: string } = {};
+		if (acaoAlvo === 'editar') {
+			if (editNomeInput.trim() !== guildaAlvo.name) camposEditados.name = editNomeInput.trim();
+			if (editDescInput.trim() !== (guildaAlvo.description ?? '')) camposEditados.description = editDescInput.trim();
+			if (!Object.keys(camposEditados).length) {
+				erro = 'Nada foi alterado.';
+				return;
+			}
+		}
+
 		const id = guildaAlvo.id;
 		ocupado = id;
 		modalAberto = false;
@@ -107,6 +135,9 @@
 			else if (acaoAlvo === 'banir') await banirGuilda(id, motivoInput);
 			else if (acaoAlvo === 'transferir') await transferirLiderancaMod(id, novoLiderId, motivoInput);
 			else if (acaoAlvo === 'apagar') await apagarGuilda(id);
+			else if (acaoAlvo === 'editar') await editarGuildaMod(id, camposEditados);
+			else if (acaoAlvo === 'xp') await ajustarXpMod(id, quantidade, motivoInput);
+			else if (acaoAlvo === 'prestigio') await ajustarPrestigioMod(id, quantidade, motivoInput);
 			await carregar();
 		} catch (e) {
 			erro = e instanceof ErroApi ? e.message : 'Erro na operação.';
@@ -138,7 +169,7 @@
 
 				<span class="total">{total} guildas</span>
 			</div>
-			<button class="btn-refresh" onclick={carregar}>🔄</button>
+			<button class="btn-refresh" onclick={carregar} aria-label="Atualizar lista">🔄</button>
 		</header>
 
 		<table class="tabela">
@@ -160,6 +191,8 @@
 						<td><small class="num">{g.leader_user_id}</small></td>
 						<td class="btns">
 							<button class="btn-members" onclick={() => alternarMembros(g)}>{membrosAbertos.has(g.id) ? 'Ocultar' : 'Membros'}</button>
+							<button class="btn-edit" onclick={() => abrirModal(g, 'editar')}>Editar</button>
+							<button class="btn-xp" onclick={() => abrirModal(g, 'xp')}>XP</button>
 							{#if g.status === 'active' || g.status === 'overflow'}
 								<button class="btn-suspend" onclick={() => abrirModal(g, 'suspender')}>Pausar</button>
 							{/if}
@@ -168,6 +201,7 @@
 							{/if}
 
 							{#if role === 'broadcaster'}
+								<button class="btn-prestige" onclick={() => abrirModal(g, 'prestigio')}>Prestígio</button>
 								<button class="btn-ban" onclick={() => abrirModal(g, 'banir')}>Banir</button>
 								<button class="btn-transfer" onclick={() => abrirModal(g, 'transferir')}>Líder</button>
 								<button class="btn-delete" onclick={() => abrirModal(g, 'apagar')}>Apagar</button>
@@ -214,12 +248,29 @@
 			<label for="confirmacao-tag">Digite a TAG {guildaAlvo?.tag} para confirmar</label>
 			<input id="confirmacao-tag" type="text" bind:value={confirmacaoTag} autocomplete="off" />
 		</div>
+	{:else if acaoAlvo === 'editar'}
+		<div class="form-modal">
+			<div class="field">
+				<label for="edit-nome">Nome</label>
+				<input id="edit-nome" type="text" bind:value={editNomeInput} maxlength="32" />
+			</div>
+			<div class="field">
+				<label for="edit-desc">Descrição</label>
+				<textarea id="edit-desc" bind:value={editDescInput} maxlength="280" placeholder="Sem descrição"></textarea>
+			</div>
+			<p class="aviso-modal">Cada campo alterado gera uma linha própria no Log de Auditoria (antes/depois).</p>
+		</div>
 	{:else}
 		<div class="form-modal">
 			{#if acaoAlvo === 'transferir'}
 				<div class="field">
 					<label for="novo-lider-id">ID do Novo Líder (Twitch ID)</label>
 					<input id="novo-lider-id" type="text" bind:value={novoLiderId} placeholder="Ex: 12345678" />
+				</div>
+			{:else if acaoAlvo === 'xp' || acaoAlvo === 'prestigio'}
+				<div class="field">
+					<label for="ajuste-qtd">Quantidade de {acaoAlvo === 'xp' ? 'XP' : 'Prestígio'} (negativo para remover)</label>
+					<input id="ajuste-qtd" type="number" bind:value={ajusteQtdInput} placeholder="Ex: 500 ou -200" />
 				</div>
 			{/if}
 			<div class="field">
@@ -281,6 +332,9 @@
 	}
 
 	button:hover { border-color: var(--argent); color: var(--argent); }
+	.btn-edit:hover { border-color: var(--or); color: var(--or); }
+	.btn-xp:hover { border-color: var(--or); color: var(--or); }
+	.btn-prestige:hover { border-color: var(--or); color: var(--or); }
 	.btn-ban:hover { border-color: var(--gules); color: var(--gules); }
 	.btn-delete:hover { border-color: var(--gules); color: var(--gules); }
 	.btn-reactivate:hover { border-color: var(--vert); color: var(--vert); }

@@ -6,6 +6,10 @@
 		configAnuncio,
 		salvarConfigAnuncio,
 		temporadaAtual,
+		criarTemporada,
+		editarTemporada,
+		encerrarTemporada,
+		recalcularTemporada,
 		ErroApi,
 		type Temporada
 	} from '$lib/api';
@@ -21,6 +25,88 @@
 
 	let anuncio = $state<any>({});
 	let temporada = $state<Temporada | null>(null);
+
+	// Painel de temporada: criar quando não há nenhuma ativa/agendada, ou
+	// editar nome/fim, encerrar antes da hora e recalcular a que existe.
+	// Toda a rota já existia (/mod/seasons*) sem nenhuma tela em cima.
+	let editandoTemporada = $state(false);
+	let novaTempNome = $state('');
+	let novaTempFim = $state('');
+	let ocupadoTemp = $state(false);
+	let erroTemp = $state('');
+	let msgTemp = $state('');
+	let confirmandoEncerrar = $state(false);
+	let motivoEncerrar = $state('');
+
+	function abrirEdicaoTemporada() {
+		erroTemp = '';
+		novaTempNome = temporada?.name ?? '';
+		novaTempFim = temporada ? new Date(temporada.ends_at).toISOString().slice(0, 10) : '';
+		editandoTemporada = true;
+	}
+
+	async function salvarTemporada() {
+		if (!novaTempNome.trim()) {
+			erroTemp = 'Nome é obrigatório.';
+			return;
+		}
+		ocupadoTemp = true;
+		erroTemp = '';
+		try {
+			if (temporada) {
+				await editarTemporada(temporada.id, {
+					name: novaTempNome.trim(),
+					ends_at: novaTempFim ? new Date(novaTempFim).toISOString() : undefined
+				});
+			} else {
+				await criarTemporada({
+					name: novaTempNome.trim(),
+					ends_at: novaTempFim ? new Date(novaTempFim).toISOString() : undefined
+				});
+			}
+			editandoTemporada = false;
+			msgTemp = 'Temporada salva.';
+			setTimeout(() => (msgTemp = ''), 3000);
+			await carregar();
+		} catch (e) {
+			erroTemp = e instanceof ErroApi ? e.message : 'Não foi possível salvar a temporada.';
+		} finally {
+			ocupadoTemp = false;
+		}
+	}
+
+	async function acaoEncerrarTemporada() {
+		if (!temporada) return;
+		ocupadoTemp = true;
+		erroTemp = '';
+		try {
+			await encerrarTemporada(temporada.id, motivoEncerrar.trim() || undefined);
+			confirmandoEncerrar = false;
+			motivoEncerrar = '';
+			msgTemp = 'Temporada em encerramento — o congelamento segue o mesmo fluxo automático.';
+			setTimeout(() => (msgTemp = ''), 5000);
+			await carregar();
+		} catch (e) {
+			erroTemp = e instanceof ErroApi ? e.message : 'Não foi possível encerrar a temporada.';
+		} finally {
+			ocupadoTemp = false;
+		}
+	}
+
+	async function acaoRecalcular() {
+		if (!temporada) return;
+		ocupadoTemp = true;
+		erroTemp = '';
+		try {
+			const r = await recalcularTemporada(temporada.id);
+			msgTemp = `Recalculado: ${r.guilds} guildas.`;
+			setTimeout(() => (msgTemp = ''), 5000);
+		} catch (e) {
+			erroTemp = e instanceof ErroApi ? e.message : 'Não foi possível recalcular a temporada.';
+		} finally {
+			ocupadoTemp = false;
+		}
+	}
 
 	async function carregar() {
 		try {
@@ -233,12 +319,69 @@
 		<!-- INFO TEMPORADA -->
 		<section class="temporada">
 			<h2>Temporada Atual</h2>
-			{#if temporada}
-				<div class="tag-temporada">
-					<b>{temporada.name}</b> • Finaliza em {new Date(temporada.ends_at).toLocaleDateString('pt-BR')}
+			{#if erroTemp}<p class="msg-erro">{erroTemp}</p>{/if}
+			{#if msgTemp}<p class="msg-ok">{msgTemp}</p>{/if}
+
+			{#if editandoTemporada}
+				<div class="grade temp-form">
+					<label>
+						Nome da Temporada
+						<input type="text" bind:value={novaTempNome} maxlength="60" placeholder="Ex: Temporada 3 — Verão" />
+					</label>
+					<label>
+						Fim (data)
+						<input type="date" bind:value={novaTempFim} />
+					</label>
 				</div>
+				<div class="acoes-geral">
+					<button class="btn-principal" disabled={ocupadoTemp} onclick={salvarTemporada}>
+						{ocupadoTemp ? 'Salvando...' : temporada ? 'Salvar Alterações' : 'Criar Temporada'}
+					</button>
+					<button class="btn-secundario" disabled={ocupadoTemp} onclick={() => (editandoTemporada = false)}>
+						Cancelar
+					</button>
+				</div>
+			{:else if temporada}
+				<div class="tag-temporada">
+					<b>#{temporada.number} {temporada.name}</b> • {temporada.status} • Finaliza em {new Date(temporada.ends_at).toLocaleDateString('pt-BR')}
+				</div>
+				<div class="acoes-geral temp-acoes">
+					{#if !['closed', 'archived'].includes(temporada.status)}
+						<button class="btn-secundario" onclick={abrirEdicaoTemporada}>Editar</button>
+					{/if}
+					{#if temporada.status === 'active'}
+						<button class="btn-secundario btn-perigo-out" onclick={() => (confirmandoEncerrar = true)}>
+							Encerrar Antecipadamente
+						</button>
+					{/if}
+					{#if temporada.status !== 'archived'}
+						<button class="btn-secundario" disabled={ocupadoTemp} onclick={acaoRecalcular}>
+							{ocupadoTemp ? 'Recalculando...' : 'Recalcular Ranking'}
+						</button>
+					{/if}
+				</div>
+
+				{#if confirmandoEncerrar}
+					<div class="bloco-mute">
+						<label>
+							Motivo (opcional, vai pro log de auditoria)
+							<input type="text" bind:value={motivoEncerrar} placeholder="Ex: virada de mês antecipada" />
+						</label>
+						<div class="acoes-geral">
+							<button class="btn-principal" disabled={ocupadoTemp} onclick={acaoEncerrarTemporada}>
+								{ocupadoTemp ? 'Encerrando...' : 'Confirmar Encerramento'}
+							</button>
+							<button class="btn-secundario" disabled={ocupadoTemp} onclick={() => (confirmandoEncerrar = false)}>
+								Cancelar
+							</button>
+						</div>
+					</div>
+				{/if}
 			{:else}
 				<p class="vazio">Nenhuma temporada ativa no momento.</p>
+				<div class="acoes-geral">
+					<button class="btn-principal" onclick={abrirEdicaoTemporada}>Criar Temporada</button>
+				</div>
 			{/if}
 		</section>
 	{/if}
@@ -309,6 +452,9 @@
 	.btn-principal { background: var(--or); color: var(--sable); font-weight: bold; border: none; padding: 12px 24px; }
 	.btn-secundario { background: none; border: 1px solid var(--borda); color: var(--argent); font-size: 12px; padding: 8px 16px; margin-top: 12px; }
 	.btn-secundario:hover { border-color: var(--or); color: var(--or); }
+	.btn-perigo-out:hover { border-color: var(--gules); color: var(--gules); }
+	.temp-acoes { flex-wrap: wrap; }
+	.temp-form { margin-bottom: 16px; }
 
 	.msg-ok { color: var(--vert); font-size: 13px; }
 	.msg-erro { color: var(--gules); font-size: 13px; }

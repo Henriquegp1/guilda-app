@@ -626,6 +626,43 @@ export default async function identity (app) {
     return { entitlement: items, purchase_id: paid.purchaseId, credit_remaining: paid.creditRemaining }
   }))
 
+  // Etapa 9 (loja e compras): histórico e estatísticas de bits_purchase.
+  // A tabela e todo o fluxo de cobrança (`charge`, em economy.js) já existiam
+  // desde a fase 06 — só nunca tinha rota de leitura pra devolver isso pra
+  // guilda. Sem tabela nova, só leitura do que `charge()` já grava.
+  app.get('/guilds/:id/store/purchases', async (req) => {
+    const { guild } = await scope(DB, req)
+    const limit = Math.min(Number(req.query.limit ?? 20), 50)
+    const cursor = req.query.cursor ? Number(req.query.cursor) : null
+    const { rows } = await query(
+      `SELECT id, sku, bits_amount, credit_amount, state, transaction_id, user_id, created_at, settled_at
+         FROM bits_purchase
+        WHERE guild_id = $1 AND ($2::bigint IS NULL OR id < $2)
+        ORDER BY id DESC LIMIT $3`, [guild.id, cursor, limit])
+    return { items: rows, next_cursor: rows.length === limit ? rows[rows.length - 1].id : null }
+  })
+
+  app.get('/guilds/:id/store/stats', async (req) => {
+    const { guild } = await scope(DB, req)
+    const [{ rows: totais }, { rows: porSku }] = await Promise.all([
+      query(
+        `SELECT count(*) FILTER (WHERE state = 'settled')          AS purchases,
+                coalesce(sum(bits_amount)   FILTER (WHERE state = 'settled'), 0) AS bits_spent,
+                coalesce(sum(credit_amount) FILTER (WHERE state = 'settled'), 0) AS credit_used
+           FROM bits_purchase WHERE guild_id = $1`, [guild.id]),
+      query(
+        `SELECT sku, count(*) AS purchases, coalesce(sum(bits_amount), 0) AS bits_spent
+           FROM bits_purchase WHERE guild_id = $1 AND state = 'settled'
+          GROUP BY sku ORDER BY purchases DESC, bits_spent DESC LIMIT 5`, [guild.id]),
+    ])
+    return {
+      purchases: Number(totais[0].purchases),
+      bits_spent: Number(totais[0].bits_spent),
+      credit_used: Number(totais[0].credit_used),
+      top_skus: porSku.map((r) => ({ sku: r.sku, purchases: Number(r.purchases), bits_spent: Number(r.bits_spent) })),
+    }
+  })
+
   // -------------------------------------------------- nome e TAG
   app.post('/guilds/:id/identity/name', (req) => requestIdentityChange(req, 'name'))
   app.post('/guilds/:id/identity/tag', (req) => requestIdentityChange(req, 'tag'))

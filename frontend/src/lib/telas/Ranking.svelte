@@ -20,6 +20,9 @@
 	let erro = $state('');
 	let lista = $state<HTMLOListElement>();
 	let vendoHistorico = $state(false);
+	let proximoCursor = $state<string | null>(null);
+	let carregandoMais = $state(false);
+	let erroMais = $state('');
 
 	async function carregar(cursor?: string) {
 		try {
@@ -40,12 +43,37 @@
 			} else {
 				linhas = r.items;
 			}
+			proximoCursor = r.next_cursor;
 			estado = r.items.length ? 'pronto' : 'vazio';
 		} catch (e) {
 			// Cursor expirado não é culpa do viewer: recomeça sozinho.
 			if (e instanceof ErroApi && e.code === 'CURSOR_EXPIRED') return carregar();
 			erro = e instanceof ErroApi ? e.message : 'Não foi possível carregar o ranking.';
 			estado = 'erro';
+		}
+	}
+
+	// A API de ranking já pagina (25 por página, `next_cursor`) mas a tela
+	// nunca chamava a segunda página — só a primeira aparecia, sempre, por
+	// maior que fosse o ranking. Isto busca e concatena a próxima leva.
+	async function carregarMais() {
+		if (!proximoCursor || carregandoMais) return;
+		carregandoMais = true;
+		erroMais = '';
+		try {
+			const r = await ranking(proximoCursor);
+			linhas = [...linhas, ...r.items];
+			proximoCursor = r.next_cursor;
+		} catch (e) {
+			if (e instanceof ErroApi && e.code === 'CURSOR_EXPIRED') {
+				// Cursor de página seguinte expirou (snapshot não-final e velho, §5.3):
+				// não dá pra emendar com o que já está na tela, então recomeça do topo.
+				proximoCursor = null;
+				return carregar();
+			}
+			erroMais = e instanceof ErroApi ? e.message : 'Não foi possível carregar mais guildas.';
+		} finally {
+			carregandoMais = false;
 		}
 	}
 
@@ -114,6 +142,17 @@
 				</li>
 			{/each}
 		</ol>
+
+		{#if proximoCursor}
+			<div class="carregar-mais">
+				{#if erroMais}
+					<span class="erro-mais">{erroMais}</span>
+				{/if}
+				<button class="btn-hist" disabled={carregandoMais} onclick={carregarMais}>
+					{carregandoMais ? 'Carregando...' : 'Carregar mais'}
+				</button>
+			</div>
+		{/if}
 
 		{#if minhaGuildaId && meuRank && !estaNaLista}
 			<div class="meu-card-fixo" in:entrarBloco>
@@ -283,5 +322,19 @@
 	}
 	.delta:not(.sobe) {
 		color: var(--gules);
+	}
+
+	.carregar-mais {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		gap: 6px;
+		padding: 10px 0 4px;
+	}
+
+	.erro-mais {
+		color: var(--gules);
+		font-size: 11px;
+		text-align: center;
 	}
 </style>

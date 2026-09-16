@@ -301,6 +301,10 @@ export const listarGuildas = (cursor?: string) =>
 	);
 export const entrar = (gid: number) => post<{ status: 'joined' | 'pending'; request_id?: number }>(`/guilds/${gid}/join`);
 export const sair = (gid: number) => chamar<void>(`/guilds/${gid}/members/me`, { metodo: 'DELETE' });
+// A candidatura de fundação rejeitada deixava a guilda travada em 'suspended'
+// pra sempre: a tela já mostrava o motivo da rejeição, mas não tinha como
+// agir — a rota de reenvio (volta pra 'pending') existia sem botão nenhum.
+export const reenviarGuilda = (gid: number) => post<{ status: string }>(`/guilds/${gid}/resubmit`);
 export const expulsar = (gid: number, uid: string) =>
 	chamar<void>(`/guilds/${gid}/members/${uid}`, { metodo: 'DELETE' });
 export const membros = (gid: number) => get<{ members: Membro[] }>(`/guilds/${gid}/members`);
@@ -316,6 +320,11 @@ export const alterarCargo = (gid: number, uid: string, role: Cargo) =>
 		metodo: 'PATCH',
 		corpo: { role }
 	});
+// Diferente de transferirLiderancaMod (override do broadcaster): esta é a
+// líder passando o cargo por vontade própria pra outro membro, sem precisar
+// sair da guilda nem chamar moderação. Rota existia, tela nunca teve o botão.
+export const transferirLideranca = (gid: number, toUserId: string) =>
+	post<{ leader_user_id: string }>(`/guilds/${gid}/leadership`, { to_user_id: toUserId });
 export const salvarSettingsGuilda = (gid: number, corpo: { join_mode?: string; description?: string; motto?: string }) =>
 	patch<{ join_mode: string }>(`/guilds/${gid}/settings`, corpo);
 export const pedidos = (gid: number) => get<{ items: Pedido[] }>(`/guilds/${gid}/requests`);
@@ -352,6 +361,22 @@ export const salvarImagemCustomizada = (gid: number, slot: number, source_url: s
 		source_url,
 		slot
 	});
+export type IdentityHistoryItem = {
+	id: number;
+	field: 'name' | 'tag';
+	old_value: string;
+	new_value: string;
+	state: 'pending_review' | 'approved' | 'rejected' | 'reverted';
+	requested_by: string;
+	reviewed_by: string | null;
+	reviewed_at: string | null;
+	reject_reason: string | null;
+	created_at: string;
+};
+export const historicoIdentidade = (gid: number, cursor?: number) =>
+	get<{ items: IdentityHistoryItem[]; next_cursor: number | null }>(
+		`/guilds/${gid}/identity/history${cursor ? `?cursor=${cursor}` : ''}`
+	);
 export const ativarSlot = (gid: number, slot: number) =>
 	post<{ active_slot: number }>(`/guilds/${gid}/emblem/active`, { slot });
 export const comprarSlot = (gid: number, receipt?: string, use_credit = false) =>
@@ -381,6 +406,17 @@ export const ranking = (cursor?: string) =>
 	get<Ranking>(`/ranking${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ''}`);
 export const temporadaAtual = () => get<Temporada | null>('/seasons/current');
 export const listarTemporadas = () => get<{ items: Temporada[] }>('/seasons');
+// Gestão de temporada (broadcaster only) — existia no backend inteira, sem
+// nenhuma tela: criar, editar janela/nome, encerrar antes da hora e
+// recalcular ranking/prestígio de uma temporada específica.
+export const criarTemporada = (dados: { name: string; starts_at?: string; ends_at?: string }) =>
+	post<{ id: number; number: number; status: string }>('/mod/seasons', dados);
+export const editarTemporada = (sid: number, dados: { name?: string; ends_at?: string }) =>
+	patch<{ season: Temporada }>(`/mod/seasons/${sid}`, dados);
+export const encerrarTemporada = (sid: number, reason?: string) =>
+	post<{ status: string; ends_at: string }>(`/mod/seasons/${sid}/close`, { reason });
+export const recalcularTemporada = (sid: number) =>
+	post<{ job_id: string; guilds: number }>(`/mod/seasons/${sid}/recompute`);
 export const buscarPodio = (sid: number) =>
 	get<{ season: Temporada; awards: { position: number; guild_id: number; tag: string; name: string; prestige_final: number }[] }>(
 		`/seasons/${sid}/podium`
@@ -414,6 +450,12 @@ export type ResumoSemanal = {
 	territories_conquered: number;
 };
 export const resumoSemanal = (gid: number) => get<ResumoSemanal>(`/guilds/${gid}/weekly-summary`);
+
+export type AtividadeFeedItem = { id: number; type: string; message: string; created_at: string };
+export const feedAtividades = (gid: number, cursor?: number) =>
+	get<{ items: AtividadeFeedItem[]; next_cursor: number | null }>(
+		`/guilds/${gid}/activity${cursor ? `?cursor=${cursor}` : ''}`
+	);
 
 export type MissaoUniforme = { code: string; label: string; progress: number; target: number; completed: boolean };
 export type MissaoMembros = {
@@ -511,6 +553,12 @@ export const suspenderGuilda = (id: number, reason: string) =>
 	post<unknown>(`/mod/guilds/${id}/suspend`, { reason });
 export const reativarGuilda = (id: number) => post<unknown>(`/mod/guilds/${id}/unsuspend`);
 export const banirGuilda = (id: number, reason: string) => post<unknown>(`/mod/guilds/${id}/ban`, { reason });
+export const editarGuildaMod = (id: number, campos: { name?: string; description?: string; emblem_preset?: string }) =>
+	patch<Guilda>(`/mod/guilds/${id}`, campos);
+export const ajustarXpMod = (id: number, amount: number, reason: string) =>
+	post<{ xp: number; level: number }>(`/mod/guilds/${id}/xp/adjust`, { amount, reason });
+export const ajustarPrestigioMod = (id: number, points: number, reason: string) =>
+	post<unknown>(`/mod/guilds/${id}/prestige-adjust`, { points, reason });
 export const transferirLiderancaMod = (id: number, userId: string, reason: string) =>
 	post<unknown>(`/mod/guilds/${id}/transfer-leader`, { user_id: userId, reason });
 
@@ -632,5 +680,34 @@ export const atualizarTerritorio = (id: number, corpo: Partial<Territory>) =>
 export const excluirTerritorio = (id: number) =>
 	chamar<void>(`/territories/${id}`, { metodo: 'DELETE' });
 export const entrarDisputa = (dispute_id: number) => post<unknown>(`/disputes/${dispute_id}/join`);
+export type DisputeEntry = { guild_id: number; points: number; name: string; tag: string };
+export type DisputeDetail = {
+	dispute: { id: number; territory_id: number; closes_at: string; state: string };
+	entries: DisputeEntry[];
+};
+export const buscarDisputa = (id: number) => get<DisputeDetail>(`/disputes/${id}`);
 export const gerenciarHolding = (id: number, guild_id: number | null, reason: string) =>
 	post<unknown>(`/territories/${id}/holdings`, { guild_id, reason });
+
+export type CompraLoja = {
+	id: number;
+	sku: string;
+	bits_amount: number;
+	credit_amount: number;
+	state: 'pending' | 'settled' | 'failed' | 'voided';
+	transaction_id: string | null;
+	user_id: string;
+	created_at: string;
+	settled_at: string | null;
+};
+export const historicoCompras = (gid: number, cursor?: number) =>
+	get<{ items: CompraLoja[]; next_cursor: number | null }>(
+		`/guilds/${gid}/store/purchases${cursor ? `?cursor=${cursor}` : ''}`
+	);
+export type EstatisticasLoja = {
+	purchases: number;
+	bits_spent: number;
+	credit_used: number;
+	top_skus: { sku: string; purchases: number; bits_spent: number }[];
+};
+export const estatisticasLoja = (gid: number) => get<EstatisticasLoja>(`/guilds/${gid}/store/stats`);

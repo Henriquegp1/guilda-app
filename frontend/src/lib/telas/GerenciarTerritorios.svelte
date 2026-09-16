@@ -7,6 +7,7 @@
 		obterMapConfig,
 		salvarMapConfig,
 		removerMapConfig,
+		gerenciarHolding,
 		type Territory
 	} from '$lib/api';
 	import { onMount } from 'svelte';
@@ -22,6 +23,15 @@
 	let salvandoBg = $state(false);
 	let msgBg = $state('');
 	let erroBgConfig = $state('');
+
+	// Override manual de posse (POST /territories/:id/holdings, só broadcaster).
+	// Existia na API desde sempre e nunca tinha uma tela — sem isso, o único
+	// jeito de corrigir uma posse errada era direto no banco.
+	let holdingAbertoId = $state<number | null>(null);
+	let holdingGuildId = $state('');
+	let holdingReason = $state('');
+	let holdingOcupado = $state(false);
+	let holdingErro = $state('');
 
 	let form = $state<Partial<Territory>>({
 		name: '',
@@ -158,6 +168,37 @@
 			enabled: true
 		};
 	}
+
+	function abrirHolding(t: Territory) {
+		holdingAbertoId = t.id;
+		holdingGuildId = t.owner_guild_id ? String(t.owner_guild_id) : '';
+		holdingReason = '';
+		holdingErro = '';
+	}
+
+	async function aplicarHolding(t: Territory, limpar: boolean) {
+		const reason = holdingReason.trim();
+		if (!reason) {
+			holdingErro = 'Informe o motivo (fica registrado na auditoria).';
+			return;
+		}
+		const guildId = limpar ? null : Number(holdingGuildId);
+		if (!limpar && (!guildId || Number.isNaN(guildId))) {
+			holdingErro = 'ID de guilda inválido.';
+			return;
+		}
+		holdingOcupado = true;
+		holdingErro = '';
+		try {
+			await gerenciarHolding(t.id, guildId, reason);
+			holdingAbertoId = null;
+			await load();
+		} catch (e: any) {
+			holdingErro = e.message || 'Erro ao alterar a posse do território.';
+		} finally {
+			holdingOcupado = false;
+		}
+	}
 </script>
 
 <div class="gerenciar">
@@ -259,19 +300,52 @@
 			<ul class="lista">
 				{#each territories as t (t.id)}
 					<li class:desabilitado={!t.enabled}>
-						<div class="info">
-							<b>{t.name}</b>
-							<small>+{t.prestige_per_day} PPD · Pos: {t.map_x}, {t.map_y}</small>
+						<div class="linha-territorio">
+							<div class="info">
+								<b>{t.name}</b>
+								<small>+{t.prestige_per_day} PPD · Pos: {t.map_x}, {t.map_y}</small>
+								<small class="dono">
+									{#if t.owner_guild_id}
+										Dono: {t.owner_name} [{t.owner_tag}] (#{t.owner_guild_id})
+									{:else}
+										Sem dono
+									{/if}
+								</small>
+							</div>
+							<div class="btns">
+								{#if excluindoId === t.id}
+									<button class="icon-btn ruim" onclick={() => remove(t.id)}>Sim</button>
+									<button class="icon-btn" onclick={() => (excluindoId = null)}>Não</button>
+								{:else}
+									<button class="icon-btn" onclick={() => edit(t)} title="Editar" aria-label={`Editar ${t.name}`}>✏️</button>
+									<button class="icon-btn" onclick={() => abrirHolding(t)} title="Forçar posse" aria-label={`Forçar posse de ${t.name}`}>👑</button>
+									<button class="icon-btn ruim" onclick={() => (excluindoId = t.id)} title="Excluir" aria-label={`Excluir ${t.name}`}>🗑️</button>
+								{/if}
+							</div>
 						</div>
-						<div class="btns">
-							{#if excluindoId === t.id}
-								<button class="icon-btn ruim" onclick={() => remove(t.id)}>Sim</button>
-								<button class="icon-btn" onclick={() => (excluindoId = null)}>Não</button>
-							{:else}
-								<button class="icon-btn" onclick={() => edit(t)} title="Editar">✏️</button>
-								<button class="icon-btn ruim" onclick={() => (excluindoId = t.id)} title="Excluir">🗑️</button>
-							{/if}
-						</div>
+
+						{#if holdingAbertoId === t.id}
+							<div class="holding-form">
+								<label>
+									ID da guilda dona (vazio = liberar território)
+									<input type="number" bind:value={holdingGuildId} placeholder="Ex: 42" min="1" />
+								</label>
+								<label>
+									Motivo (obrigatório, vai pra auditoria)
+									<input bind:value={holdingReason} placeholder="Ex: correção de disputa travada" />
+								</label>
+								{#if holdingErro}<p class="erro">{holdingErro}</p>{/if}
+								<div class="acoes-form">
+									<button class="primario" disabled={holdingOcupado} onclick={() => aplicarHolding(t, false)}>
+										{holdingOcupado ? 'Aplicando...' : 'Atribuir posse'}
+									</button>
+									<button class="fantasma ruim" disabled={holdingOcupado} onclick={() => aplicarHolding(t, true)}>
+										Liberar território
+									</button>
+									<button class="fantasma" disabled={holdingOcupado} onclick={() => (holdingAbertoId = null)}>Cancelar</button>
+								</div>
+							</div>
+						{/if}
 					</li>
 				{/each}
 			</ul>
@@ -432,12 +506,28 @@
 
 	.lista li {
 		display: flex;
-		justify-content: space-between;
-		align-items: center;
+		flex-direction: column;
+		gap: 10px;
 		padding: 10px;
 		background: var(--sable);
 		border: 1px solid var(--borda);
 		border-radius: 2px;
+	}
+
+	.linha-territorio {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+	}
+
+	.dono { display: block; color: var(--or); opacity: 0.85; }
+
+	.holding-form {
+		display: flex;
+		flex-direction: column;
+		gap: 10px;
+		padding-top: 10px;
+		border-top: 1px solid var(--borda);
 	}
 
 	.desabilitado {

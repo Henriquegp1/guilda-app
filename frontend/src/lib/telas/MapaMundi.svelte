@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { listarTerritorios, entrarDisputa, obterMapConfig, type Territory } from '$lib/api';
+	import { listarTerritorios, entrarDisputa, obterMapConfig, buscarDisputa, type Territory, type DisputeEntry } from '$lib/api';
 	import { onMount } from 'svelte';
 	import Brasao from '$lib/ui/Brasao.svelte';
 	import { entrarBloco } from '$lib/motion';
@@ -11,6 +11,9 @@
 	let selectedId = $state<number | null>(null);
 	let ocupado = $state(false);
 	let mensagem = $state('');
+	let disputaEntries = $state<DisputeEntry[]>([]);
+	let disputaCarregando = $state(false);
+	let disputaErro = $state('');
 
 	async function load() {
 		erroCarregar = '';
@@ -32,13 +35,41 @@
 
 	const selected = $derived(territories.find((t) => t.id === selectedId) || null);
 
+	// A disputa é uma corrida de pontos entre guildas (territory_dispute_entry),
+	// mas até aqui a tela só mostrava "tem disputa, entrar?" sem dizer quem já
+	// está nela nem quem está na frente. GET /disputes/:id já devolve isso
+	// pronto (ordenado por pontos), só nunca era chamado.
+	async function carregarDisputa(disputeId: number) {
+		disputaCarregando = true;
+		disputaErro = '';
+		try {
+			const r = await buscarDisputa(disputeId);
+			disputaEntries = r.entries;
+		} catch (e: any) {
+			disputaEntries = [];
+			disputaErro = e.message || 'Não foi possível carregar os participantes da disputa.';
+		} finally {
+			disputaCarregando = false;
+		}
+	}
+
+	$effect(() => {
+		const id = selected?.active_dispute_id;
+		if (id) {
+			carregarDisputa(id);
+		} else {
+			disputaEntries = [];
+			disputaErro = '';
+		}
+	});
+
 	async function participarDisputa(id: number) {
 		ocupado = true;
 		mensagem = '';
 		try {
 			await entrarDisputa(id);
 			mensagem = 'Inscrito na disputa com sucesso!';
-			await load();
+			await Promise.all([load(), carregarDisputa(id)]);
 		} catch (e: any) {
 			mensagem = e.message || 'Falha ao entrar na disputa.';
 		} finally {
@@ -179,6 +210,25 @@
 					>
 						{ocupado ? 'Processando...' : 'Entrar na Disputa'}
 					</button>
+
+					<div class="disputa-participantes">
+						{#if disputaCarregando}
+							<p class="disputa-status">Carregando participantes...</p>
+						{:else if disputaErro}
+							<p class="disputa-status erro">{disputaErro}</p>
+						{:else if disputaEntries.length > 0}
+							<strong>Guildas na disputa</strong>
+							{#each disputaEntries as d, i (d.guild_id)}
+								<div class="disputa-linha" class:lider={i === 0}>
+									<span class="disputa-pos">{i + 1}º</span>
+									<span class="disputa-nome">{d.name} <small>[{d.tag}]</small></span>
+									<span class="disputa-pontos num">{d.points.toLocaleString('pt-BR')}</span>
+								</div>
+							{/each}
+						{:else}
+							<p class="disputa-status">Ninguém entrou na disputa ainda.</p>
+						{/if}
+					</div>
 				{/if}
 
 				{#if mensagem}<p class="aviso-mapa" class:sucesso={mensagem.includes('sucesso')}>{mensagem}</p>{/if}
@@ -303,6 +353,39 @@
 		border-radius: 2px;
 		cursor: pointer;
 	}
+
+	.disputa-participantes {
+		margin-top: 12px;
+		padding-top: 12px;
+		border-top: 1px solid var(--borda);
+		display: flex;
+		flex-direction: column;
+		gap: 6px;
+	}
+
+	.disputa-participantes strong {
+		font-size: 10px;
+		text-transform: uppercase;
+		color: var(--argent-fraco);
+		letter-spacing: 0.05em;
+	}
+
+	.disputa-status { margin: 0; font-size: 11px; color: var(--argent-fraco); font-style: italic; }
+	.disputa-status.erro { color: var(--gules); font-style: normal; }
+
+	.disputa-linha {
+		display: grid;
+		grid-template-columns: 24px 1fr auto;
+		align-items: center;
+		gap: 8px;
+		font-size: 11px;
+		color: var(--argent);
+	}
+
+	.disputa-linha.lider { color: var(--or); font-weight: bold; }
+	.disputa-linha small { color: var(--argent-fraco); font-weight: normal; }
+	.disputa-pos { color: var(--argent-fraco); }
+	.disputa-pontos { color: var(--or); }
 
 	.ajuda-mapa {
 		padding: 24px;

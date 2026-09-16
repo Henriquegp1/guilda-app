@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import {
-		membros, alterarCargo, sair, expulsar, salvarSettingsGuilda,
+		membros, alterarCargo, transferirLideranca, sair, expulsar, salvarSettingsGuilda,
 		obterPerfil, salvarPerfil, contribuicoesXp, contribuicoesXpSemana, ErroApi,
 		type Guilda, type Membro, type Cargo, type ContribuicaoMembro
 	} from '$lib/api';
@@ -32,6 +32,17 @@
 	let editandoMeuPerfil = $state(false);
 	let novoNomeInput = $state('');
 	let salvandoPerfil = $state(false);
+	let perfilAberto = $state<Membro | null>(null);
+	let membroParaLiderar = $state<Membro | null>(null);
+	let transferindoLideranca = $state(false);
+
+	// Boas-vindas: banner de "acabou de chegar", só pra quem entrou há pouco
+	// tempo (mesmo limiar de 2 dias usado como "recente" no resto da tela).
+	const BOAS_VINDAS_HORAS = 48;
+	const meuMembro = $derived(lista.find((m) => m.user_id === meuId) ?? null);
+	const souRecemChegado = $derived(
+		meuMembro ? (Date.now() - new Date(meuMembro.joined_at).getTime()) / 3_600_000 <= BOAS_VINDAS_HORAS : false
+	);
 
 	onMount(() => {
 		const unsubViewer = viewerStore.subscribe(v => {
@@ -150,6 +161,26 @@
 		}
 	}
 
+	// Diferente de expulsar/mudar cargo: aqui é a própria líder abrindo mão do
+	// posto, então uma confirmação simples de "sim/não" no lugar do padrão
+	// motivo+auditoria dos outros modais de moderação não se aplica.
+	async function acaoTransferirLideranca() {
+		if (!membroParaLiderar) return;
+		const m = membroParaLiderar;
+		membroParaLiderar = null;
+		transferindoLideranca = true;
+		erro = '';
+		try {
+			await transferirLideranca(guilda.id, m.user_id);
+			await carregar();
+			aoAtualizar();
+		} catch (e) {
+			erro = e instanceof ErroApi ? e.message : 'Erro ao transferir liderança.';
+		} finally {
+			transferindoLideranca = false;
+		}
+	}
+
 	async function acaoSair() {
 		confirmandoSair = false;
 		ocupado = true;
@@ -171,6 +202,35 @@
 		if (cargoAtor === 'lider') return true;
 		if (cargoAtor === 'sub-lider' && (alvo.role === 'comandante' || alvo.role === 'vassalo')) return true;
 		return false;
+	};
+
+	const CARGO_LABEL: Record<Cargo, string> = {
+		lider: 'Líder',
+		'sub-lider': 'Sub-líder',
+		comandante: 'Comandante',
+		vassalo: 'Vassalo'
+	};
+
+	function tenureDias(iso: string) {
+		return Math.floor((Date.now() - new Date(iso).getTime()) / 86_400_000);
+	}
+
+	function dataFormatada(iso: string) {
+		return new Date(iso).toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' });
+	}
+
+	// Fundador e veterano não são cargos (a escada de cargos é só vassalo →
+	// comandante → sub-lider → lider, ver permissions.js). "Fundador" é quem
+	// tem o joined_at mais antigo da guilda; "veterano" é tempo de casa acima
+	// de um limiar. `membros()` já devolve a lista ordenada por joined_at ASC,
+	// então o primeiro item da lista é sempre o fundador.
+	const VETERANO_DIAS = 30;
+
+	const fundadorId = $derived(lista[0]?.user_id ?? null);
+
+	const eVeterano = (m: Membro) => {
+		const dias = (Date.now() - new Date(m.joined_at).getTime()) / 86_400_000;
+		return dias >= VETERANO_DIAS;
 	};
 </script>
 
@@ -220,6 +280,14 @@
 		</p>
 	{/if}
 
+	{#if souRecemChegado}
+		<div class="boas-vindas" in:entrarBloco>
+			🎉 Bem-vindo(a) à guilda, {meuMembro?.nickname || 'aventureiro(a)'}! Dá uma olhada nos destaques da
+			semana e nas missões pra já começar a somar prestígio.
+		</div>
+	{/if}
+
+
 	{#if topSemana.length > 0}
 		<div class="top-semana">
 			<h4>🏆 Destaques da semana</h4>
@@ -240,11 +308,18 @@
 	{/if}
 
 	<div class="lista">
-		{#each lista as m}
+		{#each lista as m (m.user_id)}
 			<div class="membro" class:eu={m.user_id === meuId}>
-				<div class="info">
+				<button class="info" onclick={() => (perfilAberto = m)}>
 					<span class="id">
 						{m.user_id === meuId ? `🛡️ VOCÊ (${m.nickname || m.user_id})` : (m.nickname || `ID: ${m.user_id}`)}
+					</span>
+					<span class="selos">
+						{#if m.user_id === fundadorId}
+							<span class="selo selo-fundador" title="Fundador da guilda">👑 Fundador</span>
+						{:else if eVeterano(m)}
+							<span class="selo selo-veterano" title="Membro há {VETERANO_DIAS}+ dias">🎖️ Veterano</span>
+						{/if}
 					</span>
 					<span class="cargo-atual">{m.role}</span>
 					{#if contribuicoes.has(m.user_id)}
@@ -253,7 +328,7 @@
 							<small>(#{contribuicoes.get(m.user_id)!.rank} na guilda)</small>
 						</span>
 					{/if}
-				</div>
+				</button>
 
 				<div class="acoes">
 					{#if podeMudar(m)}
@@ -266,7 +341,10 @@
 								<option value={c}>{c}</option>
 							{/each}
 						</select>
-						<button class="expulsar" onclick={() => (membroParaExpulsar = m)} title="Expulsar">🗑️</button>
+						<button class="expulsar" onclick={() => (membroParaExpulsar = m)} title="Expulsar" aria-label={`Expulsar ${m.nickname || m.user_id}`}>🗑️</button>
+						{#if cargoAtor === 'lider' && m.user_id !== meuId}
+							<button class="coroar" onclick={() => (membroParaLiderar = m)} title="Tornar líder" aria-label={`Tornar ${m.nickname || m.user_id} líder da guilda`}>👑</button>
+						{/if}
 					{/if}
 				</div>
 			</div>
@@ -319,6 +397,26 @@
 		</div>
 	{/if}
 
+	{#if membroParaLiderar}
+		<div class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="titulo-lideranca" in:entrarBloco>
+			<div class="modal-box">
+				<h4 id="titulo-lideranca">Transferir Liderança</h4>
+				<p>
+					Tornar <b>{membroParaLiderar.nickname || membroParaLiderar.user_id}</b> a nova líder da guilda?
+					Você vira sub-líder e não pode desfazer isso sozinha depois.
+				</p>
+				<div class="modal-botoes">
+					<button class="btn-perigo" disabled={transferindoLideranca} onclick={acaoTransferirLideranca}>
+						{transferindoLideranca ? 'Transferindo...' : 'Transferir'}
+					</button>
+					<button class="btn-cancelar" disabled={transferindoLideranca} onclick={() => (membroParaLiderar = null)}>
+						Cancelar
+					</button>
+				</div>
+			</div>
+		</div>
+	{/if}
+
 	{#if editandoMeuPerfil}
 		<div class="modal-backdrop" role="dialog" aria-modal="true" in:entrarBloco>
 			<div class="modal-box">
@@ -344,6 +442,42 @@
 						<button class="btn-cancelar" onclick={() => (editandoMeuPerfil = false)}>Fechar</button>
 					</div>
 				{/if}
+			</div>
+		</div>
+	{/if}
+
+	{#if perfilAberto}
+		<div class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="titulo-perfil" in:entrarBloco>
+			<div class="modal-box perfil-box">
+				<button class="fechar-perfil" onclick={() => (perfilAberto = null)} aria-label="Fechar">✕</button>
+				<h4 id="titulo-perfil">{perfilAberto.nickname || `ID: ${perfilAberto.user_id}`}</h4>
+
+				<div class="perfil-selos">
+					{#if perfilAberto.user_id === fundadorId}
+						<span class="selo selo-fundador">👑 Fundador</span>
+					{:else if eVeterano(perfilAberto)}
+						<span class="selo selo-veterano">🎖️ Veterano</span>
+					{/if}
+					{#if perfilAberto.user_id === meuId}
+						<span class="selo">🛡️ Você</span>
+					{/if}
+				</div>
+
+				<dl class="perfil-dados">
+					<div><dt>Cargo</dt><dd>{CARGO_LABEL[perfilAberto.role]}</dd></div>
+					<div><dt>Na guilda desde</dt><dd>{dataFormatada(perfilAberto.joined_at)}</dd></div>
+					<div><dt>Tempo de casa</dt><dd>{tenureDias(perfilAberto.joined_at)} dias</dd></div>
+					{#if contribuicoes.has(perfilAberto.user_id)}
+						<div>
+							<dt>Contribuição de XP</dt>
+							<dd>{contribuicoes.get(perfilAberto.user_id)!.xp_total.toLocaleString('pt-BR')} XP (#{contribuicoes.get(perfilAberto.user_id)!.rank} na guilda)</dd>
+						</div>
+					{/if}
+				</dl>
+
+				<div class="modal-botoes">
+					<button class="btn-cancelar" onclick={() => (perfilAberto = null)}>Fechar</button>
+				</div>
 			</div>
 		</div>
 	{/if}
@@ -396,9 +530,25 @@
 	.membro { display: flex; align-items: center; justify-content: space-between; padding: 10px; background: var(--sable-2); border: 1px solid var(--borda); border-radius: 4px; width: 100%; }
 	.membro.eu { border-color: var(--or); background: rgba(212, 175, 55, 0.05); }
 
-	.info { display: flex; flex-direction: column; gap: 2px; }
+	.info { display: flex; flex-direction: column; gap: 2px; background: none; border: none; padding: 0; margin: 0; font-family: inherit; text-align: left; cursor: pointer; }
+	.info:hover .id { color: var(--or); }
 	.id { font-size: 10px; color: var(--argent); font-weight: bold; }
 	.cargo-atual { font-size: 9px; text-transform: uppercase; color: var(--or); opacity: 0.8; }
+	.selos { display: flex; }
+	.selo { font-size: 9px; font-weight: bold; padding: 1px 5px; border-radius: 2px; width: fit-content; }
+	.selo-fundador { color: var(--or); background: rgba(212, 175, 55, 0.12); border: 1px solid var(--or); }
+	.selo-veterano { color: var(--argent); background: rgba(255, 255, 255, 0.06); border: 1px solid var(--borda); }
+
+	.boas-vindas {
+		background: rgba(212, 175, 55, 0.08);
+		border: 1px solid var(--or);
+		border-radius: 4px;
+		padding: 10px 12px;
+		font-size: 11px;
+		color: var(--argent);
+		line-height: 1.4;
+		margin-bottom: 10px;
+	}
 	.contribuicao { font-size: 10px; color: var(--vert); margin-top: 2px; }
 	.contribuicao small { color: var(--argent-fraco); }
 
@@ -417,6 +567,8 @@
 	select { background: var(--sable); color: var(--argent); border: 1px solid var(--borda); font-size: 10px; padding: 3px; border-radius: 2px; outline: none; }
 	.expulsar { background: none; border: none; font-size: 14px; cursor: pointer; padding: 4px; filter: grayscale(1); opacity: 0.6; }
 	.expulsar:hover { filter: none; opacity: 1; }
+	.coroar { background: none; border: none; font-size: 14px; cursor: pointer; padding: 4px; filter: grayscale(1); opacity: 0.6; }
+	.coroar:hover { filter: none; opacity: 1; }
 
 	.rodape-gestao { padding-top: 12px; border-top: 1px solid var(--borda); }
 	.btn-sair { width: 100%; padding: 10px; background: rgba(255, 0, 0, 0.1); border: 1px solid var(--gules); color: #ff4d4d; font-size: 11px; font-weight: bold; text-transform: uppercase; border-radius: 4px; cursor: pointer; transition: background 0.2s; }
@@ -456,6 +608,26 @@
 		margin: 0 0 16px;
 		line-height: 1.4;
 	}
+
+	.perfil-box { position: relative; text-align: left; }
+	.fechar-perfil {
+		position: absolute;
+		top: 10px;
+		right: 10px;
+		background: none;
+		border: none;
+		color: var(--argent-fraco);
+		font-size: 14px;
+		min-height: auto;
+		padding: 2px 6px;
+		cursor: pointer;
+	}
+	.perfil-box h4 { text-align: left; padding-right: 24px; }
+	.perfil-selos { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
+	.perfil-dados { display: flex; flex-direction: column; gap: 8px; margin: 0 0 16px; }
+	.perfil-dados div { display: flex; justify-content: space-between; gap: 8px; font-size: 11px; border-bottom: 1px solid var(--borda); padding-bottom: 6px; }
+	.perfil-dados dt { color: var(--argent-fraco); text-transform: uppercase; font-size: 9px; }
+	.perfil-dados dd { color: var(--argent); margin: 0; text-align: right; }
 
 	.modal-botoes {
 		display: flex;

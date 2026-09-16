@@ -1175,7 +1175,7 @@
                                 L-29 2
                                 Z
                             "
-                            fill="url(#${instanceId}-grad-legendary)"
+                            fill={`url(#${instanceId}-grad-legendary)`}
                             stroke="rgba(0,0,0,0.65)"
                             stroke-width="2"
                             stroke-linejoin="round"

@@ -13,11 +13,16 @@
 		missoesSemanal,
 		missoesDiarias,
 		sair,
+		reenviarGuilda,
 		listarTerritorios,
 		carregarConquistas,
+		historicoIdentidade,
+		feedAtividades,
+		historicoCompras,
+		estatisticasLoja,
 		ErroApi
 	} from '$lib/api';
-	import type { Guilda, Cargo, Progressao, ProgressoSemanal, ResumoSemanal, MissaoSemanal, MissaoDiaria, Territory, Achievement } from '$lib/api';
+	import type { Guilda, Cargo, Progressao, ProgressoSemanal, ResumoSemanal, MissaoSemanal, MissaoDiaria, Territory, Achievement, IdentityHistoryItem, AtividadeFeedItem, CompraLoja, EstatisticasLoja } from '$lib/api';
 	import { gsap, dur, entrarBloco } from '$lib/motion';
 
 	let {
@@ -41,6 +46,16 @@
 	let editando = $state(false);
 	let vendoConquistas = $state(false);
 	let vendoMembros = $state(false);
+	let historico = $state<IdentityHistoryItem[]>([]);
+	let historicoAberto = $state(false);
+	let historicoCarregado = $state(false);
+	let feed = $state<AtividadeFeedItem[]>([]);
+	let feedAberto = $state(false);
+	let feedCarregado = $state(false);
+	let compras = $state<CompraLoja[]>([]);
+	let stats = $state<EstatisticasLoja | null>(null);
+	let lojaAberta = $state(false);
+	let lojaCarregada = $state(false);
 
 	// Falha em qualquer bloco abaixo não derruba a tela: o essencial já está na
 	// prop `guilda`. Mas a falha precisa aparecer — cada bloco guarda seu
@@ -53,6 +68,11 @@
 	let erroMissoesDia = $state('');
 	let erroTerrs = $state('');
 	let erroMedalhas = $state('');
+	let erroHistorico = $state('');
+	let erroFeed = $state('');
+	let erroLoja = $state('');
+	let reenviando = $state(false);
+	let erroReenvio = $state('');
 
 	const mensagemErro = (e: unknown, fallback: string) =>
 		e instanceof ErroApi ? e.message : fallback;
@@ -112,6 +132,103 @@
 			.then((res) => (medalhas = res.unlocked.slice(0, 4)))
 			.catch((e) => (erroMedalhas = mensagemErro(e, 'Não foi possível carregar as conquistas.')));
 	}
+
+	// Carregado sob demanda (só quando a seção é aberta), diferente dos blocos
+	// acima: histórico de nome/TAG é consulta rara, não faz sentido puxar toda
+	// vez que a tela abre.
+	function carregarHistorico() {
+		erroHistorico = '';
+		historicoIdentidade(guilda.id)
+			.then((r) => {
+				historico = r.items;
+				historicoCarregado = true;
+			})
+			.catch((e) => (erroHistorico = mensagemErro(e, 'Não foi possível carregar o histórico.')));
+	}
+
+	function alternarHistorico() {
+		historicoAberto = !historicoAberto;
+		if (historicoAberto && !historicoCarregado) carregarHistorico();
+	}
+
+	function carregarFeed() {
+		erroFeed = '';
+		feedAtividades(guilda.id)
+			.then((r) => {
+				feed = r.items;
+				feedCarregado = true;
+			})
+			.catch((e) => (erroFeed = mensagemErro(e, 'Não foi possível carregar o feed de atividades.')));
+	}
+
+	function alternarFeed() {
+		feedAberto = !feedAberto;
+		if (feedAberto && !feedCarregado) carregarFeed();
+	}
+
+	// Etapa 9: histórico e estatísticas da loja (bits_purchase). Junta as duas
+	// chamadas porque na prática quem abre uma quer ver a outra também.
+	function carregarLoja() {
+		erroLoja = '';
+		Promise.all([historicoCompras(guilda.id), estatisticasLoja(guilda.id)])
+			.then(([h, s]) => {
+				compras = h.items;
+				stats = s;
+				lojaCarregada = true;
+			})
+			.catch((e) => (erroLoja = mensagemErro(e, 'Não foi possível carregar o histórico da loja.')));
+	}
+
+	function alternarLoja() {
+		lojaAberta = !lojaAberta;
+		if (lojaAberta && !lojaCarregada) carregarLoja();
+	}
+
+	// Fundação rejeitada trava em 'suspended' (status.js: resubmit só sai daí)
+	// até alguém reenviar. Só a líder de fato (não sub-líder) pode chamar isso,
+	// exatamente como o backend valida em guilds/index.js.
+	async function acaoReenviar() {
+		reenviando = true;
+		erroReenvio = '';
+		try {
+			await reenviarGuilda(guilda.id);
+			aoAtualizar();
+		} catch (e) {
+			erroReenvio = mensagemErro(e, 'Não foi possível reenviar a guilda para aprovação.');
+		} finally {
+			reenviando = false;
+		}
+	}
+
+	const ESTADO_COMPRA_LABEL: Record<CompraLoja['state'], string> = {
+		pending: 'Pendente',
+		settled: 'Concluída',
+		failed: 'Falhou',
+		voided: 'Estornada'
+	};
+
+	// Ex: "há 3h", "há 2d" — não precisa de precisão de segundo, é feed social.
+	function tempoRelativo(iso: string) {
+		const diffMs = Date.now() - new Date(iso).getTime();
+		const min = Math.floor(diffMs / 60_000);
+		if (min < 1) return 'agora';
+		if (min < 60) return `há ${min}min`;
+		const h = Math.floor(min / 60);
+		if (h < 24) return `há ${h}h`;
+		return `há ${Math.floor(h / 24)}d`;
+	}
+
+	const ESTADO_HISTORICO_LABEL: Record<IdentityHistoryItem['state'], string> = {
+		pending_review: 'Em análise',
+		approved: 'Aprovado',
+		rejected: 'Rejeitado',
+		reverted: 'Revertido'
+	};
+
+	const CAMPO_HISTORICO_LABEL: Record<IdentityHistoryItem['field'], string> = {
+		name: 'Nome',
+		tag: 'TAG'
+	};
 
 	$effect(() => {
 		carregarProgressao();
@@ -468,8 +585,124 @@
 		</p>
 	{:else if guilda.status === 'suspended' && guilda.reject_reason}
 		<p class="nota gules">{guilda.reject_reason}</p>
+		{#if eLider}
+			<p class="nota">Ajuste o que causou a rejeição e reenvie para uma nova análise.</p>
+			{#if erroReenvio}<p class="nota gules">{erroReenvio}</p>{/if}
+			<button class="reenviar-btn" disabled={reenviando} onclick={acaoReenviar}>
+				{reenviando ? 'Reenviando...' : 'Reenviar para Aprovação'}
+			</button>
+		{/if}
 	{/if}
 </div>
+
+<div class="historico-wrapper">
+	<button class="missoes-toggle" onclick={alternarFeed}>
+		<span>📰 Feed de Atividades</span>
+		<span class="chevron" class:aberto={feedAberto}>▸</span>
+	</button>
+
+	{#if feedAberto}
+		{#if feed.length > 0}
+			<section class="feed-atividades" aria-label="Feed de atividades da guilda">
+				{#each feed as f (f.id)}
+					<div class="feed-linha">
+						<span class="feed-msg">{f.message}</span>
+						<span class="feed-tempo">{tempoRelativo(f.created_at)}</span>
+					</div>
+				{/each}
+			</section>
+		{:else if erroFeed}
+			<div class="bloco-erro">
+				<Estado estado="erro" mensagem={erroFeed} acao="Tentar de novo" aoAgir={carregarFeed} />
+			</div>
+		{:else if feedCarregado}
+			<p class="nota">Nenhuma atividade recente.</p>
+		{/if}
+	{/if}
+</div>
+
+{#if podeEditar}
+	<div class="historico-wrapper">
+		<button class="missoes-toggle" onclick={alternarLoja}>
+			<span>🛒 Loja: histórico e estatísticas</span>
+			<span class="chevron" class:aberto={lojaAberta}>▸</span>
+		</button>
+
+		{#if lojaAberta}
+			{#if erroLoja}
+				<div class="bloco-erro">
+					<Estado estado="erro" mensagem={erroLoja} acao="Tentar de novo" aoAgir={carregarLoja} />
+				</div>
+			{:else if lojaCarregada}
+				{#if stats}
+					<dl class="loja-stats">
+						<div><dt>Compras concluídas</dt><dd>{stats.purchases}</dd></div>
+						<div><dt>Bits gastos</dt><dd>{stats.bits_spent.toLocaleString('pt-BR')}</dd></div>
+						<div><dt>Crédito usado</dt><dd>{stats.credit_used.toLocaleString('pt-BR')}</dd></div>
+					</dl>
+					{#if stats.top_skus.length > 0}
+						<div class="loja-top-skus">
+							{#each stats.top_skus as ts (ts.sku)}
+								<span class="loja-sku-tag">{ts.sku} <small>×{ts.purchases}</small></span>
+							{/each}
+						</div>
+					{/if}
+				{/if}
+
+				{#if compras.length > 0}
+					<section class="loja-historico" aria-label="Histórico de compras">
+						{#each compras as c (c.id)}
+							<div class="loja-linha">
+								<span class="loja-sku">{c.sku}</span>
+								<span class="loja-valor">
+									{#if c.bits_amount > 0}{c.bits_amount.toLocaleString('pt-BR')} bits{/if}
+									{#if c.bits_amount > 0 && c.credit_amount > 0} + {/if}
+									{#if c.credit_amount > 0}{c.credit_amount.toLocaleString('pt-BR')} crédito{/if}
+								</span>
+								<span class="loja-estado" class:ok={c.state === 'settled'} class:ruim={c.state === 'failed' || c.state === 'voided'}>
+									{ESTADO_COMPRA_LABEL[c.state]}
+								</span>
+							</div>
+						{/each}
+					</section>
+				{:else}
+					<p class="nota">Nenhuma compra ainda.</p>
+				{/if}
+			{/if}
+		{/if}
+	</div>
+{/if}
+
+{#if podeEditar}
+	<div class="historico-wrapper">
+		<button class="missoes-toggle" onclick={alternarHistorico}>
+			<span>📜 Histórico de Identidade</span>
+			<span class="chevron" class:aberto={historicoAberto}>▸</span>
+		</button>
+
+		{#if historicoAberto}
+			{#if historico.length > 0}
+				<section class="historico-identidade" aria-label="Histórico de alterações de nome e TAG">
+					{#each historico as h (h.id)}
+						<div class="historico-linha">
+							<span class="historico-campo">{CAMPO_HISTORICO_LABEL[h.field]}</span>
+							<span class="historico-valores">{h.old_value} → {h.new_value}</span>
+							<span class="historico-estado" class:aprovado={h.state === 'approved'} class:rejeitado={h.state === 'rejected' || h.state === 'reverted'}>
+								{ESTADO_HISTORICO_LABEL[h.state]}
+							</span>
+						</div>
+					{/each}
+				</section>
+			{:else if erroHistorico}
+				<div class="bloco-erro">
+					<Estado estado="erro" mensagem={erroHistorico} acao="Tentar de novo" aoAgir={carregarHistorico} />
+				</div>
+			{:else if historicoCarregado}
+				<p class="nota">Nenhuma alteração de nome ou TAG ainda.</p>
+			{/if}
+		{/if}
+	</div>
+{/if}
 
 {#if aviso}
 	<p class="nota gules" role="alert">{aviso}</p>
@@ -711,6 +944,91 @@
 		margin-top: 6px;
 		border-top: none;
 	}
+
+	.historico-wrapper { margin-top: 10px; }
+
+	.historico-identidade {
+		margin-top: 6px;
+		background: var(--sable-2);
+		border: 1px solid var(--borda);
+		border-radius: 4px;
+		padding: 8px 10px;
+		display: flex;
+		flex-direction: column;
+		gap: 6px;
+	}
+
+	.historico-linha {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		font-size: 11px;
+		flex-wrap: wrap;
+	}
+
+	.historico-campo { color: var(--or); font-weight: bold; text-transform: uppercase; font-size: 9px; }
+	.historico-valores { color: var(--argent); flex: 1; }
+	.historico-estado { font-size: 9px; text-transform: uppercase; color: var(--argent-fraco); }
+	.historico-estado.aprovado { color: var(--vert); }
+	.historico-estado.rejeitado { color: var(--gules); }
+
+	.feed-atividades {
+		margin-top: 6px;
+		background: var(--sable-2);
+		border: 1px solid var(--borda);
+		border-radius: 4px;
+		padding: 8px 10px;
+		display: flex;
+		flex-direction: column;
+		gap: 6px;
+		max-height: 240px;
+		overflow-y: auto;
+	}
+
+	.feed-linha {
+		display: flex;
+		align-items: baseline;
+		justify-content: space-between;
+		gap: 8px;
+		font-size: 11px;
+	}
+
+	.feed-msg { color: var(--argent); }
+	.feed-tempo { color: var(--argent-fraco); font-size: 9px; white-space: nowrap; }
+
+	.loja-stats {
+		display: grid;
+		grid-template-columns: repeat(3, 1fr);
+		gap: 8px;
+		margin-top: 6px;
+	}
+	.loja-stats div { background: var(--sable-2); border: 1px solid var(--borda); border-radius: 4px; padding: 6px; text-align: center; }
+	.loja-stats dt { font-size: 8px; text-transform: uppercase; color: var(--argent-fraco); margin: 0; }
+	.loja-stats dd { font-size: 13px; color: var(--or); margin: 2px 0 0; font-weight: bold; }
+
+	.loja-top-skus { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+	.loja-sku-tag { font-size: 10px; color: var(--argent); background: var(--sable-2); border: 1px solid var(--borda); border-radius: 10px; padding: 2px 8px; }
+	.loja-sku-tag small { color: var(--argent-fraco); }
+
+	.loja-historico {
+		margin-top: 8px;
+		background: var(--sable-2);
+		border: 1px solid var(--borda);
+		border-radius: 4px;
+		padding: 8px 10px;
+		display: flex;
+		flex-direction: column;
+		gap: 6px;
+		max-height: 200px;
+		overflow-y: auto;
+	}
+	.loja-linha { display: flex; align-items: center; gap: 8px; font-size: 11px; }
+	.loja-sku { color: var(--argent); flex: 1; }
+	.loja-valor { color: var(--or); white-space: nowrap; }
+	.loja-estado { font-size: 9px; text-transform: uppercase; color: var(--argent-fraco); white-space: nowrap; }
+	.loja-estado.ok { color: var(--vert); }
+	.loja-estado.ruim { color: var(--gules); }
+
 	.proximo-desbloqueio { margin: 10px 0 0; color: var(--argent-fraco); font-size: 11px; }
 	.proximo-desbloqueio b { color: var(--or); }
 
@@ -757,6 +1075,19 @@
 		border-left-color: var(--gules);
 		color: var(--argent);
 	}
+
+	.reenviar-btn {
+		margin-top: 10px;
+		width: 100%;
+		padding: 10px;
+		background: var(--or);
+		color: var(--sable);
+		border: none;
+		font-weight: bold;
+		border-radius: 2px;
+		cursor: pointer;
+	}
+	.reenviar-btn:disabled { opacity: 0.6; cursor: default; }
 
 	.bloco-erro {
 		margin: 4px 0;

@@ -110,6 +110,28 @@ button.twitch {
 	font-weight: 600;
 }
 
+.fortaleza-fundo {
+	position: absolute;
+	inset: 0;
+	overflow: hidden;
+	background:
+		linear-gradient(
+			135deg,
+			var(--banner-pri),
+			var(--banner-sec)
+		);
+}
+
+.fortaleza-svg {
+	position: absolute;
+	inset: 0;
+
+	width: 100%;
+	height: 100%;
+
+	display: block;
+}
+
 @media (prefers-reduced-motion: reduce) {
 	*,
 	*::before,
