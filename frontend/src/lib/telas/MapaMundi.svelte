@@ -14,6 +14,9 @@
 	let disputaEntries = $state<DisputeEntry[]>([]);
 	let disputaCarregando = $state(false);
 	let disputaErro = $state('');
+	// guarda contra corrida: clicar em 2 territórios rapidamente não pode
+	// deixar a resposta antiga sobrescrever a nova
+	let disputaReqId = 0;
 
 	async function load() {
 		erroCarregar = '';
@@ -40,16 +43,19 @@
 	// está nela nem quem está na frente. GET /disputes/:id já devolve isso
 	// pronto (ordenado por pontos), só nunca era chamado.
 	async function carregarDisputa(disputeId: number) {
+		const reqId = ++disputaReqId;
 		disputaCarregando = true;
 		disputaErro = '';
 		try {
 			const r = await buscarDisputa(disputeId);
+			if (reqId !== disputaReqId) return; // resposta de uma seleção já abandonada
 			disputaEntries = r.entries;
 		} catch (e: any) {
+			if (reqId !== disputaReqId) return;
 			disputaEntries = [];
 			disputaErro = e.message || 'Não foi possível carregar os participantes da disputa.';
 		} finally {
-			disputaCarregando = false;
+			if (reqId === disputaReqId) disputaCarregando = false;
 		}
 	}
 

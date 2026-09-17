@@ -20,9 +20,12 @@
 		feedAtividades,
 		historicoCompras,
 		estatisticasLoja,
+		meuXpDiario,
+		historicoXpGuilda,
+		extratoPrestigio,
 		ErroApi
 	} from '$lib/api';
-	import type { Guilda, Cargo, Progressao, ProgressoSemanal, ResumoSemanal, MissaoSemanal, MissaoDiaria, Territory, Achievement, IdentityHistoryItem, AtividadeFeedItem, CompraLoja, EstatisticasLoja } from '$lib/api';
+	import type { Guilda, Cargo, Progressao, ProgressoSemanal, ResumoSemanal, MissaoSemanal, MissaoDiaria, Territory, Achievement, IdentityHistoryItem, AtividadeFeedItem, CompraLoja, EstatisticasLoja, MeuXpDiario, XpDiaGuilda, LancamentoPrestigio } from '$lib/api';
 	import { gsap, dur, entrarBloco } from '$lib/motion';
 
 	let {
@@ -49,13 +52,29 @@
 	let historico = $state<IdentityHistoryItem[]>([]);
 	let historicoAberto = $state(false);
 	let historicoCarregado = $state(false);
+	let historicoCursor = $state<number | null>(null);
+	let historicoCarregandoMais = $state(false);
 	let feed = $state<AtividadeFeedItem[]>([]);
 	let feedAberto = $state(false);
 	let feedCarregado = $state(false);
+	let feedCursor = $state<number | null>(null);
+	let feedCarregandoMais = $state(false);
 	let compras = $state<CompraLoja[]>([]);
 	let stats = $state<EstatisticasLoja | null>(null);
 	let lojaAberta = $state(false);
 	let lojaCarregada = $state(false);
+	let lojaCursor = $state<number | null>(null);
+	let lojaCarregandoMais = $state(false);
+	let xpHoje = $state<MeuXpDiario | null>(null);
+	let xpDias = $state<XpDiaGuilda[]>([]);
+	let xpHistAberto = $state(false);
+	let xpHistCarregado = $state(false);
+	let xpHistBloqueado = $state(false);
+	let lancamentos = $state<LancamentoPrestigio[]>([]);
+	let extratoAberto = $state(false);
+	let extratoCarregado = $state(false);
+	let extratoCursor = $state<string | null>(null);
+	let extratoCarregandoMais = $state(false);
 
 	// Falha em qualquer bloco abaixo não derruba a tela: o essencial já está na
 	// prop `guilda`. Mas a falha precisa aparecer — cada bloco guarda seu
@@ -71,6 +90,8 @@
 	let erroHistorico = $state('');
 	let erroFeed = $state('');
 	let erroLoja = $state('');
+	let erroXpHist = $state('');
+	let erroExtrato = $state('');
 	let reenviando = $state(false);
 	let erroReenvio = $state('');
 
@@ -141,9 +162,22 @@
 		historicoIdentidade(guilda.id)
 			.then((r) => {
 				historico = r.items;
+				historicoCursor = r.next_cursor;
 				historicoCarregado = true;
 			})
 			.catch((e) => (erroHistorico = mensagemErro(e, 'Não foi possível carregar o histórico.')));
+	}
+
+	function carregarMaisHistorico() {
+		if (!historicoCursor || historicoCarregandoMais) return;
+		historicoCarregandoMais = true;
+		historicoIdentidade(guilda.id, historicoCursor)
+			.then((r) => {
+				historico = [...historico, ...r.items];
+				historicoCursor = r.next_cursor;
+			})
+			.catch((e) => (erroHistorico = mensagemErro(e, 'Não foi possível carregar mais itens.')))
+			.finally(() => (historicoCarregandoMais = false));
 	}
 
 	function alternarHistorico() {
@@ -156,9 +190,22 @@
 		feedAtividades(guilda.id)
 			.then((r) => {
 				feed = r.items;
+				feedCursor = r.next_cursor;
 				feedCarregado = true;
 			})
 			.catch((e) => (erroFeed = mensagemErro(e, 'Não foi possível carregar o feed de atividades.')));
+	}
+
+	function carregarMaisFeed() {
+		if (!feedCursor || feedCarregandoMais) return;
+		feedCarregandoMais = true;
+		feedAtividades(guilda.id, feedCursor)
+			.then((r) => {
+				feed = [...feed, ...r.items];
+				feedCursor = r.next_cursor;
+			})
+			.catch((e) => (erroFeed = mensagemErro(e, 'Não foi possível carregar mais itens.')))
+			.finally(() => (feedCarregandoMais = false));
 	}
 
 	function alternarFeed() {
@@ -173,16 +220,98 @@
 		Promise.all([historicoCompras(guilda.id), estatisticasLoja(guilda.id)])
 			.then(([h, s]) => {
 				compras = h.items;
+				lojaCursor = h.next_cursor;
 				stats = s;
 				lojaCarregada = true;
 			})
 			.catch((e) => (erroLoja = mensagemErro(e, 'Não foi possível carregar o histórico da loja.')));
 	}
 
+	function carregarMaisLoja() {
+		if (!lojaCursor || lojaCarregandoMais) return;
+		lojaCarregandoMais = true;
+		historicoCompras(guilda.id, lojaCursor)
+			.then((h) => {
+				compras = [...compras, ...h.items];
+				lojaCursor = h.next_cursor;
+			})
+			.catch((e) => (erroLoja = mensagemErro(e, 'Não foi possível carregar mais compras.')))
+			.finally(() => (lojaCarregandoMais = false));
+	}
+
 	function alternarLoja() {
 		lojaAberta = !lojaAberta;
 		if (lojaAberta && !lojaCarregada) carregarLoja();
 	}
+
+	// XP hoje é pessoal (member_xp_daily), independe de nível — carrega direto,
+	// sem toggle, porque é um número pequeno que cabe no quadro principal.
+	function carregarXpHoje() {
+		meuXpDiario()
+			.then((r) => (xpHoje = r))
+			.catch(() => {}); // não crítico o suficiente pra ocupar um bloco de erro
+	}
+
+	function carregarXpHistorico() {
+		erroXpHist = '';
+		xpHistBloqueado = false;
+		historicoXpGuilda(guilda.id)
+			.then((r) => {
+				xpDias = r.days;
+				xpHistCarregado = true;
+			})
+			.catch((e) => {
+				if (e instanceof ErroApi && e.code === 'UNLOCK_NOT_AVAILABLE') {
+					xpHistBloqueado = true;
+					xpHistCarregado = true;
+				} else {
+					erroXpHist = mensagemErro(e, 'Não foi possível carregar o histórico de XP.');
+				}
+			});
+	}
+
+	function alternarXpHistorico() {
+		xpHistAberto = !xpHistAberto;
+		if (xpHistAberto && !xpHistCarregado) carregarXpHistorico();
+	}
+
+	function carregarExtrato() {
+		erroExtrato = '';
+		extratoPrestigio(guilda.id)
+			.then((r) => {
+				lancamentos = r.items;
+				extratoCursor = r.next_cursor;
+				extratoCarregado = true;
+			})
+			.catch((e) => (erroExtrato = mensagemErro(e, 'Não foi possível carregar o extrato de prestígio.')));
+	}
+
+	// Mesmo erro que corrigi no Ranking.svelte: a API pagina por cursor e eu
+	// tinha esquecido de novo de usar next_cursor. Corrigindo aqui já de cara
+	// pra não deixar a mesma limitação (só a 1ª página, sempre) se repetir.
+	function carregarMaisExtrato() {
+		if (!extratoCursor || extratoCarregandoMais) return;
+		extratoCarregandoMais = true;
+		extratoPrestigio(guilda.id, extratoCursor)
+			.then((r) => {
+				lancamentos = [...lancamentos, ...r.items];
+				extratoCursor = r.next_cursor;
+			})
+			.catch((e) => (erroExtrato = mensagemErro(e, 'Não foi possível carregar mais lançamentos.')))
+			.finally(() => (extratoCarregandoMais = false));
+	}
+
+	function alternarExtrato() {
+		extratoAberto = !extratoAberto;
+		if (extratoAberto && !extratoCarregado) carregarExtrato();
+	}
+
+	const FONTE_PRESTIGIO_LABEL: Record<string, string> = {
+		'war.win': 'Vitória em guerra',
+		'territory.daily': 'Rendimento territorial',
+		'season.weekly_objective': 'Objetivo semanal',
+		'prestige.manual_adjust': 'Ajuste manual (moderação)'
+	};
 
 	// Fundação rejeitada trava em 'suspended' (status.js: resubmit só sai daí)
 	// até alguém reenviar. Só a líder de fato (não sub-líder) pode chamar isso,
@@ -239,6 +368,7 @@
 		carregarMissoesDia();
 		carregarTerritoriosDaGuilda();
 		carregarMedalhas();
+		carregarXpHoje();
 	});
 
 	const rendimentoTotal = $derived(terrs.reduce((sum, t) => sum + t.prestige_per_day, 0));
@@ -558,6 +688,12 @@
 			<dt>Membros</dt>
 			<dd class="num" class:aviso={lotada}>{guilda.member_count}/{guilda.member_limit}</dd>
 		</div>
+		{#if xpHoje}
+			<div>
+				<dt>Meu XP Hoje</dt>
+				<dd class="num" class:aviso={xpHoje.xp_remaining <= 0}>{xpHoje.xp_today.toLocaleString('pt-BR')}/{xpHoje.cap.toLocaleString('pt-BR')}</dd>
+			</div>
+		{/if}
 		{#if terrs.length > 0}
 			<div class="rendimento">
 				<dt>Rendimento Territorial</dt>
@@ -595,6 +731,28 @@
 	{/if}
 </div>
 
+{#if aviso}
+	<p class="nota gules" role="alert">{aviso}</p>
+{/if}
+
+<div class="acoes">
+	{#if podeGerenciar}
+		<button class="primario" onclick={() => (vendoMembros = true)}>Gestão de Membros</button>
+	{/if}
+
+	{#if podeEditar}
+		<button class="secundario" onclick={() => (editando = true)}>Editar Identidade</button>
+	{/if}
+
+	{#if eLider}
+		<!-- Líder não sai sem transferir (fase 02, R17): o servidor recusa, e a
+		     interface não oferece a ação para não prometer o que não entrega. -->
+		<p class="nota">Como líder, transfira a liderança antes de sair.</p>
+	{:else}
+		<button onclick={deixar}>Sair da guilda</button>
+	{/if}
+</div>
+
 <div class="historico-wrapper">
 	<button class="missoes-toggle" onclick={alternarFeed}>
 		<span>📰 Feed de Atividades</span>
@@ -611,6 +769,11 @@
 					</div>
 				{/each}
 			</section>
+			{#if feedCursor}
+				<button class="carregar-mais-secao" disabled={feedCarregandoMais} onclick={carregarMaisFeed}>
+					{feedCarregandoMais ? 'Carregando...' : 'Carregar mais'}
+				</button>
+			{/if}
 		{:else if erroFeed}
 			<div class="bloco-erro">
 				<Estado estado="erro" mensagem={erroFeed} acao="Tentar de novo" aoAgir={carregarFeed} />
@@ -668,6 +831,11 @@
 				{:else}
 					<p class="nota">Nenhuma compra ainda.</p>
 				{/if}
+				{#if lojaCursor}
+					<button class="carregar-mais-secao" disabled={lojaCarregandoMais} onclick={carregarMaisLoja}>
+						{lojaCarregandoMais ? 'Carregando...' : 'Carregar mais'}
+					</button>
+				{/if}
 			{/if}
 		{/if}
 	</div>
@@ -693,6 +861,11 @@
 						</div>
 					{/each}
 				</section>
+				{#if historicoCursor}
+					<button class="carregar-mais-secao" disabled={historicoCarregandoMais} onclick={carregarMaisHistorico}>
+						{historicoCarregandoMais ? 'Carregando...' : 'Carregar mais'}
+					</button>
+				{/if}
 			{:else if erroHistorico}
 				<div class="bloco-erro">
 					<Estado estado="erro" mensagem={erroHistorico} acao="Tentar de novo" aoAgir={carregarHistorico} />
@@ -704,25 +877,62 @@
 	</div>
 {/if}
 
-{#if aviso}
-	<p class="nota gules" role="alert">{aviso}</p>
-{/if}
+<div class="historico-wrapper">
+	<button class="missoes-toggle" onclick={alternarXpHistorico}>
+		<span>📈 Histórico de XP da Guilda</span>
+		<span class="chevron" class:aberto={xpHistAberto}>▸</span>
+	</button>
 
-<div class="acoes">
-	{#if podeGerenciar}
-		<button class="primario" onclick={() => (vendoMembros = true)}>Gestão de Membros</button>
+	{#if xpHistAberto}
+		{#if xpHistBloqueado}
+			<p class="nota">Desbloqueia no Nível 12.</p>
+		{:else if erroXpHist}
+			<div class="bloco-erro">
+				<Estado estado="erro" mensagem={erroXpHist} acao="Tentar de novo" aoAgir={carregarXpHistorico} />
+			</div>
+		{:else if xpDias.length > 0}
+			<section class="feed-atividades" aria-label="Histórico diário de XP">
+				{#each xpDias as d (d.day)}
+					<div class="feed-linha">
+						<span class="feed-msg">{new Date(d.day).toLocaleDateString('pt-BR')} — Nv.{d.level}</span>
+						<span class="feed-tempo">{d.xp.toLocaleString('pt-BR')} XP</span>
+					</div>
+				{/each}
+			</section>
+		{:else if xpHistCarregado}
+			<p class="nota">Sem dados de XP nos últimos 30 dias.</p>
+		{/if}
 	{/if}
+</div>
 
-	{#if podeEditar}
-		<button class="secundario" onclick={() => (editando = true)}>Editar Identidade</button>
-	{/if}
+<div class="historico-wrapper">
+	<button class="missoes-toggle" onclick={alternarExtrato}>
+		<span>💰 Extrato de Prestígio</span>
+		<span class="chevron" class:aberto={extratoAberto}>▸</span>
+	</button>
 
-	{#if eLider}
-		<!-- Líder não sai sem transferir (fase 02, R17): o servidor recusa, e a
-		     interface não oferece a ação para não prometer o que não entrega. -->
-		<p class="nota">Como líder, transfira a liderança antes de sair.</p>
-	{:else}
-		<button onclick={deixar}>Sair da guilda</button>
+	{#if extratoAberto}
+		{#if erroExtrato}
+			<div class="bloco-erro">
+				<Estado estado="erro" mensagem={erroExtrato} acao="Tentar de novo" aoAgir={carregarExtrato} />
+			</div>
+		{:else if lancamentos.length > 0}
+			<section class="feed-atividades" aria-label="Extrato de prestígio da temporada">
+				{#each lancamentos as l, i (l.created_at + i)}
+					<div class="feed-linha">
+						<span class="feed-msg">{FONTE_PRESTIGIO_LABEL[l.source] || l.source}</span>
+						<span class="feed-tempo" class:sobe={l.points > 0}>{l.points > 0 ? '+' : ''}{l.points.toLocaleString('pt-BR')}</span>
+					</div>
+				{/each}
+			</section>
+			{#if extratoCursor}
+				<button class="carregar-mais-secao" disabled={extratoCarregandoMais} onclick={carregarMaisExtrato}>
+					{extratoCarregandoMais ? 'Carregando...' : 'Carregar mais'}
+				</button>
+			{/if}
+		{:else if extratoCarregado}
+			<p class="nota">Nenhum lançamento de prestígio nesta temporada.</p>
+		{/if}
 	{/if}
 </div>
 {/if}
@@ -995,6 +1205,21 @@
 
 	.feed-msg { color: var(--argent); }
 	.feed-tempo { color: var(--argent-fraco); font-size: 9px; white-space: nowrap; }
+	.feed-tempo.sobe { color: var(--vert); font-weight: bold; }
+
+	.carregar-mais-secao {
+		display: block;
+		margin: 8px auto 0;
+		background: none;
+		border: 1px solid var(--borda);
+		color: var(--argent);
+		font-size: 11px;
+		padding: 6px 14px;
+		border-radius: 2px;
+		cursor: pointer;
+	}
+	.carregar-mais-secao:hover { border-color: var(--or); color: var(--or); }
+	.carregar-mais-secao:disabled { opacity: 0.6; cursor: default; }
 
 	.loja-stats {
 		display: grid;

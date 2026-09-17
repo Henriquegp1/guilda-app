@@ -62,6 +62,7 @@
 	function abrirModal(g: Guilda, acao: typeof acaoAlvo) {
 		guildaAlvo = g;
 		acaoAlvo = acao;
+		erro = '';
 		motivoInput = '';
 		novoLiderId = '';
 		confirmacaoTag = '';
@@ -155,6 +156,12 @@
 	{:else if estado === 'erro'}
 		<Estado estado="erro" mensagem={erro} acao="Tentar de novo" aoAgir={carregar} />
 	{:else}
+		{#if erro}
+			<p class="erro-banner">
+				{erro}
+				<button class="fechar-erro" onclick={() => (erro = '')} aria-label="Dispensar aviso">×</button>
+			</p>
+		{/if}
 		<header>
 			<div class="controles">
 				<select bind:value={filtroStatus} onchange={carregar}>
@@ -240,6 +247,10 @@
 	perigoso={acaoAlvo === 'banir'}
 	aoConfirmar={confirmarAcao}
 >
+	{#if erro}
+		<p class="erro-modal">{erro}</p>
+	{/if}
+
 	{#if acaoAlvo === 'reativar'}
 		<p>Deseja reativar a guilda <b>{guildaAlvo?.name}</b>? Ela voltará a aparecer nas listagens públicas.</p>
 	{:else if acaoAlvo === 'apagar'}
@@ -357,6 +368,9 @@
 	.field textarea { height: 80px; resize: none; }
 	.aviso-modal { font-size: 11px; color: var(--argent-fraco); font-style: italic; margin-top: 8px; }
 	.perigo { color: var(--gules); }
+	.erro-modal { color: var(--gules); background: rgba(166, 50, 50, 0.1); border: 1px solid var(--gules); padding: 8px 10px; border-radius: 4px; font-size: 12px; margin: 0 0 12px; }
+	.erro-banner { display: flex; justify-content: space-between; align-items: center; gap: 12px; color: var(--gules); background: rgba(166, 50, 50, 0.1); border: 1px solid var(--gules); padding: 10px 14px; border-radius: 4px; font-size: 13px; margin-bottom: 16px; }
+	.fechar-erro { background: none; border: none; color: var(--gules); font-size: 16px; cursor: pointer; padding: 0 4px; min-height: auto; }
 	.linha-membros td { background: var(--sable-3); padding: 8px 16px; }
 	.linha-membros ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 5px; }
 	.linha-membros li { color: var(--argent); font-size: 12px; }

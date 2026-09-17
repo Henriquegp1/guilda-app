@@ -632,8 +632,10 @@ export default async function identity (app) {
   // guilda. Sem tabela nova, só leitura do que `charge()` já grava.
   app.get('/guilds/:id/store/purchases', async (req) => {
     const { guild } = await scope(DB, req)
-    const limit = Math.min(Number(req.query.limit ?? 20), 50)
-    const cursor = req.query.cursor ? Number(req.query.cursor) : null
+    const limit = Math.min(Math.trunc(Number(req.query.limit)) || 20, 50)
+    const cursorRaw = req.query.cursor ? Number(req.query.cursor) : null
+    if (req.query.cursor && !Number.isFinite(cursorRaw)) throw badRequest('INVALID_CURSOR', 'cursor inválido')
+    const cursor = cursorRaw
     const { rows } = await query(
       `SELECT id, sku, bits_amount, credit_amount, state, transaction_id, user_id, created_at, settled_at
          FROM bits_purchase
@@ -669,8 +671,10 @@ export default async function identity (app) {
 
   app.get('/guilds/:id/identity/history', async (req) => {
     const { guild } = await scope(DB, req)
-    const limit = Math.min(Number(req.query.limit ?? 20), 100)
-    const cursor = req.query.cursor ? Number(req.query.cursor) : null
+    const limit = Math.min(Math.trunc(Number(req.query.limit)) || 20, 100)
+    const cursorRaw = req.query.cursor ? Number(req.query.cursor) : null
+    if (req.query.cursor && !Number.isFinite(cursorRaw)) throw badRequest('INVALID_CURSOR', 'cursor inválido')
+    const cursor = cursorRaw
     const { rows } = await query(
       `SELECT id, field, old_value, new_value, state, requested_by, reviewed_by, reviewed_at,
               reject_reason, created_at

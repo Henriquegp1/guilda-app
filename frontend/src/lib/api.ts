@@ -315,6 +315,18 @@ export const contribuicoesXp = (gid: number, cursor?: string) =>
 	);
 export const contribuicoesXpSemana = (gid: number) =>
 	get<{ week: string; items: ContribuicaoMembro[] }>(`/guilds/${gid}/xp/contributions/weekly`);
+export type MeuXpDiario = { xp_today: number; xp_remaining: number; cap: number; ticks_today: number };
+export const meuXpDiario = () => get<MeuXpDiario>('/me/xp/daily');
+export type XpDiaGuilda = { day: string; xp: number; level: number };
+// Só desbloqueia no Nv.12 (guild_level_snapshot) — a rota já valida isso e
+// devolve UNLOCK_NOT_AVAILABLE, a tela só precisa tratar esse erro específico.
+export const historicoXpGuilda = (gid: number, days = 30) =>
+	get<{ days: XpDiaGuilda[] }>(`/guilds/${gid}/xp/history?days=${days}`);
+export type LancamentoPrestigio = { source: string; points: number; created_at: string };
+export const extratoPrestigio = (gid: number, cursor?: string) =>
+	get<{ items: LancamentoPrestigio[]; next_cursor: string | null }>(
+		`/guilds/${gid}/prestige/ledger${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ''}`
+	);
 export const alterarCargo = (gid: number, uid: string, role: Cargo) =>
 	chamar<{ user_id: string; from_role: Cargo; to_role: Cargo }>(`/guilds/${gid}/members/${uid}/role`, {
 		metodo: 'PATCH',
