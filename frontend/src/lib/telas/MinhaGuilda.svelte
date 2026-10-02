@@ -49,6 +49,7 @@
 	let editando = $state(false);
 	let vendoConquistas = $state(false);
 	let vendoMembros = $state(false);
+	let vendoExtras = $state(false);
 	let historico = $state<IdentityHistoryItem[]>([]);
 	let historicoAberto = $state(false);
 	let historicoCarregado = $state(false);
@@ -506,6 +507,197 @@
 	</div>
 {:else if vendoConquistas}
 	<Conquistas guildaId={guilda.id} aoVoltar={() => (vendoConquistas = false)} />
+{:else if vendoExtras}
+	<div class="editor-overlay" in:entrarBloco>
+		<header class="editor-header">
+			<button class="voltar" onclick={() => (vendoExtras = false)} aria-label="Voltar">←</button>
+			<h2>Mais Opções</h2>
+		</header>
+		<div class="extras-lista">
+		<div class="historico-wrapper">
+			<button class="missoes-toggle" onclick={alternarFeed}>
+				<span>📰 Feed de Atividades</span>
+				<span class="chevron" class:aberto={feedAberto}>▸</span>
+			</button>
+
+			{#if feedAberto}
+				{#if feed.length > 0}
+					<section class="feed-atividades" aria-label="Feed de atividades da guilda">
+						{#each feed as f (f.id)}
+							<div class="feed-linha">
+								<span class="feed-msg">{f.message}</span>
+								<span class="feed-tempo">{tempoRelativo(f.created_at)}</span>
+							</div>
+						{/each}
+					</section>
+					{#if feedCursor}
+						<button class="carregar-mais-secao" disabled={feedCarregandoMais} onclick={carregarMaisFeed}>
+							{feedCarregandoMais ? 'Carregando...' : 'Carregar mais'}
+						</button>
+					{/if}
+				{:else if erroFeed}
+					<div class="bloco-erro">
+						<Estado estado="erro" mensagem={erroFeed} acao="Tentar de novo" aoAgir={carregarFeed} />
+					</div>
+				{:else if feedCarregado}
+					<p class="nota">Nenhuma atividade recente.</p>
+				{/if}
+			{/if}
+		</div>
+
+		{#if podeEditar}
+			<div class="historico-wrapper">
+				<button class="missoes-toggle" onclick={alternarLoja}>
+					<span>🛒 Loja: histórico e estatísticas</span>
+					<span class="chevron" class:aberto={lojaAberta}>▸</span>
+				</button>
+
+				{#if lojaAberta}
+					{#if erroLoja}
+						<div class="bloco-erro">
+							<Estado estado="erro" mensagem={erroLoja} acao="Tentar de novo" aoAgir={carregarLoja} />
+						</div>
+					{:else if lojaCarregada}
+						{#if stats}
+							<dl class="loja-stats">
+								<div><dt>Compras concluídas</dt><dd>{stats.purchases}</dd></div>
+								<div><dt>Bits gastos</dt><dd>{stats.bits_spent.toLocaleString('pt-BR')}</dd></div>
+								<div><dt>Crédito usado</dt><dd>{stats.credit_used.toLocaleString('pt-BR')}</dd></div>
+							</dl>
+							{#if stats.top_skus.length > 0}
+								<div class="loja-top-skus">
+									{#each stats.top_skus as ts (ts.sku)}
+										<span class="loja-sku-tag">{ts.sku} <small>×{ts.purchases}</small></span>
+									{/each}
+								</div>
+							{/if}
+						{/if}
+
+						{#if compras.length > 0}
+							<section class="loja-historico" aria-label="Histórico de compras">
+								{#each compras as c (c.id)}
+									<div class="loja-linha">
+										<span class="loja-sku">{c.sku}</span>
+										<span class="loja-valor">
+											{#if c.bits_amount > 0}{c.bits_amount.toLocaleString('pt-BR')} bits{/if}
+											{#if c.bits_amount > 0 && c.credit_amount > 0} + {/if}
+											{#if c.credit_amount > 0}{c.credit_amount.toLocaleString('pt-BR')} crédito{/if}
+										</span>
+										<span class="loja-estado" class:ok={c.state === 'settled'} class:ruim={c.state === 'failed' || c.state === 'voided'}>
+											{ESTADO_COMPRA_LABEL[c.state]}
+										</span>
+									</div>
+								{/each}
+							</section>
+						{:else}
+							<p class="nota">Nenhuma compra ainda.</p>
+						{/if}
+						{#if lojaCursor}
+							<button class="carregar-mais-secao" disabled={lojaCarregandoMais} onclick={carregarMaisLoja}>
+								{lojaCarregandoMais ? 'Carregando...' : 'Carregar mais'}
+							</button>
+						{/if}
+					{/if}
+				{/if}
+			</div>
+		{/if}
+
+		{#if podeEditar}
+			<div class="historico-wrapper">
+				<button class="missoes-toggle" onclick={alternarHistorico}>
+					<span>📜 Histórico de Identidade</span>
+					<span class="chevron" class:aberto={historicoAberto}>▸</span>
+				</button>
+
+				{#if historicoAberto}
+					{#if historico.length > 0}
+						<section class="historico-identidade" aria-label="Histórico de alterações de nome e TAG">
+							{#each historico as h (h.id)}
+								<div class="historico-linha">
+									<span class="historico-campo">{CAMPO_HISTORICO_LABEL[h.field]}</span>
+									<span class="historico-valores">{h.old_value} → {h.new_value}</span>
+									<span class="historico-estado" class:aprovado={h.state === 'approved'} class:rejeitado={h.state === 'rejected' || h.state === 'reverted'}>
+										{ESTADO_HISTORICO_LABEL[h.state]}
+									</span>
+								</div>
+							{/each}
+						</section>
+						{#if historicoCursor}
+							<button class="carregar-mais-secao" disabled={historicoCarregandoMais} onclick={carregarMaisHistorico}>
+								{historicoCarregandoMais ? 'Carregando...' : 'Carregar mais'}
+							</button>
+						{/if}
+					{:else if erroHistorico}
+						<div class="bloco-erro">
+							<Estado estado="erro" mensagem={erroHistorico} acao="Tentar de novo" aoAgir={carregarHistorico} />
+						</div>
+					{:else if historicoCarregado}
+						<p class="nota">Nenhuma alteração de nome ou TAG ainda.</p>
+					{/if}
+				{/if}
+			</div>
+		{/if}
+
+		<div class="historico-wrapper">
+			<button class="missoes-toggle" onclick={alternarXpHistorico}>
+				<span>📈 Histórico de XP da Guilda</span>
+				<span class="chevron" class:aberto={xpHistAberto}>▸</span>
+			</button>
+
+			{#if xpHistAberto}
+				{#if xpHistBloqueado}
+					<p class="nota">Desbloqueia no Nível 12.</p>
+				{:else if erroXpHist}
+					<div class="bloco-erro">
+						<Estado estado="erro" mensagem={erroXpHist} acao="Tentar de novo" aoAgir={carregarXpHistorico} />
+					</div>
+				{:else if xpDias.length > 0}
+					<section class="feed-atividades" aria-label="Histórico diário de XP">
+						{#each xpDias as d (d.day)}
+							<div class="feed-linha">
+								<span class="feed-msg">{new Date(d.day).toLocaleDateString('pt-BR')} — Nv.{d.level}</span>
+								<span class="feed-tempo">{d.xp.toLocaleString('pt-BR')} XP</span>
+							</div>
+						{/each}
+					</section>
+				{:else if xpHistCarregado}
+					<p class="nota">Sem dados de XP nos últimos 30 dias.</p>
+				{/if}
+			{/if}
+		</div>
+
+		<div class="historico-wrapper">
+			<button class="missoes-toggle" onclick={alternarExtrato}>
+				<span>💰 Extrato de Prestígio</span>
+				<span class="chevron" class:aberto={extratoAberto}>▸</span>
+			</button>
+
+			{#if extratoAberto}
+				{#if erroExtrato}
+					<div class="bloco-erro">
+						<Estado estado="erro" mensagem={erroExtrato} acao="Tentar de novo" aoAgir={carregarExtrato} />
+					</div>
+				{:else if lancamentos.length > 0}
+					<section class="feed-atividades" aria-label="Extrato de prestígio da temporada">
+						{#each lancamentos as l, i (l.created_at + i)}
+							<div class="feed-linha">
+								<span class="feed-msg">{FONTE_PRESTIGIO_LABEL[l.source] || l.source}</span>
+								<span class="feed-tempo" class:sobe={l.points > 0}>{l.points > 0 ? '+' : ''}{l.points.toLocaleString('pt-BR')}</span>
+							</div>
+						{/each}
+					</section>
+					{#if extratoCursor}
+						<button class="carregar-mais-secao" disabled={extratoCarregandoMais} onclick={carregarMaisExtrato}>
+							{extratoCarregandoMais ? 'Carregando...' : 'Carregar mais'}
+						</button>
+					{/if}
+				{:else if extratoCarregado}
+					<p class="nota">Nenhum lançamento de prestígio nesta temporada.</p>
+				{/if}
+			{/if}
+		</div>
+		</div>
+	</div>
 {:else}
 	<div class="conteudo" in:entrarBloco>
 		<header>
@@ -744,6 +936,8 @@
 		<button class="secundario" onclick={() => (editando = true)}>Editar Identidade</button>
 	{/if}
 
+	<button class="secundario" onclick={() => (vendoExtras = true)}>Mais Opções ▸</button>
+
 	{#if eLider}
 		<!-- Líder não sai sem transferir (fase 02, R17): o servidor recusa, e a
 		     interface não oferece a ação para não prometer o que não entrega. -->
@@ -753,188 +947,6 @@
 	{/if}
 </div>
 
-<div class="historico-wrapper">
-	<button class="missoes-toggle" onclick={alternarFeed}>
-		<span>📰 Feed de Atividades</span>
-		<span class="chevron" class:aberto={feedAberto}>▸</span>
-	</button>
-
-	{#if feedAberto}
-		{#if feed.length > 0}
-			<section class="feed-atividades" aria-label="Feed de atividades da guilda">
-				{#each feed as f (f.id)}
-					<div class="feed-linha">
-						<span class="feed-msg">{f.message}</span>
-						<span class="feed-tempo">{tempoRelativo(f.created_at)}</span>
-					</div>
-				{/each}
-			</section>
-			{#if feedCursor}
-				<button class="carregar-mais-secao" disabled={feedCarregandoMais} onclick={carregarMaisFeed}>
-					{feedCarregandoMais ? 'Carregando...' : 'Carregar mais'}
-				</button>
-			{/if}
-		{:else if erroFeed}
-			<div class="bloco-erro">
-				<Estado estado="erro" mensagem={erroFeed} acao="Tentar de novo" aoAgir={carregarFeed} />
-			</div>
-		{:else if feedCarregado}
-			<p class="nota">Nenhuma atividade recente.</p>
-		{/if}
-	{/if}
-</div>
-
-{#if podeEditar}
-	<div class="historico-wrapper">
-		<button class="missoes-toggle" onclick={alternarLoja}>
-			<span>🛒 Loja: histórico e estatísticas</span>
-			<span class="chevron" class:aberto={lojaAberta}>▸</span>
-		</button>
-
-		{#if lojaAberta}
-			{#if erroLoja}
-				<div class="bloco-erro">
-					<Estado estado="erro" mensagem={erroLoja} acao="Tentar de novo" aoAgir={carregarLoja} />
-				</div>
-			{:else if lojaCarregada}
-				{#if stats}
-					<dl class="loja-stats">
-						<div><dt>Compras concluídas</dt><dd>{stats.purchases}</dd></div>
-						<div><dt>Bits gastos</dt><dd>{stats.bits_spent.toLocaleString('pt-BR')}</dd></div>
-						<div><dt>Crédito usado</dt><dd>{stats.credit_used.toLocaleString('pt-BR')}</dd></div>
-					</dl>
-					{#if stats.top_skus.length > 0}
-						<div class="loja-top-skus">
-							{#each stats.top_skus as ts (ts.sku)}
-								<span class="loja-sku-tag">{ts.sku} <small>×{ts.purchases}</small></span>
-							{/each}
-						</div>
-					{/if}
-				{/if}
-
-				{#if compras.length > 0}
-					<section class="loja-historico" aria-label="Histórico de compras">
-						{#each compras as c (c.id)}
-							<div class="loja-linha">
-								<span class="loja-sku">{c.sku}</span>
-								<span class="loja-valor">
-									{#if c.bits_amount > 0}{c.bits_amount.toLocaleString('pt-BR')} bits{/if}
-									{#if c.bits_amount > 0 && c.credit_amount > 0} + {/if}
-									{#if c.credit_amount > 0}{c.credit_amount.toLocaleString('pt-BR')} crédito{/if}
-								</span>
-								<span class="loja-estado" class:ok={c.state === 'settled'} class:ruim={c.state === 'failed' || c.state === 'voided'}>
-									{ESTADO_COMPRA_LABEL[c.state]}
-								</span>
-							</div>
-						{/each}
-					</section>
-				{:else}
-					<p class="nota">Nenhuma compra ainda.</p>
-				{/if}
-				{#if lojaCursor}
-					<button class="carregar-mais-secao" disabled={lojaCarregandoMais} onclick={carregarMaisLoja}>
-						{lojaCarregandoMais ? 'Carregando...' : 'Carregar mais'}
-					</button>
-				{/if}
-			{/if}
-		{/if}
-	</div>
-{/if}
-
-{#if podeEditar}
-	<div class="historico-wrapper">
-		<button class="missoes-toggle" onclick={alternarHistorico}>
-			<span>📜 Histórico de Identidade</span>
-			<span class="chevron" class:aberto={historicoAberto}>▸</span>
-		</button>
-
-		{#if historicoAberto}
-			{#if historico.length > 0}
-				<section class="historico-identidade" aria-label="Histórico de alterações de nome e TAG">
-					{#each historico as h (h.id)}
-						<div class="historico-linha">
-							<span class="historico-campo">{CAMPO_HISTORICO_LABEL[h.field]}</span>
-							<span class="historico-valores">{h.old_value} → {h.new_value}</span>
-							<span class="historico-estado" class:aprovado={h.state === 'approved'} class:rejeitado={h.state === 'rejected' || h.state === 'reverted'}>
-								{ESTADO_HISTORICO_LABEL[h.state]}
-							</span>
-						</div>
-					{/each}
-				</section>
-				{#if historicoCursor}
-					<button class="carregar-mais-secao" disabled={historicoCarregandoMais} onclick={carregarMaisHistorico}>
-						{historicoCarregandoMais ? 'Carregando...' : 'Carregar mais'}
-					</button>
-				{/if}
-			{:else if erroHistorico}
-				<div class="bloco-erro">
-					<Estado estado="erro" mensagem={erroHistorico} acao="Tentar de novo" aoAgir={carregarHistorico} />
-				</div>
-			{:else if historicoCarregado}
-				<p class="nota">Nenhuma alteração de nome ou TAG ainda.</p>
-			{/if}
-		{/if}
-	</div>
-{/if}
-
-<div class="historico-wrapper">
-	<button class="missoes-toggle" onclick={alternarXpHistorico}>
-		<span>📈 Histórico de XP da Guilda</span>
-		<span class="chevron" class:aberto={xpHistAberto}>▸</span>
-	</button>
-
-	{#if xpHistAberto}
-		{#if xpHistBloqueado}
-			<p class="nota">Desbloqueia no Nível 12.</p>
-		{:else if erroXpHist}
-			<div class="bloco-erro">
-				<Estado estado="erro" mensagem={erroXpHist} acao="Tentar de novo" aoAgir={carregarXpHistorico} />
-			</div>
-		{:else if xpDias.length > 0}
-			<section class="feed-atividades" aria-label="Histórico diário de XP">
-				{#each xpDias as d (d.day)}
-					<div class="feed-linha">
-						<span class="feed-msg">{new Date(d.day).toLocaleDateString('pt-BR')} — Nv.{d.level}</span>
-						<span class="feed-tempo">{d.xp.toLocaleString('pt-BR')} XP</span>
-					</div>
-				{/each}
-			</section>
-		{:else if xpHistCarregado}
-			<p class="nota">Sem dados de XP nos últimos 30 dias.</p>
-		{/if}
-	{/if}
-</div>
-
-<div class="historico-wrapper">
-	<button class="missoes-toggle" onclick={alternarExtrato}>
-		<span>💰 Extrato de Prestígio</span>
-		<span class="chevron" class:aberto={extratoAberto}>▸</span>
-	</button>
-
-	{#if extratoAberto}
-		{#if erroExtrato}
-			<div class="bloco-erro">
-				<Estado estado="erro" mensagem={erroExtrato} acao="Tentar de novo" aoAgir={carregarExtrato} />
-			</div>
-		{:else if lancamentos.length > 0}
-			<section class="feed-atividades" aria-label="Extrato de prestígio da temporada">
-				{#each lancamentos as l, i (l.created_at + i)}
-					<div class="feed-linha">
-						<span class="feed-msg">{FONTE_PRESTIGIO_LABEL[l.source] || l.source}</span>
-						<span class="feed-tempo" class:sobe={l.points > 0}>{l.points > 0 ? '+' : ''}{l.points.toLocaleString('pt-BR')}</span>
-					</div>
-				{/each}
-			</section>
-			{#if extratoCursor}
-				<button class="carregar-mais-secao" disabled={extratoCarregandoMais} onclick={carregarMaisExtrato}>
-					{extratoCarregandoMais ? 'Carregando...' : 'Carregar mais'}
-				</button>
-			{/if}
-		{:else if extratoCarregado}
-			<p class="nota">Nenhum lançamento de prestígio nesta temporada.</p>
-		{/if}
-	{/if}
-</div>
 {/if}
 
 <style>
@@ -1372,6 +1384,12 @@
 		display: flex;
 		flex-direction: column;
 		overflow: hidden;
+	}
+
+	.extras-lista {
+		padding: 14px;
+		overflow-y: auto;
+		flex: 1;
 	}
 
 	.editor-header {
