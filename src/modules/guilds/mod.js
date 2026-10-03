@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto'
 import { requireBroadcaster, requireModerator } from '../../core/auth.js'
 import { pool, query, tx } from '../../core/db.js'
 import { audit, emit } from '../../core/events.js'
@@ -5,6 +6,10 @@ import { AppError, badRequest, onUnique } from '../../core/errors.js'
 import { getChannel, loadGuild, pageLimit, view } from './queries.js'
 import { nextStatus } from './status.js'
 import { parseForm } from './validate.js'
+
+const nameTaken = onUnique('guild_name_uk', 'GUILD_NAME_TAKEN', 'nome já usado neste canal')
+const tagTaken = onUnique('guild_tag_uk', 'GUILD_TAG_TAKEN', 'TAG já usada neste canal')
+const oneGuild = onUnique('guild_one_per_leader_uk', 'ALREADY_HAS_GUILD', 'esse usuário já lidera uma guilda neste canal')
 
 const STATUSES = ['awaiting', 'pending', 'active', 'overflow', 'suspended', 'banned', 'purged']
 
@@ -76,6 +81,73 @@ export default async function modRoutes (app) {
       total: count.total,
       next_cursor: rows.length === limit ? rows[rows.length - 1].id : null,
     }
+  })
+
+  // Criação gratuita (sem Bits), só o streamer. A guilda já nasce `active`: quem
+  // cria é a própria moderação, então não há fila a aprovar. Para satisfazer
+  // guild_paid_has_tx_chk, a "transação" é um id sintético `free:<uuid>` e
+  // bits_amount = 0 — assim a fase 06 nunca gera crédito de rejeição e a
+  // reconciliação de estornos (markRefunded) nunca casa com ela.
+  app.post('/mod/guilds', async (req, reply) => {
+    requireBroadcaster(req)
+    const { name, tag, leader_user_id: leaderRaw, reason } = req.body ?? {}
+    if (typeof reason !== 'string' || !reason.trim() || reason.length > 280) {
+      throw badRequest('VALIDATION_ERROR', 'reason: 1–280 caracteres (obrigatório)')
+    }
+    const leaderId = String(leaderRaw ?? '').trim()
+    if (!/^\d{1,20}$/.test(leaderId)) {
+      throw badRequest('VALIDATION_ERROR', 'leader_user_id: informe o ID numérico da Twitch do líder')
+    }
+
+    const guild = await tx(async (c) => {
+      const channel = await getChannel(c, req.auth)
+      const form = parseForm({ name, tag }, channel.settings)
+      const txId = `free:${randomUUID()}`
+
+      const { rows: [g] } = await c.query(
+        `INSERT INTO guild (channel_id, name, tag, creator_user_id, leader_user_id,
+                            status, payment_status, bits_transaction_id, bits_amount,
+                            member_count, member_limit, reviewed_by_user_id, reviewed_at)
+         VALUES ($1, $2, $3, $4, $4, 'active', 'paid', $5, 0, 1, $6, $7, now())
+         RETURNING *`,
+        [channel.id, form.name, form.tag, leaderId, txId,
+          channel.settings.default_member_limit, req.auth.userId])
+        .catch(nameTaken).catch(tagTaken).catch(oneGuild)
+
+      // Mesma regra do fluxo pago (R18): o líder nasce junto com a guilda.
+      await c.query(
+        `INSERT INTO guild_member (guild_id, user_id, channel_id, role) VALUES ($1, $2, $3, 'lider')`,
+        [g.id, leaderId, channel.id])
+        .catch(onUnique('guild_member_one_per_channel_uk', 'ALREADY_HAS_GUILD', 'esse usuário já está em outra guilda neste canal'))
+
+      await emit(c, {
+        channelId: channel.id,
+        guildId: g.id,
+        type: 'guild.created',
+        payload: { name: g.name, tag: g.tag, leader_user_id: leaderId, free: true },
+        actorUserId: req.auth.userId,
+        externalId: txId,
+      })
+      await emit(c, {
+        channelId: channel.id,
+        guildId: g.id,
+        type: 'guild.approved',
+        payload: { actor_user_id: req.auth.userId },
+        actorUserId: req.auth.userId,
+      })
+      await audit(c, {
+        channelId: channel.id,
+        actorUserId: req.auth.userId,
+        actorRole: req.auth.role,
+        action: 'guild.create_free',
+        target: `guild:${g.id}`,
+        before: null,
+        after: { name: g.name, tag: g.tag, leader_user_id: leaderId, reason },
+      })
+      return g
+    })
+
+    return reply.code(201).send(view(guild, true))
   })
 
   app.get('/mod/guilds/:id/members', async (req) => withGuild(req, async (c, _channel, guild) => {

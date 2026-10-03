@@ -1,7 +1,7 @@
 <script lang="ts">
 	import Brasao from '$lib/ui/Brasao.svelte';
 	import { criarRascunho, confirmarPagamento, ErroApi } from '$lib/api';
-	import { gastarBits, produtosBits, bitsHabilitado, aoMudarRecursos, setLoopback } from '$lib/twitch';
+	import { gastarBits, produtosBits, bitsHabilitado, aoMudarRecursos } from '$lib/twitch';
 
 	let { aoCriar }: { aoCriar: () => void } = $props();
 
@@ -12,11 +12,6 @@
 	let sku = $state('');
 	let custo = $state<number | null>(null);
 	let temBits = $state(true);
-	let loopback = $state(false);
-
-	$effect(() => {
-		setLoopback(loopback);
-	});
 
 	// Cada passo é um estado do backend, não um passo de formulário: o rascunho
 	// já existe no banco antes de o viewer pagar (fase 01).
@@ -85,9 +80,7 @@
 			}
 			rascunhoId = g.id;
 
-			// Se o loopback estiver ativo, enviamos o recibo fake direto para o nosso servidor
-			// ignorando a interface de pagamento da Twitch.
-			const recibo = loopback ? 'receipt-fake-123' : await gastarBits(sku);
+			const recibo = await gastarBits(sku);
 			ultimoRecibo = recibo;
 
 			passo = 'confirmando';
@@ -206,11 +199,6 @@
 			{/if}
 		</button>
 
-		<label class="row">
-			<input type="checkbox" bind:checked={loopback} />
-			Simular pagamento (Loopback)
-		</label>
-
 		<p class="nota">Nome, brasão e descrição passam por aprovação do streamer.</p>
 	</form>
 {/if}
@@ -236,19 +224,6 @@
 		text-transform: uppercase;
 		letter-spacing: 0.08em;
 		color: var(--argent-fraco);
-	}
-
-	label.row {
-		flex-direction: row;
-		align-items: center;
-		gap: 8px;
-		text-transform: none;
-		cursor: pointer;
-	}
-
-	label.row input {
-		width: auto;
-		margin: 0;
 	}
 
 	.opc {

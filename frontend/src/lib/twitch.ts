@@ -89,24 +89,13 @@ export function aoMudarRecursos(fn: () => void): () => void {
 }
 
 /**
- * Força o modo de loopback (simulação) para testes de Bits.
- */
-export function setLoopback(ativo: boolean) {
-	const t = (window as any).Twitch?.ext;
-	if (t?.bits?.setUseLoopback) {
-		t.bits.setUseLoopback(ativo);
-	}
-}
-
-/**
  * Interface de Bits (Fase 01).
  */
 export function gastarBits(sku: string): Promise<string> {
 	return new Promise((resolve, reject) => {
 		const t = (window as any).Twitch?.ext;
 		if (!t) {
-			console.log('Simulando gasto de Bits:', sku);
-			resolve('receipt-fake-123');
+			reject(new Error('Bits só funcionam dentro da Twitch.'));
 			return;
 		}
 		t.bits.useBits(sku);

@@ -607,7 +607,7 @@ describe('Prestígio, ranking e conquistas (Postgres)', { skip: !process.env.DAT
  
     await db.query(
       'INSERT INTO guild_member (guild_id, user_id, channel_id, role) VALUES ($1, $2, $3, $4)',
-      [g, `h19-${sufixo}`, channelId, 'member'])
+      [g, `h19-${sufixo}`, channelId, 'vassalo'])
     assert.deepEqual(await db.tx(c => mod.evaluateGuild(c, channelId, g)), ['army'])
     // R17/R18: reavaliar não concede de novo.
     assert.deepEqual(await db.tx(c => mod.evaluateGuild(c, channelId, g)), [])

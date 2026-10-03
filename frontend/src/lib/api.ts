@@ -567,6 +567,8 @@ export const reativarGuilda = (id: number) => post<unknown>(`/mod/guilds/${id}/u
 export const banirGuilda = (id: number, reason: string) => post<unknown>(`/mod/guilds/${id}/ban`, { reason });
 export const editarGuildaMod = (id: number, campos: { name?: string; description?: string; emblem_preset?: string }) =>
 	patch<Guilda>(`/mod/guilds/${id}`, campos);
+export const criarGuildaMod = (dados: { name: string; tag: string; leader_user_id: string; reason: string }) =>
+	post<Guilda>('/mod/guilds', dados);
 export const ajustarXpMod = (id: number, amount: number, reason: string) =>
 	post<{ xp: number; level: number }>(`/mod/guilds/${id}/xp/adjust`, { amount, reason });
 export const ajustarPrestigioMod = (id: number, points: number, reason: string) =>

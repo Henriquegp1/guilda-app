@@ -9,6 +9,7 @@
 		banirGuilda,
 		transferirLiderancaMod,
 		editarGuildaMod,
+		criarGuildaMod,
 		ajustarXpMod,
 		ajustarPrestigioMod,
 		membrosModeracao,
@@ -32,13 +33,16 @@
 	// Controle do Modal
 	let modalAberto = $state(false);
 	let guildaAlvo = $state<Guilda | null>(null);
-	let acaoAlvo = $state<'suspender' | 'reativar' | 'banir' | 'transferir' | 'apagar' | 'editar' | 'xp' | 'prestigio' | null>(null);
+	let acaoAlvo = $state<'suspender' | 'reativar' | 'banir' | 'transferir' | 'apagar' | 'editar' | 'xp' | 'prestigio' | 'criar' | null>(null);
 	let motivoInput = $state('');
 	let novoLiderId = $state('');
 	let confirmacaoTag = $state('');
 	let editNomeInput = $state('');
 	let editDescInput = $state('');
 	let ajusteQtdInput = $state('');
+	let novaNomeInput = $state('');
+	let novaTagInput = $state('');
+	let novaLiderInput = $state('');
 
 	async function carregar() {
 		try {
@@ -72,6 +76,49 @@
 		modalAberto = true;
 	}
 
+	function abrirCriar() {
+		guildaAlvo = null;
+		acaoAlvo = 'criar';
+		erro = '';
+		motivoInput = '';
+		novaNomeInput = '';
+		novaTagInput = '';
+		novaLiderInput = '';
+		modalAberto = true;
+	}
+
+	// Criação gratuita (só streamer). O servidor valida de novo; aqui só
+	// espelhamos as regras para avisar antes de fechar o modal.
+	async function confirmarCriar() {
+		const name = novaNomeInput.trim();
+		const tag = novaTagInput.trim().toUpperCase();
+		const lider = novaLiderInput.trim();
+		if (!/^[A-Za-z0-9][A-Za-z0-9 ]{1,22}[A-Za-z0-9]$/.test(name) || name.includes('  ')) {
+			erro = 'Nome: 3–24 caracteres (letras, números e espaço), sem espaço nas pontas nem duplo.';
+			return;
+		}
+		if (!/^[A-Z0-9]{2,5}$/.test(tag)) {
+			erro = 'TAG: 2–5 caracteres (letras e números).';
+			return;
+		}
+		if (!/^\d{1,20}$/.test(lider)) {
+			erro = 'ID do líder: apenas números (ID da Twitch).';
+			return;
+		}
+		if (!motivoInput.trim()) {
+			erro = 'O motivo é obrigatório.';
+			return;
+		}
+		modalAberto = false;
+		try {
+			await criarGuildaMod({ name, tag, leader_user_id: lider, reason: motivoInput.trim() });
+			filtroStatus = 'active';
+			await carregar();
+		} catch (e) {
+			erro = e instanceof ErroApi ? e.message : 'Erro ao criar a guilda.';
+		}
+	}
+
 	async function alternarMembros(g: Guilda) {
 		if (membrosAbertos.has(g.id)) {
 			membrosAbertos.delete(g.id);
@@ -90,6 +137,7 @@
 	}
 
 	async function confirmarAcao() {
+		if (acaoAlvo === 'criar') return confirmarCriar();
 		if (!guildaAlvo || !acaoAlvo) return;
 		erro = '';
 
@@ -175,6 +223,9 @@
 				</div>
 
 				<span class="total">{total} guildas</span>
+				{#if role === 'broadcaster'}
+					<button class="btn-criar" onclick={abrirCriar}>+ Criar grátis</button>
+				{/if}
 			</div>
 			<button class="btn-refresh" onclick={carregar} aria-label="Atualizar lista">🔄</button>
 		</header>
@@ -241,9 +292,11 @@
 </div>
 
 <Modal
-	titulo="{acaoAlvo?.toUpperCase()} GUILDA: {guildaAlvo?.name}"
+	titulo={acaoAlvo === 'criar'
+		? 'CRIAR GUILDA (GRÁTIS)'
+		: `${acaoAlvo?.toUpperCase()} GUILDA: ${guildaAlvo?.name}`}
 	bind:aberto={modalAberto}
-	confirmarTexto={acaoAlvo === 'reativar' ? 'Confirmar' : 'Aplicar Ação'}
+	confirmarTexto={acaoAlvo === 'reativar' ? 'Confirmar' : acaoAlvo === 'criar' ? 'Criar guilda' : 'Aplicar Ação'}
 	perigoso={acaoAlvo === 'banir'}
 	aoConfirmar={confirmarAcao}
 >
@@ -258,6 +311,26 @@
 		<div class="field">
 			<label for="confirmacao-tag">Digite a TAG {guildaAlvo?.tag} para confirmar</label>
 			<input id="confirmacao-tag" type="text" bind:value={confirmacaoTag} autocomplete="off" />
+		</div>
+	{:else if acaoAlvo === 'criar'}
+		<div class="form-modal">
+			<div class="field">
+				<label for="nova-nome">Nome</label>
+				<input id="nova-nome" type="text" bind:value={novaNomeInput} maxlength="24" autocomplete="off" />
+			</div>
+			<div class="field">
+				<label for="nova-tag">TAG</label>
+				<input id="nova-tag" type="text" bind:value={novaTagInput} maxlength="5" autocomplete="off" />
+			</div>
+			<div class="field">
+				<label for="nova-lider">ID do líder (Twitch ID)</label>
+				<input id="nova-lider" type="text" inputmode="numeric" bind:value={novaLiderInput} placeholder="Ex: 12345678" autocomplete="off" />
+			</div>
+			<div class="field">
+				<label for="nova-motivo">Motivo</label>
+				<textarea id="nova-motivo" bind:value={motivoInput} placeholder="Ex: prêmio de sorteio, parceria..."></textarea>
+			</div>
+			<p class="aviso-modal">A guilda nasce ativa, sem cobrança de Bits, e a criação fica registrada no Log de Auditoria.</p>
 		</div>
 	{:else if acaoAlvo === 'editar'}
 		<div class="form-modal">
@@ -344,6 +417,8 @@
 
 	button:hover { border-color: var(--argent); color: var(--argent); }
 	.btn-edit:hover { border-color: var(--or); color: var(--or); }
+	.btn-criar { border-color: var(--or); color: var(--or); font-size: 11px; padding: 5px 10px; white-space: nowrap; }
+	.btn-criar:hover { background: var(--or); color: var(--sable); }
 	.btn-xp:hover { border-color: var(--or); color: var(--or); }
 	.btn-prestige:hover { border-color: var(--or); color: var(--or); }
 	.btn-ban:hover { border-color: var(--gules); color: var(--gules); }

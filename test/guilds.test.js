@@ -173,6 +173,9 @@ describe('recibo de Bits (R8)', () => {
   })
   test('rejeita lixo', () =>
     assert.throws(() => decodeReceipt('nao.eh.jwt', SECRET), code('PAYMENT_INVALID_RECEIPT')))
+  // Regressão: antes existia um recibo "de teste" aceito em produção (criação de guilda sem pagar).
+  test('rejeita o antigo recibo fake de teste', () =>
+    assert.throws(() => decodeReceipt('receipt-fake-123', SECRET), code('PAYMENT_INVALID_RECEIPT')))
 
   test('recibo do SKU certo e valor exato passa', () =>
     assert.doesNotThrow(() => checkReceipt(decodeReceipt(receipt(), SECRET), expected)))

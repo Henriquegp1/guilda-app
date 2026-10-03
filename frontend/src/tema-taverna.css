@@ -1,0 +1,112 @@
+/*
+ * Tema "Taverna" — camada de superfície (bordas, fundos, texturas).
+ *
+ * Tudo aqui vive atrás de html[data-tema='taverna'] (definido em app.html).
+ * Para voltar ao visual anterior: remova o atributo. Nada mais muda.
+ *
+ * Regras de segurança desta camada:
+ *  - Não altera tamanho, posição nem margem de nada (só cor, textura e forma).
+ *  - Botões ganham estilo pixel (bisel, cantos chanfrados), sem mudar tamanho/posição.
+ *  - Brasão, Banner e paletas do catálogo não são tocados.
+ *  - Só imagens data: (a CSP da Twitch permite img-src 'self' data:).
+ */
+
+html[data-tema='taverna'] {
+	/* Superfícies do sistema: madeira escura e pedra aquecida (antes: preto violeta). */
+	--sable: #15110d;
+	--sable-2: #261d14;
+	--borda: #4a3a28;
+	--argent-fraco: #a29a8a;
+
+	--tijolo: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='64' height='32' viewBox='0 0 32 16' shape-rendering='crispEdges'><rect width='32' height='16' fill='%231c1712'/><path d='M0 0h32v1H0zM0 8h32v1H0zM0 1h1v7H0zM16 1h1v7h-1zM8 9h1v7H8zM24 9h1v7h-1z' fill='%23150f0a'/><path d='M1 1h15v1H1zM17 1h15v1H17zM9 9h15v1H9zM25 9h7v1h-7zM0 9h8v1H0z' fill='%23211a14'/><path d='M4 4h2v1H4zM21 5h2v1h-2zM12 12h2v1h-2zM28 13h2v1h-2zM10 3h1v1h-1zM26 12h1v1h-1z' fill='%2317120e'/></svg>");
+	--viga: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='48' height='8' viewBox='0 0 24 4' shape-rendering='crispEdges'><rect width='24' height='4' fill='%233b2a1a'/><rect width='24' height='1' fill='%235a4028'/><rect y='3' width='24' height='1' fill='%231f150e'/><path d='M3 1h5v1H3zM13 2h6v1h-6z' fill='%232e2116'/><path d='M1 1h2v2H1zM21 1h2v2h-2z' fill='%238d8470'/><path d='M2 2h1v1H2zM22 2h1v1h-1z' fill='%234f4a3e'/></svg>");
+	--ferro: #2a2420;
+}
+
+/* ── Estandarte: parede de tijolo, viga no topo, mastro de ouro, cauda em degraus ── */
+html[data-tema='taverna'] .estandarte .pano {
+	background:
+		var(--viga) 0 0 / 48px 8px repeat-x,
+		var(--tijolo) 0 0 / 64px 32px,
+		#1c1712;
+	box-shadow:
+		inset -2px 0 0 var(--ferro),
+		inset 0 -2px 0 var(--ferro);
+	clip-path: polygon(0 0, 100% 0, 100% 100%, calc(100% - 50% * 1 / 11) calc(100% - 0px), calc(100% - 50% * 1 / 11) calc(100% - 2px), calc(100% - 50% * 2 / 11) calc(100% - 2px), calc(100% - 50% * 2 / 11) calc(100% - 4px), calc(100% - 50% * 3 / 11) calc(100% - 4px), calc(100% - 50% * 3 / 11) calc(100% - 6px), calc(100% - 50% * 4 / 11) calc(100% - 6px), calc(100% - 50% * 4 / 11) calc(100% - 8px), calc(100% - 50% * 5 / 11) calc(100% - 8px), calc(100% - 50% * 5 / 11) calc(100% - 10px), calc(100% - 50% * 6 / 11) calc(100% - 10px), calc(100% - 50% * 6 / 11) calc(100% - 12px), calc(100% - 50% * 7 / 11) calc(100% - 12px), calc(100% - 50% * 7 / 11) calc(100% - 14px), calc(100% - 50% * 8 / 11) calc(100% - 14px), calc(100% - 50% * 8 / 11) calc(100% - 16px), calc(100% - 50% * 9 / 11) calc(100% - 16px), calc(100% - 50% * 9 / 11) calc(100% - 18px), calc(100% - 50% * 10 / 11) calc(100% - 18px), calc(100% - 50% * 10 / 11) calc(100% - 20px), 50% calc(100% - 20px), calc(50% * 10 / 11) calc(100% - 20px), calc(50% * 10 / 11) calc(100% - 18px), calc(50% * 9 / 11) calc(100% - 18px), calc(50% * 9 / 11) calc(100% - 16px), calc(50% * 8 / 11) calc(100% - 16px), calc(50% * 8 / 11) calc(100% - 14px), calc(50% * 7 / 11) calc(100% - 14px), calc(50% * 7 / 11) calc(100% - 12px), calc(50% * 6 / 11) calc(100% - 12px), calc(50% * 6 / 11) calc(100% - 10px), calc(50% * 5 / 11) calc(100% - 10px), calc(50% * 5 / 11) calc(100% - 8px), calc(50% * 4 / 11) calc(100% - 8px), calc(50% * 4 / 11) calc(100% - 6px), calc(50% * 3 / 11) calc(100% - 6px), calc(50% * 3 / 11) calc(100% - 4px), calc(50% * 2 / 11) calc(100% - 4px), calc(50% * 2 / 11) calc(100% - 2px), calc(50% * 1 / 11) calc(100% - 2px), calc(50% * 1 / 11) calc(100% - 0px), 0 100%);
+}
+
+/* Telas largas e mobile: mesma parede, sem a cauda. */
+html[data-tema='taverna'] .estandarte.fluido .pano {
+	clip-path: none;
+}
+html[data-tema='taverna'] main,
+html[data-tema='taverna'] .fluido-mobile {
+	background: var(--tijolo) 0 0 / 64px 32px, #1c1712;
+}
+
+/* ── Forma: tudo quadrado, como pixel art (só o Banner da guilda fica de fora) ── */
+html[data-tema='taverna'] :where(*):not(.banner-container, .banner-container *, svg, svg *, img) {
+	border-radius: 0 !important;
+}
+
+/* Campos "afundados" no estilo de janela de RPG. */
+html[data-tema='taverna'] :is(textarea, select, input:not([type='checkbox'], [type='radio'], [type='range'], [type='color'], [type='file'])) {
+	box-shadow: inset 2px 2px 0 rgba(0, 0, 0, 0.45);
+}
+
+/* ── Botões: bisel pixelado, cantos chanfrados, "apertar" ao clicar ──
+   Só pinta (sombras internas, filter, clip-path): tamanho e posição não mudam.
+   Ficam de fora: abas e botões que são só texto (voltar, tentar de novo...). */
+html[data-tema='taverna'] :is(button, a[class*='btn']):not([role='tab'], .voltar, .btn-voltar, .link-retry, .btn-fechar, .fechar-erro) {
+	box-shadow:
+		inset 2px 2px 0 rgba(255, 255, 255, 0.22),
+		inset -2px -2px 0 rgba(0, 0, 0, 0.38),
+		inset 0 -4px 0 rgba(0, 0, 0, 0.22);
+	clip-path: polygon(0 2px, 2px 2px, 2px 0, calc(100% - 2px) 0, calc(100% - 2px) 2px, 100% 2px, 100% calc(100% - 2px), calc(100% - 2px) calc(100% - 2px), calc(100% - 2px) 100%, 2px 100%, 2px calc(100% - 2px), 0 calc(100% - 2px));
+	transition: none;
+}
+html[data-tema='taverna'] :is(button, a[class*='btn']):not([role='tab'], .voltar, .btn-voltar, .link-retry, .btn-fechar, .fechar-erro):hover:not(:disabled) {
+	filter: brightness(1.15);
+}
+html[data-tema='taverna'] :is(button, a[class*='btn']):not([role='tab'], .voltar, .btn-voltar, .link-retry, .btn-fechar, .fechar-erro):active:not(:disabled) {
+	transform: translateY(2px);
+	filter: brightness(0.92);
+	box-shadow:
+		inset 2px 2px 0 rgba(0, 0, 0, 0.38),
+		inset -2px -2px 0 rgba(255, 255, 255, 0.12);
+}
+/* O anel de foco fica fora do botão: sem chanfro enquanto focado, para não cortá-lo. */
+html[data-tema='taverna'] :is(button, a[class*='btn']):focus-visible {
+	clip-path: none;
+}
+
+/* ── Janelas flutuantes: moldura dupla de ferro e ouro, sombra dura ── */
+html[data-tema='taverna'] :is(.modal-content, .modal-box, .box-personagem, .aviso-flutuante) {
+	box-shadow:
+		inset 0 0 0 2px var(--ferro),
+		inset 0 0 0 3px rgba(200, 160, 46, 0.35),
+		4px 4px 0 rgba(0, 0, 0, 0.6) !important;
+	background: var(--tijolo) 0 0 / 64px 32px, #221a12;
+}
+html[data-tema='taverna'] .modal-personagem {
+	background: rgba(12, 9, 6, 0.94);
+}
+html[data-tema='taverna'] .guerra {
+	background: rgba(21, 17, 13, 0.9);
+	box-shadow: inset 0 0 0 2px var(--ferro), 3px 3px 0 rgba(0, 0, 0, 0.55);
+	backdrop-filter: none;
+}
+
+/* Fundo da grade de categorias do editor (aparece na célula vazia): mais escuro. */
+html[data-tema='taverna'] .abas {
+	background: #2b2016;
+}
+
+/* ── Barra de rolagem quadrada (mesma largura de antes) ── */
+html[data-tema='taverna'] ::-webkit-scrollbar-track {
+	background: rgba(0, 0, 0, 0.35);
+}
+html[data-tema='taverna'] ::-webkit-scrollbar-thumb {
+	border-radius: 0;
+	box-shadow: inset 1px 0 0 rgba(255, 255, 255, 0.25), inset -1px 0 0 rgba(0, 0, 0, 0.35);
+}
